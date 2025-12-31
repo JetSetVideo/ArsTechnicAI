@@ -1,0 +1,10 @@
+{
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "install": "deno install --allow-scripts",
+    "dev": "deno run -A npm:next@14.2.15 dev",
+    "build": "deno run -A npm:next@14.2.15 build",
+    "start": "deno run -A npm:next@14.2.15 start",
+    "lint": "deno run -A npm:next@14.2.15 lint"
+  }
+}
