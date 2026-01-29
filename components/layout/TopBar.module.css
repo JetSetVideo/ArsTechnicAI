@@ -1,0 +1,301 @@
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--topbar-height, 48px);
+  padding: 0 0.75rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  gap: 1rem;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  -webkit-app-region: no-drag;
+}
+
+.section:nth-child(2) {
+  flex: 1;
+  justify-content: center;
+  max-width: 500px;
+}
+
+/* Project Selector (unified logo + menu button) */
+.projectSelector {
+  position: relative;
+}
+
+.projectButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.projectButton:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+.projectButton.open {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+}
+
+.projectName {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.projectButton.open .chevron {
+  transform: rotate(180deg);
+}
+
+/* Project Dropdown Menu */
+.projectMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 280px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  overflow: hidden;
+  animation: menuSlideDown 0.15s ease;
+}
+
+@keyframes menuSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menuSection {
+  padding: 0.375rem;
+}
+
+.menuLabel {
+  padding: 0.5rem 0.625rem 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.menuDivider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.menuItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.menuItem svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.menuItem span {
+  flex: 1;
+}
+
+.menuItem kbd {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  padding: 0.125rem 0.375rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+.menuItemContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+}
+
+.projectTitle {
+  font-weight: 500;
+}
+
+.projectMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.125rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.logoArs {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--text-primary);
+}
+
+.logoTechnic {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.logoAI {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-color);
+  margin: 0 0.25rem;
+}
+
+.modeNav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.modeButton {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modeButton:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.modeButton.active {
+  background: var(--accent-primary-alpha, rgba(0, 212, 170, 0.15));
+  color: var(--accent-primary);
+}
+
+.modeButton span {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .modeButton span {
+    display: inline;
+  }
+}
+
+.panelToggles {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.toggleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggleButton:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.toggleButton.active {
+  background: var(--bg-tertiary);
+  color: var(--accent-primary);
+}
+
+.actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.actions button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.hiddenInput {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}

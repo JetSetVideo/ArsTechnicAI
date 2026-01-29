@@ -1,0 +1,233 @@
+.canvasWrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.toolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.toolbarGroup + .toolbarGroup {
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--border-color);
+}
+
+.zoomLevel {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  min-width: 48px;
+  text-align: center;
+}
+
+.itemCount {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 212, 170, 0.03) 0%, transparent 70%),
+    var(--bg-primary);
+}
+
+.canvas.showGrid {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 212, 170, 0.03) 0%, transparent 70%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    var(--bg-primary);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+}
+
+.canvas.dropTarget {
+  background-color: rgba(0, 212, 170, 0.05);
+}
+
+.canvasContent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* Canvas items */
+.canvasItem {
+  position: absolute;
+  cursor: move;
+  user-select: none;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
+}
+
+.canvasItem:hover {
+  box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.3);
+}
+
+.canvasItem.selected {
+  box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+.canvasItem.locked {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.itemImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  background: var(--bg-tertiary);
+}
+
+.placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--bg-tertiary);
+  border: 2px dashed var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* Selection handles */
+.handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--accent-primary);
+  border: 1px solid var(--bg-primary);
+  border-radius: 2px;
+  cursor: nwse-resize;
+}
+
+.handleNW {
+  top: -4px;
+  left: -4px;
+  cursor: nwse-resize;
+}
+
+.handleNE {
+  top: -4px;
+  right: -4px;
+  cursor: nesw-resize;
+}
+
+.handleSW {
+  bottom: -4px;
+  left: -4px;
+  cursor: nesw-resize;
+}
+
+.handleSE {
+  bottom: -4px;
+  right: -4px;
+  cursor: nwse-resize;
+}
+
+/* Lock indicator */
+.lockIndicator {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+/* Empty state */
+.emptyState {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.emptyState svg {
+  opacity: 0.3;
+}
+
+.emptyState h3 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.emptyState p {
+  font-size: 0.875rem;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+/* Drop indicator */
+.dropIndicator {
+  position: absolute;
+  inset: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent-primary);
+  border-radius: 12px;
+  background: rgba(0, 212, 170, 0.1);
+  pointer-events: none;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.dropIndicator span {
+  padding: 0.5rem 1rem;
+  background: var(--accent-primary);
+  color: var(--bg-primary);
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}

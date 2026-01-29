@@ -1,0 +1,80 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mainArea {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Vertical resize handle (for side panels) */
+.resizeHandle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.resizeHandle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -2px;
+  right: -2px;
+}
+
+.resizeHandle:hover {
+  background: var(--accent-primary);
+}
+
+.resizeHandle:active {
+  background: var(--accent-primary);
+}
+
+/* Horizontal resize handle (for timeline) */
+.resizeHandleHorizontal {
+  height: 4px;
+  cursor: row-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.resizeHandleHorizontal::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  bottom: -2px;
+}
+
+.resizeHandleHorizontal:hover {
+  background: var(--accent-primary);
+}
+
+.resizeHandleHorizontal:active {
+  background: var(--accent-primary);
+}

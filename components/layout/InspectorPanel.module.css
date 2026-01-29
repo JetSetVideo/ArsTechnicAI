@@ -1,0 +1,206 @@
+.inspector {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Sections */
+.section {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sectionHeader:hover {
+  background: var(--bg-tertiary);
+}
+
+.sectionHeader svg {
+  flex-shrink: 0;
+}
+
+.sectionHeader span {
+  flex: 1;
+}
+
+.sectionContent {
+  padding: 0 0.75rem 0.75rem;
+}
+
+/* Form elements */
+.formGroup {
+  margin-bottom: 0.75rem;
+}
+
+.formGroup:last-child {
+  margin-bottom: 0;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.hint {
+  margin-top: 0.375rem;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.hint a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.hint a:hover {
+  text-decoration: underline;
+}
+
+.generateButton {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+/* Property grid */
+.propertyGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.property {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.propertyLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.propertyValue {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  text-align: right;
+  word-break: break-word;
+}
+
+/* Job list */
+.jobList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.jobItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.jobStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusDot.queued {
+  background: var(--text-muted);
+}
+
+.statusDot.processing {
+  background: var(--accent-tertiary);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.statusDot.completed {
+  background: var(--success-solid);
+}
+
+.statusDot.failed {
+  background: var(--error-solid);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.jobPrompt {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jobThumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
