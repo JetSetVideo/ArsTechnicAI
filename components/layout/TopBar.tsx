@@ -155,8 +155,8 @@ export const TopBar: React.FC<TopBarProps> = ({
     canvasStore.clearCanvas();
     canvasStore.resetViewport();
     
-    // Reset file store
-    fileStore.loadDemoFiles();
+    // Reset file store with default project structure
+    fileStore.initializeFileStructure('Untitled Project');
     
     // Reset project name
     onProjectNameChange('Untitled Project');

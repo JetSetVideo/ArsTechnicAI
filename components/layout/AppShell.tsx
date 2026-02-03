@@ -6,7 +6,7 @@ import { Canvas } from './Canvas';
 import { Timeline } from './Timeline';
 import { SettingsModal } from './SettingsModal';
 import { ActionLog } from './ActionLog';
-import { useLogStore } from '@/stores';
+import { useLogStore, useUserStore, useFileStore } from '@/stores';
 import styles from './AppShell.module.css';
 import type { WorkspaceMode, WorkspaceLayout } from '@/types';
 
@@ -25,9 +25,31 @@ export const AppShell: React.FC = () => {
   const [mode, setMode] = useState<WorkspaceMode>('create');
   const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [projectName, setProjectName] = useState('Untitled Project');
   const [timelineHeight, setTimelineHeight] = useState(160);
   const log = useLogStore((s) => s.log);
+  
+  // User and project management
+  const { currentProject, updateProject, refreshDeviceInfo, deviceInfo } = useUserStore();
+  const { setCurrentProject } = useFileStore();
+  const projectName = currentProject.name;
+
+  // Initialize user info and device capabilities on mount
+  useEffect(() => {
+    refreshDeviceInfo();
+    
+    // Log device info for debugging
+    console.log('[AppShell] Device info gathered:', deviceInfo);
+    
+    // Initialize file structure with current project
+    setCurrentProject(currentProject.name);
+  }, []);
+
+  // Sync project name changes with both stores
+  const setProjectName = useCallback((name: string) => {
+    updateProject({ name });
+    setCurrentProject(name);
+    log('settings_change', `Project renamed to: ${name}`, { projectName: name });
+  }, [updateProject, setCurrentProject, log]);
 
   // Refs for resize handling
   const isResizingExplorer = useRef(false);

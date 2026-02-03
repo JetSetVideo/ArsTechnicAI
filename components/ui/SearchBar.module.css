@@ -1,13 +1,13 @@
 .searchBar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: var(--bg-secondary);
+  gap: var(--space-2, 0.5rem);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-lg, 8px);
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
   transition: all 0.15s ease;
-  max-width: 400px;
+  max-width: 360px;
   width: 100%;
 }
 
@@ -22,17 +22,17 @@
 
 .scopeButtons {
   display: flex;
-  gap: 0.25rem;
+  gap: var(--space-1, 0.25rem);
 }
 
 .scopeButton {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm, 4px);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -53,7 +53,7 @@
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
   position: relative;
 }
 
@@ -68,7 +68,7 @@
   border: none;
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 0.875rem;
+  font-size: var(--font-base, 0.8125rem);
   outline: none;
   min-width: 0;
 }

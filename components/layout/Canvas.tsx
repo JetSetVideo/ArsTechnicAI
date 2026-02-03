@@ -5,12 +5,12 @@ import {
   Maximize,
   Grid3X3,
   Lock,
-  Unlock,
   Trash2,
   Copy,
   Layers,
+  ImageOff,
 } from 'lucide-react';
-import { useCanvasStore, useFileStore, useLogStore, useSettingsStore } from '@/stores';
+import { useCanvasStore, useLogStore, useSettingsStore } from '@/stores';
 import { Button } from '../ui/Button';
 import styles from './Canvas.module.css';
 import type { CanvasItem, Asset } from '@/types';
@@ -19,8 +19,9 @@ interface CanvasProps {
   showTimeline?: boolean;
 }
 
-export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
+export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = false }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const {
     items,
     selectedIds,
@@ -48,6 +49,61 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(settings.showGrid);
+  
+  // Editable filename tag state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle double-click on filename tag to start editing
+  const handleTagDoubleClick = useCallback((e: React.MouseEvent, item: CanvasItem) => {
+    e.stopPropagation();
+    setEditingItemId(item.id);
+    setEditingName(item.name);
+  }, []);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingItemId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingItemId]);
+
+  // Handle saving the edited name
+  const handleSaveName = useCallback(() => {
+    if (editingItemId && editingName.trim()) {
+      updateItem(editingItemId, { name: editingName.trim() });
+      log('canvas_move', `Renamed item to: ${editingName.trim()}`);
+    }
+    setEditingItemId(null);
+    setEditingName('');
+  }, [editingItemId, editingName, updateItem, log]);
+
+  // Handle click outside to stop editing
+  useEffect(() => {
+    if (!editingItemId) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(`.${styles.filenameEditInput}`)) {
+        handleSaveName();
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [editingItemId, handleSaveName]);
+
+  // Handle keyboard events for editing
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveName();
+    } else if (e.key === 'Escape') {
+      setEditingItemId(null);
+      setEditingName('');
+    }
+  }, [handleSaveName]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -334,55 +390,135 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
           }}
         >
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className={`${styles.canvasItem} ${
-                selectedIds.includes(item.id) ? styles.selected : ''
-              } ${item.locked ? styles.locked : ''}`}
-              style={{
-                left: item.x,
-                top: item.y,
-                width: item.width * item.scale,
-                height: item.height * item.scale,
-                transform: `rotate(${item.rotation}deg)`,
-                zIndex: item.zIndex,
-                opacity: item.visible ? 1 : 0.3,
-              }}
-              onMouseDown={(e) => handleItemMouseDown(e, item)}
-            >
-              {item.src ? (
-                <img
-                  src={item.src}
-                  alt={item.name}
-                  className={styles.itemImage}
-                  draggable={false}
-                />
-              ) : (
-                <div className={styles.placeholder}>
-                  <Layers size={32} />
-                  <span>{item.name}</span>
-                </div>
-              )}
+          {items.map((item) => {
+            // Check if item has a valid src and hasn't failed to load
+            const hasValidSrc = item.src && item.src.length > 10 && !failedImages.has(item.id);
+            
+            // Debug log for each item
+            if (process.env.NODE_ENV === 'development' && item.src) {
+              console.log(`[Canvas] Rendering item: ${item.name}`, {
+                hasSrc: !!item.src,
+                srcLength: item.src?.length,
+                srcType: item.src?.slice(0, 30),
+                isFailed: failedImages.has(item.id),
+                willShowImage: hasValidSrc,
+              });
+            }
+            
+            return (
+              <div
+                key={item.id}
+                className={`${styles.canvasItem} ${
+                  selectedIds.includes(item.id) ? styles.selected : ''
+                } ${item.locked ? styles.locked : ''}`}
+                style={{
+                  left: item.x,
+                  top: item.y,
+                  width: item.width * item.scale,
+                  height: item.height * item.scale,
+                  transform: `rotate(${item.rotation}deg)`,
+                  zIndex: item.zIndex,
+                  opacity: item.visible ? 1 : 0.3,
+                }}
+                onMouseDown={(e) => handleItemMouseDown(e, item)}
+              >
+                {/* Filename tag - top left corner outside the item */}
+                {settings.appearance?.showFilenames !== false && (
+                  editingItemId === item.id ? (
+                    <input
+                      ref={editInputRef}
+                      type="text"
+                      className={styles.filenameEditInput}
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onKeyDown={handleEditKeyDown}
+                      onBlur={handleSaveName}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div 
+                      className={styles.filenameTag} 
+                      title={`${item.name} (double-click to rename)`}
+                      onDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                    >
+                      {item.name.length > 30 ? `${item.name.slice(0, 27)}...` : item.name}
+                    </div>
+                  )
+                )}
 
-              {/* Selection handles */}
-              {selectedIds.includes(item.id) && !item.locked && (
-                <>
-                  <div className={`${styles.handle} ${styles.handleNW}`} />
-                  <div className={`${styles.handle} ${styles.handleNE}`} />
-                  <div className={`${styles.handle} ${styles.handleSW}`} />
-                  <div className={`${styles.handle} ${styles.handleSE}`} />
-                </>
-              )}
-
-              {/* Lock indicator */}
-              {item.locked && (
-                <div className={styles.lockIndicator}>
-                  <Lock size={12} />
+                {/* Content wrapper */}
+                <div className={styles.itemContent}>
+                  {hasValidSrc ? (
+                    <img
+                      src={item.src}
+                      alt={item.name}
+                      className={styles.itemImage}
+                      draggable={false}
+                      onError={() => {
+                        // Mark this image as failed
+                        console.error(`[Canvas] Failed to load image: ${item.name}`, {
+                          srcPreview: item.src?.slice(0, 100),
+                          srcLength: item.src?.length,
+                        });
+                        setFailedImages(prev => new Set(prev).add(item.id));
+                      }}
+                      onLoad={() => {
+                        // Image loaded successfully - remove from failed set if it was there
+                        console.log(`[Canvas] Image loaded successfully: ${item.name}`);
+                        if (failedImages.has(item.id)) {
+                          setFailedImages(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(item.id);
+                            return newSet;
+                          });
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className={styles.placeholder}>
+                      {failedImages.has(item.id) ? (
+                        <>
+                          <ImageOff size={32} />
+                          <span>Failed to load</span>
+                          <span className={styles.placeholderName}>{item.name}</span>
+                        </>
+                      ) : !item.src ? (
+                        <>
+                          <Layers size={32} />
+                          <span>No image source</span>
+                          <span className={styles.placeholderName}>{item.name}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Layers size={32} />
+                          <span>Loading...</span>
+                          <span className={styles.placeholderName}>{item.name}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Selection handles */}
+                {selectedIds.includes(item.id) && !item.locked && (
+                  <>
+                    <div className={`${styles.handle} ${styles.handleNW}`} />
+                    <div className={`${styles.handle} ${styles.handleNE}`} />
+                    <div className={`${styles.handle} ${styles.handleSW}`} />
+                    <div className={`${styles.handle} ${styles.handleSE}`} />
+                  </>
+                )}
+
+                {/* Lock indicator */}
+                {item.locked && (
+                  <div className={styles.lockIndicator}>
+                    <Lock size={12} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Empty state */}

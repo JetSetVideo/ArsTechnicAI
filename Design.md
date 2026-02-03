@@ -2,6 +2,8 @@
 
 This document defines **UI/UX rules**, **interaction patterns**, and **CSS specifications** for Ars TechnicAI (Deno 2 + Next.js + TypeScript). It is written as a **desktop-grade product spec** for **Windows/macOS + browser**, optimized for **keyboard + mouse** input today.
 
+> **Implementation Status**: Most design specs are implemented. See `ARCHITECTURE.md` for UX analysis and recommendations.
+
 Also see: `Structure.md` (module boundaries, naming, file layout).
 
 ---
@@ -557,3 +559,114 @@ Each mode defines:
   - Unit: pure functions, parsers, adapters
   - Integration: explorer CRUD, canvas graph ops, timeline edits
 
+---
+
+## Current Implementation Status (February 2026)
+
+### Implemented Design Tokens
+
+```css
+/* Typography Scale (user-configurable) */
+--font-scale: 1;                    /* 0.875 | 1 | 1.125 */
+--font-2xs: calc(0.625rem * var(--font-scale));
+--font-xs: calc(0.6875rem * var(--font-scale));
+--font-sm: calc(0.75rem * var(--font-scale));
+--font-base: calc(0.8125rem * var(--font-scale));
+--font-md: calc(0.875rem * var(--font-scale));
+--font-lg: calc(1rem * var(--font-scale));
+
+/* Spacing Scale */
+--space-1: 0.25rem;
+--space-2: 0.5rem;
+--space-3: 0.75rem;
+--space-4: 1rem;
+--space-5: 1.25rem;
+--space-6: 1.5rem;
+--space-8: 2rem;
+
+/* Component-specific spacing */
+--panel-padding: var(--space-3);
+--input-padding-x: var(--space-3);
+--input-padding-y: var(--space-2);
+--button-padding-x: var(--space-3);
+--button-padding-y: var(--space-2);
+
+/* Border Radius */
+--radius-sm: 4px;
+--radius-md: 6px;
+--radius-lg: 8px;
+--radius-xl: 12px;
+```
+
+### Responsive Breakpoints
+
+| Breakpoint | Width | Changes |
+|------------|-------|---------|
+| Large Desktop | > 1440px | Wider panels, generous spacing |
+| Desktop | 1024-1440px | Default settings |
+| Tablet Landscape | 768-1024px | Reduced sizes, 95% font |
+| Tablet Portrait | 640-768px | Compact layout, 90% font |
+| Mobile | < 640px | Full-width panels, 87.5% font |
+| Touch devices | (hover: none) | 44px minimum touch targets |
+
+### User-Configurable Appearance
+
+Users can adjust in Settings > Appearance:
+
+1. **Font Size**: Small (87.5%) / Medium (100%) / Large (112.5%)
+2. **Compact Mode**: Reduces all spacing by ~30%
+3. **Show Filenames**: Toggle filename tags on canvas items
+
+### Component Implementation Status
+
+| Component | Spec | Implementation | Notes |
+|-----------|------|----------------|-------|
+| Button | ✅ | ✅ | All variants, sizes |
+| Input | ✅ | ✅ | With icons, validation |
+| SearchBar | ✅ | ✅ | Scope chips, shortcuts |
+| Toast | ✅ | ✅ | Error codes, progress |
+| TopBar | ✅ | ✅ | Mode switcher, menu |
+| Explorer | ✅ | ✅ | Tree, drag-drop |
+| Canvas | ✅ | ✅ | Pan/zoom, selection |
+| Inspector | ✅ | ✅ | Forms, properties |
+| Timeline | ⚠️ | ✅ UI | No playback engine |
+| Modal | ✅ | ✅ | Focus trap, escape |
+| Tooltip | ❌ | ❌ | Not implemented |
+| Combobox | ❌ | ❌ | Using native select |
+
+### Accessibility Status
+
+| Requirement | Status |
+|-------------|--------|
+| Keyboard navigation | ✅ Implemented |
+| Focus management | ✅ Implemented |
+| ARIA roles | ⚠️ Partial |
+| Color contrast | ⚠️ Check needed |
+| Reduced motion | ❌ Not implemented |
+| Screen reader | ⚠️ Partial |
+
+---
+
+## UX Improvements Needed
+
+Based on the critical analysis in `ARCHITECTURE.md`:
+
+### High Priority
+
+1. **Add skeleton loaders** for async content
+2. **Improve empty states** with clear call-to-actions
+3. **Add contextual tooltips** for complex controls
+4. **Implement keyboard shortcut hints** in menus
+
+### Medium Priority
+
+1. **Add first-run tutorial** overlay
+2. **Implement drag preview** improvements
+3. **Add progress indicators** for long operations
+4. **Improve error message** specificity
+
+### Low Priority
+
+1. **Add themes** beyond dark mode
+2. **Implement custom keyboard shortcuts**
+3. **Add animation preferences** (reduced motion)

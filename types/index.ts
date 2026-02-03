@@ -152,8 +152,16 @@ export interface AIProviderSettings {
   defaultGuidanceScale: number;
 }
 
+export interface AppearanceSettings {
+  fontSize: 'small' | 'medium' | 'large';
+  fontScale: number; // 0.875 | 1 | 1.125
+  compactMode: boolean;
+  showFilenames: boolean;
+}
+
 export interface AppSettings {
   theme: 'dark' | 'light' | 'system';
+  appearance: AppearanceSettings;
   aiProvider: AIProviderSettings;
   outputDirectory: string;
   autoSavePrompts: boolean;

@@ -155,17 +155,17 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({
 };
 
 export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
-  const { rootNodes, loadDemoFiles, importFiles } = useFileStore();
+  const { rootNodes, initializeFileStructure, importFiles } = useFileStore();
   const log = useLogStore((s) => s.log);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [filter, setFilter] = useState('');
 
-  // Load demo files on mount
+  // Initialize file structure on mount
   useEffect(() => {
     if (rootNodes.length === 0) {
-      loadDemoFiles();
+      initializeFileStructure('Untitled Project');
     }
-  }, [rootNodes.length, loadDemoFiles]);
+  }, [rootNodes.length, initializeFileStructure]);
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click();

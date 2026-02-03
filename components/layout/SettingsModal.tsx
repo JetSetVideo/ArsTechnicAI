@@ -16,7 +16,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { settings, updateSettings, updateAIProvider, resetSettings } =
+  const { settings, updateSettings, updateAIProvider, updateAppearance, resetSettings } =
     useSettingsStore();
   const log = useLogStore((s) => s.log);
 
@@ -63,7 +63,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h2>Settings</h2>
-          <button className={styles.closeButton} onClick={onClose}>
+          <button type="button" className={styles.closeButton} onClick={onClose}>
             <X size={20} />
           </button>
         </div>
@@ -72,6 +72,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <nav className={styles.tabs}>
             {tabs.map((tab) => (
               <button
+                type="button"
                 key={tab.id}
                 className={`${styles.tab} ${
                   activeTab === tab.id ? styles.active : ''
@@ -169,6 +170,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {(['dark', 'light', 'system'] as const).map((theme) => (
                     <button
                       key={theme}
+                      type="button"
                       className={`${styles.themeOption} ${
                         settings.theme === theme ? styles.active : ''
                       }`}
@@ -178,6 +180,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   ))}
                 </div>
+
+                <h3>Font Size</h3>
+                <p className={styles.description}>
+                  Adjust the interface text size for better readability.
+                </p>
+                <div className={styles.fontSizeOptions}>
+                  {(['small', 'medium', 'large'] as const).map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      className={`${styles.fontSizeOption} ${
+                        settings.appearance?.fontSize === size ? styles.active : ''
+                      }`}
+                      onClick={() => updateAppearance({ fontSize: size })}
+                    >
+                      <span className={styles.fontSizeLabel}>{size.charAt(0).toUpperCase() + size.slice(1)}</span>
+                      <span className={styles.fontSizePreview} style={{ fontSize: size === 'small' ? '12px' : size === 'medium' ? '14px' : '16px' }}>Aa</span>
+                    </button>
+                  ))}
+                </div>
+
+                <h3>Display</h3>
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={settings.appearance?.compactMode || false}
+                    onChange={(e) =>
+                      updateAppearance({ compactMode: e.target.checked })
+                    }
+                  />
+                  <span>Compact mode (reduced spacing)</span>
+                </label>
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={settings.appearance?.showFilenames ?? true}
+                    onChange={(e) =>
+                      updateAppearance({ showFilenames: e.target.checked })
+                    }
+                  />
+                  <span>Show filenames on canvas items</span>
+                </label>
 
                 <h3>Canvas</h3>
                 <label className={styles.checkbox}>

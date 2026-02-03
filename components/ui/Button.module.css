@@ -74,21 +74,21 @@
 
 /* Sizes */
 .sm {
-  height: 28px;
-  padding: 0 0.75rem;
-  font-size: 0.75rem;
+  height: 26px;
+  padding: 0 var(--button-padding-x, 0.625rem);
+  font-size: var(--font-sm, 0.75rem);
 }
 
 .md {
-  height: 36px;
-  padding: 0 1rem;
-  font-size: 0.875rem;
+  height: 32px;
+  padding: 0 var(--button-padding-x, 0.875rem);
+  font-size: var(--font-base, 0.8125rem);
 }
 
 .lg {
-  height: 44px;
-  padding: 0 1.5rem;
-  font-size: 1rem;
+  height: 40px;
+  padding: 0 var(--space-4, 1rem);
+  font-size: var(--font-md, 0.875rem);
 }
 
 /* Icon */

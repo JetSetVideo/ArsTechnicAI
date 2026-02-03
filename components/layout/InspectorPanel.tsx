@@ -3,12 +3,8 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
-  Copy,
-  Save,
   History,
   Palette,
-  ImagePlus,
-  Trash2,
   Settings2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -19,9 +15,12 @@ import {
   useSettingsStore,
   useLogStore,
   useFileStore,
+  useToastStore,
+  ERROR_CODES,
+  parseAPIError,
 } from '@/stores';
 import styles from './InspectorPanel.module.css';
-import type { CanvasItem, GenerationResult } from '@/types';
+import type { GenerationResult } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface InspectorPanelProps {
@@ -33,6 +32,7 @@ interface CollapsibleSectionProps {
   title: string;
   icon?: React.ReactNode;
   defaultOpen?: boolean;
+  expandable?: boolean; // If true, section can grow to fill available space
   children: React.ReactNode;
 }
 
@@ -40,13 +40,21 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   title,
   icon,
   defaultOpen = true,
+  expandable = false,
   children,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
 
+  const sectionClasses = [
+    styles.section,
+    open ? styles.expanded : '',
+    expandable && open ? styles.expandable : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={styles.section}>
+    <div className={sectionClasses}>
       <button
+        type="button"
         className={styles.sectionHeader}
         onClick={() => setOpen(!open)}
       >
@@ -79,25 +87,102 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   } = useGenerationStore();
 
   const { settings } = useSettingsStore();
-  const { addItem } = useCanvasStore();
-  const { addAsset } = useFileStore();
+  const { addItem, updateItem } = useCanvasStore();
+  const { addAssetToFolder, updateAsset, getProjectGeneratedPath } = useFileStore();
   const log = useLogStore((s) => s.log);
+  const toast = useToastStore();
   const selectedItems = useCanvasStore((s) => s.getSelectedItems());
   const selectedItem = selectedItems[0];
 
-  const handleGenerate = useCallback(async () => {
-    if (!prompt.trim()) return;
+  // Handler for renaming selected item
+  const handleRenameItem = useCallback((newName: string) => {
+    if (selectedItem && newName.trim()) {
+      updateItem(selectedItem.id, { name: newName.trim() });
+      // Also update the asset if it exists
+      if (selectedItem.assetId) {
+        updateAsset(selectedItem.assetId, { name: newName.trim() });
+      }
+      log('canvas_move', `Renamed item to: ${newName.trim()}`);
+    }
+  }, [selectedItem, updateItem, updateAsset, log]);
 
-    if (!settings.aiProvider.apiKey) {
-      alert('Please enter your NanoBanana API key in Settings (⌘,)');
+  // Handler for updating position
+  const handleUpdatePosition = useCallback((axis: 'x' | 'y', value: number) => {
+    if (selectedItem) {
+      updateItem(selectedItem.id, { [axis]: value });
+    }
+  }, [selectedItem, updateItem]);
+
+  // Handler for updating scale
+  const handleUpdateScale = useCallback((value: number) => {
+    if (selectedItem) {
+      updateItem(selectedItem.id, { scale: Math.max(0.1, Math.min(5, value)) });
+    }
+  }, [selectedItem, updateItem]);
+
+  // Handler for updating rotation
+  const handleUpdateRotation = useCallback((value: number) => {
+    if (selectedItem) {
+      updateItem(selectedItem.id, { rotation: value % 360 });
+    }
+  }, [selectedItem, updateItem]);
+
+  const handleGenerate = useCallback(async () => {
+    // ═══════════════════════════════════════════════════════════
+    // VALIDATION PHASE - Check all inputs before making request
+    // ═══════════════════════════════════════════════════════════
+    
+    // Check for empty prompt
+    if (!prompt.trim()) {
+      const err = ERROR_CODES.EMPTY_PROMPT;
+      toast.error(err.title, err.message);
       return;
     }
 
+    // Check for API key
+    if (!settings.aiProvider.apiKey) {
+      const err = ERROR_CODES.MISSING_API_KEY;
+      toast.addToast({
+        type: 'error',
+        title: err.title,
+        message: err.message,
+        action: {
+          label: 'Open Settings',
+          onClick: onOpenSettings,
+        },
+      });
+      return;
+    }
+
+    // Validate dimensions
+    if (genWidth < 256 || genWidth > 2048 || genHeight < 256 || genHeight > 2048) {
+      const err = ERROR_CODES.INVALID_DIMENSIONS;
+      toast.error(err.title, err.message);
+      return;
+    }
+
+    // Check prompt length (most APIs have limits)
+    if (prompt.length > 4000) {
+      const err = ERROR_CODES.PROMPT_TOO_LONG;
+      toast.error(err.title, err.message);
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // GENERATION PHASE - Start the generation job
+    // ═══════════════════════════════════════════════════════════
+    
     log('generation_start', `Started generating: "${prompt.slice(0, 50)}..."`, {
       prompt,
       width: genWidth,
       height: genHeight,
     });
+
+    toast.info(
+      'Generation Started',
+      `Creating: "${prompt.slice(0, 40)}${prompt.length > 40 ? '...' : ''}"`,
+      3000
+    );
 
     const job = startGeneration({
       prompt,
@@ -107,8 +192,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       model: settings.aiProvider.model,
     });
 
+    // ═══════════════════════════════════════════════════════════
+    // REQUEST PHASE - Make the API call with timeout
+    // ═══════════════════════════════════════════════════════════
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
     try {
-      // Call our API route
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,14 +210,73 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           height: genHeight,
           apiKey: settings.aiProvider.apiKey,
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
+      // ═══════════════════════════════════════════════════════════
+      // ERROR HANDLING - Parse response errors
+      // ═══════════════════════════════════════════════════════════
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Generation failed');
+        let errorBody: any = {};
+        try {
+          errorBody = await response.json();
+        } catch {
+          // Response might not be JSON
+        }
+
+        // Parse the error code from status and body
+        const errorCode = parseAPIError(response.status, errorBody);
+        const errorInfo = ERROR_CODES[errorCode];
+        
+        // Use specific message from API if available
+        const errorMessage = errorBody.error || errorBody.message || errorInfo.message;
+        
+        toast.error(errorInfo.title, errorMessage);
+        failJob(job.id, errorMessage);
+        log('generation_fail', `Generation failed: ${errorMessage}`, { 
+          error: errorMessage,
+          status: response.status,
+          errorCode,
+        });
+        return;
       }
 
+      // ═══════════════════════════════════════════════════════════
+      // SUCCESS PHASE - Process the generated image
+      // ═══════════════════════════════════════════════════════════
+      
       const result = await response.json();
+
+      // Debug: Log the result
+      console.log('[Generation] API Response:', {
+        hasDataUrl: !!result.dataUrl,
+        dataUrlLength: result.dataUrl?.length || 0,
+        dataUrlPreview: result.dataUrl?.slice(0, 50),
+        hasImageUrl: !!result.imageUrl,
+        seed: result.seed,
+      });
+
+      // Validate we got an actual image
+      const imageSrc = result.dataUrl || result.imageUrl;
+      if (!imageSrc) {
+        const err = ERROR_CODES.GENERATION_FAILED;
+        toast.error(err.title, 'No image was returned from the API.');
+        failJob(job.id, 'No image returned');
+        log('generation_fail', 'Generation failed: No image returned', { error: 'No image returned' });
+        return;
+      }
+
+      // Validate the data URL format
+      if (result.dataUrl && !result.dataUrl.startsWith('data:')) {
+        console.error('[Generation] Invalid dataUrl format:', result.dataUrl.slice(0, 100));
+        toast.error('Generation Failed', 'Received invalid image data format.');
+        failJob(job.id, 'Invalid image data format');
+        log('generation_fail', 'Generation failed: Invalid image format', { error: 'Invalid format' });
+        return;
+      }
 
       // Create a proper result object
       const generationResult: GenerationResult = {
@@ -151,6 +301,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         .slice(0, 30);
       const filename = `gen_${promptSlug}_${timestamp}.png`;
 
+      console.log('[Generation] Adding to canvas:', {
+        filename,
+        srcLength: imageSrc.length,
+        srcPreview: imageSrc.slice(0, 80),
+      });
+
       // Add to canvas
       const canvasItem = addItem({
         type: 'generated',
@@ -162,28 +318,45 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         scale: 0.5,
         locked: false,
         visible: true,
-        src: result.dataUrl || result.imageUrl,
+        src: imageSrc,
         prompt,
         name: filename,
       });
 
-      // Add to file system
-      addAsset({
-        id: uuidv4(),
-        name: filename,
-        type: 'image',
-        path: `/generated/${filename}`,
-        createdAt: Date.now(),
-        modifiedAt: Date.now(),
-        thumbnail: result.dataUrl || result.imageUrl,
-        metadata: {
-          width: genWidth,
-          height: genHeight,
-          prompt,
-          model: settings.aiProvider.model,
-          seed: generationResult.seed,
+      console.log('[Generation] Canvas item created:', canvasItem?.id);
+
+      // Add to file system and project folder
+      const generatedFolderPath = getProjectGeneratedPath();
+      const assetId = uuidv4();
+      
+      console.log('[Generation] Adding to folder:', generatedFolderPath);
+      
+      addAssetToFolder(
+        {
+          id: assetId,
+          name: filename,
+          type: 'image',
+          path: `${generatedFolderPath}/${filename}`,
+          createdAt: Date.now(),
+          modifiedAt: Date.now(),
+          thumbnail: imageSrc,
+          metadata: {
+            width: genWidth,
+            height: genHeight,
+            prompt,
+            model: settings.aiProvider.model,
+            seed: generationResult.seed,
+          },
         },
-      });
+        generatedFolderPath
+      );
+
+      // Show success toast
+      toast.success(
+        'Image Generated',
+        `Successfully created: ${filename}`,
+        5000
+      );
 
       log('generation_complete', `Generated: ${filename}`, {
         prompt,
@@ -196,9 +369,51 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         log('prompt_save', `Saved prompt: "${prompt.slice(0, 30)}..."`, { prompt });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      failJob(job.id, message);
-      log('generation_fail', `Generation failed: ${message}`, { error: message });
+      clearTimeout(timeoutId);
+      
+      // ═══════════════════════════════════════════════════════════
+      // CATCH-ALL ERROR HANDLING
+      // ═══════════════════════════════════════════════════════════
+      
+      let errorTitle: string;
+      let errorMessage: string;
+      let errorCode: string;
+
+      if (error instanceof Error) {
+        // Handle abort/timeout
+        if (error.name === 'AbortError') {
+          const err = ERROR_CODES.TIMEOUT;
+          errorTitle = err.title;
+          errorMessage = err.message;
+          errorCode = 'TIMEOUT';
+        }
+        // Handle network errors
+        else if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+          const err = ERROR_CODES.NETWORK_ERROR;
+          errorTitle = err.title;
+          errorMessage = err.message;
+          errorCode = 'NETWORK_ERROR';
+        }
+        // Handle other errors
+        else {
+          const err = ERROR_CODES.UNKNOWN_ERROR;
+          errorTitle = err.title;
+          errorMessage = error.message || err.message;
+          errorCode = 'UNKNOWN_ERROR';
+        }
+      } else {
+        const err = ERROR_CODES.UNKNOWN_ERROR;
+        errorTitle = err.title;
+        errorMessage = err.message;
+        errorCode = 'UNKNOWN_ERROR';
+      }
+
+      toast.error(errorTitle, errorMessage);
+      failJob(job.id, errorMessage);
+      log('generation_fail', `Generation failed: ${errorMessage}`, { 
+        error: errorMessage,
+        errorCode,
+      });
     }
   }, [
     prompt,
@@ -211,8 +426,11 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     completeJob,
     failJob,
     addItem,
-    addAsset,
+    addAssetToFolder,
+    getProjectGeneratedPath,
     log,
+    toast,
+    onOpenSettings,
   ]);
 
   const recentJobs = jobs.slice(0, 5);
@@ -299,31 +517,89 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           <CollapsibleSection
             title="Selected Item"
             icon={<Palette size={14} />}
-            defaultOpen={true}
+            defaultOpen
           >
             <div className={styles.propertyGrid}>
-              <div className={styles.property}>
-                <span className={styles.propertyLabel}>Name</span>
-                <span className={styles.propertyValue}>{selectedItem.name}</span>
+              {/* Editable Name */}
+              <div className={styles.formGroup}>
+                <Input
+                  label="Name"
+                  value={selectedItem.name}
+                  onChange={(e) => handleRenameItem(e.target.value)}
+                  placeholder="Item name..."
+                />
               </div>
-              <div className={styles.property}>
-                <span className={styles.propertyLabel}>Position</span>
-                <span className={styles.propertyValue}>
-                  {Math.round(selectedItem.x)}, {Math.round(selectedItem.y)}
-                </span>
+
+              {/* Position */}
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <Input
+                    label="X"
+                    type="number"
+                    value={Math.round(selectedItem.x)}
+                    onChange={(e) => handleUpdatePosition('x', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <Input
+                    label="Y"
+                    type="number"
+                    value={Math.round(selectedItem.y)}
+                    onChange={(e) => handleUpdatePosition('y', parseInt(e.target.value) || 0)}
+                  />
+                </div>
               </div>
+
+              {/* Size (read-only for now, just display) */}
               <div className={styles.property}>
-                <span className={styles.propertyLabel}>Size</span>
+                <span className={styles.propertyLabel}>Original Size</span>
                 <span className={styles.propertyValue}>
                   {selectedItem.width} × {selectedItem.height}
                 </span>
               </div>
+
+              {/* Scale and Rotation */}
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <Input
+                    label="Scale"
+                    type="number"
+                    value={selectedItem.scale.toFixed(2)}
+                    onChange={(e) => handleUpdateScale(parseFloat(e.target.value) || 1)}
+                    min={0.1}
+                    max={5}
+                    step={0.1}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <Input
+                    label="Rotation"
+                    type="number"
+                    value={Math.round(selectedItem.rotation)}
+                    onChange={(e) => handleUpdateRotation(parseInt(e.target.value) || 0)}
+                    min={-360}
+                    max={360}
+                    step={1}
+                  />
+                </div>
+              </div>
+
+              {/* Prompt (if generated) */}
               {selectedItem.prompt && (
                 <div className={styles.property}>
                   <span className={styles.propertyLabel}>Prompt</span>
                   <span className={styles.propertyValue}>{selectedItem.prompt}</span>
                 </div>
               )}
+
+              {/* Item type indicator */}
+              <div className={styles.property}>
+                <span className={styles.propertyLabel}>Type</span>
+                <span className={styles.propertyValue}>
+                  {selectedItem.type === 'generated' ? 'AI Generated' : 
+                   selectedItem.type === 'image' ? 'Imported Image' : 'Placeholder'}
+                </span>
+              </div>
             </div>
           </CollapsibleSection>
         )}

@@ -57,9 +57,26 @@ For detailed component specs and CSS terms, see `Design.md`.
 - **Framework**: Next.js 14 (Pages Router)
 - **Language**: TypeScript (strict)
 - **UI**: React 18
+- **State Management**: Zustand with persistence middleware
 - **Styling**: CSS Variables + CSS Modules
+- **Icons**: Lucide React
 
-> Planned (not necessarily implemented yet): Zustand for state, Framer Motion for micro-interactions, Three.js/WebGL for canvas shaders/transitions, WebAudio for waveforms, ffmpeg-based processing (server-side or native wrapper), provider SDK adapters.
+### Current Implementation Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| App Shell | ✅ Complete | Resizable panels, responsive |
+| Explorer Panel | ✅ Complete | File tree, import, drag-drop |
+| Canvas | ✅ Complete | Infinite pan/zoom, item management |
+| Inspector | ✅ Complete | Generation form, properties |
+| Timeline | ⚠️ UI Only | Visual only, no playback |
+| AI Generation | ✅ Complete | Google Imagen integration |
+| Settings | ✅ Complete | API keys, appearance, shortcuts |
+| Action Log | ✅ Complete | Activity tracking |
+| Toast Notifications | ✅ Complete | Error handling with codes |
+| User Profiling | ✅ Complete | Anonymous device/session info |
+
+> **Roadmap**: ffmpeg-based video processing, WebGL canvas renderer, collaborative editing, cloud sync. See `ARCHITECTURE.md` for detailed analysis.
 
 ---
 
@@ -103,13 +120,34 @@ ARSTECHNICAI_SENTRY_DSN=
 
 ## Repository map
 
-Current structure (early-stage):
+```
+/
+├── components/
+│   ├── layout/          # App shell: TopBar, Explorer, Canvas, Inspector, Timeline
+│   └── ui/              # Primitives: Button, Input, Toast, SearchBar
+├── stores/              # Zustand state management
+│   ├── canvasStore.ts   # Canvas items, viewport, selection
+│   ├── fileStore.ts     # File tree, assets, project structure
+│   ├── generationStore.ts # AI generation jobs
+│   ├── logStore.ts      # Action history
+│   ├── settingsStore.ts # App configuration
+│   ├── toastStore.ts    # Notifications
+│   └── userStore.ts     # User session, device info
+├── pages/
+│   ├── api/             # API routes (generate, test-image)
+│   └── index.tsx        # Main app entry
+├── types/               # TypeScript definitions
+├── styles/              # Global CSS + design tokens
+└── [config files]       # deno.json, tsconfig, next.config
+```
 
-- `pages/`: Next.js routes
-- `styles/`: global CSS + CSS Modules
-- `deno.json`: Deno tasks (authoritative dev workflow)
+### Documentation
 
-Target structure and module boundaries are documented in `Structure.md`.
+- `README.md` — What it is + how to run
+- `Design.md` — UI/UX specs + CSS standards
+- `Prompt.md` — PRD + feature inventory
+- `Structure.md` — Module boundaries + naming conventions
+- `ARCHITECTURE.md` — **Critical analysis + technical roadmap**
 
 ---
 
