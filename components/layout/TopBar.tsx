@@ -221,153 +221,142 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header className={styles.topBar}>
-      {/* Left section - Project Menu & Logo */}
-      <div className={styles.section}>
-        {/* Unified Project Button (Logo + Menu) */}
-        <div className={styles.projectSelector} ref={menuRef}>
-          <button
-            className={`${styles.projectButton} ${menuOpen ? styles.open : ''}`}
-            onClick={() => setMenuOpen(!menuOpen)}
-            title="Project Menu"
-          >
-            <div className={styles.logo}>
-              <span className={styles.logoArs}>Ars</span>
-              <span className={styles.logoTechnic}>Technic</span>
-              <span className={styles.logoAI}>AI</span>
-            </div>
-            <span className={styles.projectName}>{projectName}</span>
-            <ChevronDown size={14} className={styles.chevron} />
-          </button>
-
-          {/* Project Dropdown Menu */}
-          {menuOpen && (
-            <div className={styles.projectMenu}>
-              <div className={styles.menuSection}>
-                <button className={styles.menuItem} onClick={handleNewProject}>
-                  <FolderPlus size={14} />
-                  <span>New Project</span>
-                  <kbd>⌘N</kbd>
-                </button>
-                <button className={styles.menuItem} onClick={handleOpenProjectClick}>
-                  <FolderOpen size={14} />
-                  <span>Open Project...</span>
-                  <kbd>⌘O</kbd>
-                </button>
-                <button className={styles.menuItem} onClick={handleSave}>
-                  <Save size={14} />
-                  <span>Save Project</span>
-                  <kbd>⌘S</kbd>
-                </button>
-              </div>
-
-              <div className={styles.menuDivider} />
-
-              <div className={styles.menuSection}>
-                <div className={styles.menuLabel}>Recent Projects</div>
-                {recentProjects.map((project) => (
-                  <button
-                    key={project.id}
-                    className={styles.menuItem}
-                    onClick={() => handleOpenRecentProject(project.name)}
-                  >
-                    <FileText size={14} />
-                    <span className={styles.menuItemContent}>
-                      <span className={styles.projectTitle}>{project.name}</span>
-                      <span className={styles.projectMeta}>
-                        <Clock size={10} />
-                        {project.lastModified}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className={styles.menuDivider} />
-
-              <div className={styles.menuSection}>
-                <button className={styles.menuItem} onClick={onOpenSettings}>
-                  <Settings size={14} />
-                  <span>Settings</span>
-                  <kbd>⌘,</kbd>
-                </button>
-              </div>
-            </div>
-          )}
+      {/* Top row: App name | Search | Panel toggles tag */}
+      <div className={styles.row}>
+        <div className={styles.appName}>
+          <span className={styles.logoArs}>Ars</span>
+          <span className={styles.logoTechnic}>Technic</span>
+          <span className={styles.logoAI}>AI</span>
         </div>
 
-        <div className={styles.divider} />
+        <div className={styles.searchWrap}>
+          <SearchBar onSearch={handleSearch} placeholder="Search files or Google images..." />
+        </div>
 
-        {/* Mode switcher */}
-        <nav className={styles.modeNav}>
-          {modes.map((mode) => (
-            <button
-              key={mode.id}
-              className={`${styles.modeButton} ${
-                currentMode === mode.id ? styles.active : ''
-              }`}
-              onClick={() => onModeChange(mode.id)}
-              title={mode.label}
-            >
-              {mode.icon}
-              <span>{mode.label}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Center section - Search */}
-      <div className={styles.section}>
-        <SearchBar onSearch={handleSearch} placeholder="Search files or Google images..." />
-      </div>
-
-      {/* Right section - Panel toggles & Settings */}
-      <div className={styles.section}>
-        <div className={styles.panelToggles}>
+        <div className={styles.panelTag}>
           <button
-            className={`${styles.toggleButton} ${
-              explorerVisible ? styles.active : ''
-            }`}
+            className={`${styles.toggleButton} ${explorerVisible ? styles.active : ''}`}
             onClick={onToggleExplorer}
             title="Toggle Explorer (⌘1)"
           >
             <PanelLeft size={18} />
           </button>
           <button
-            className={`${styles.toggleButton} ${
-              timelineVisible ? styles.active : ''
-            }`}
+            className={`${styles.toggleButton} ${timelineVisible ? styles.active : ''}`}
             onClick={onToggleTimeline}
             title="Toggle Timeline (⌘2)"
           >
             <PanelBottom size={18} />
           </button>
           <button
-            className={`${styles.toggleButton} ${
-              inspectorVisible ? styles.active : ''
-            }`}
+            className={`${styles.toggleButton} ${inspectorVisible ? styles.active : ''}`}
             onClick={onToggleInspector}
             title="Toggle Inspector (⌘3)"
           >
             <PanelRight size={18} />
           </button>
         </div>
+      </div>
 
-        <div className={styles.divider} />
+      {/* Bottom row: Project menu + mode nav | Settings + Help */}
+      <div className={styles.row}>
+        <div className={styles.section}>
+          <div className={styles.projectSelector} ref={menuRef}>
+            <button
+              className={`${styles.projectButton} ${menuOpen ? styles.open : ''}`}
+              onClick={() => setMenuOpen(!menuOpen)}
+              title="Project Menu"
+            >
+              <span className={styles.projectName}>{projectName}</span>
+              <ChevronDown size={14} className={styles.chevron} />
+            </button>
 
-        <div className={styles.actions}>
-          <Button variant="ghost" size="sm" onClick={handleSave} title="Save">
-            <Save size={16} />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onOpenSettings} title="Settings">
-            <Settings size={16} />
-          </Button>
-          <Button variant="ghost" size="sm" title="Help">
-            <HelpCircle size={16} />
-          </Button>
+            {menuOpen && (
+              <div className={styles.projectMenu}>
+                <div className={styles.menuSection}>
+                  <button className={styles.menuItem} onClick={handleNewProject}>
+                    <FolderPlus size={14} />
+                    <span>New Project</span>
+                    <kbd>⌘N</kbd>
+                  </button>
+                  <button className={styles.menuItem} onClick={handleOpenProjectClick}>
+                    <FolderOpen size={14} />
+                    <span>Open Project...</span>
+                    <kbd>⌘O</kbd>
+                  </button>
+                  <button className={styles.menuItem} onClick={handleSave}>
+                    <Save size={14} />
+                    <span>Save Project</span>
+                    <kbd>⌘S</kbd>
+                  </button>
+                </div>
+
+                <div className={styles.menuDivider} />
+
+                <div className={styles.menuSection}>
+                  <div className={styles.menuLabel}>Recent Projects</div>
+                  {recentProjects.map((project) => (
+                    <button
+                      key={project.id}
+                      className={styles.menuItem}
+                      onClick={() => handleOpenRecentProject(project.name)}
+                    >
+                      <FileText size={14} />
+                      <span className={styles.menuItemContent}>
+                        <span className={styles.projectTitle}>{project.name}</span>
+                        <span className={styles.projectMeta}>
+                          <Clock size={10} />
+                          {project.lastModified}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.menuDivider} />
+
+                <div className={styles.menuSection}>
+                  <button className={styles.menuItem} onClick={onOpenSettings}>
+                    <Settings size={14} />
+                    <span>Settings</span>
+                    <kbd>⌘,</kbd>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={styles.divider} />
+
+          <nav className={styles.modeNav}>
+            {modes.map((mode) => (
+              <button
+                key={mode.id}
+                className={`${styles.modeButton} ${
+                  currentMode === mode.id ? styles.active : ''
+                }`}
+                onClick={() => onModeChange(mode.id)}
+                title={mode.label}
+              >
+                {mode.icon}
+                <span>{mode.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className={styles.section}>
+          <div className={styles.actions}>
+            <Button variant="ghost" size="sm" onClick={onOpenSettings} title="Settings">
+              <Settings size={16} />
+            </Button>
+            <Button variant="ghost" size="sm" title="Help">
+              <HelpCircle size={16} />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Hidden file input for opening projects */}
       <input
         ref={fileInputRef}
         type="file"

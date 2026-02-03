@@ -6,7 +6,6 @@ import {
   Copy,
   Save,
   History,
-  Sliders,
   Palette,
   ImagePlus,
   Trash2,
@@ -79,25 +78,18 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     jobs,
   } = useGenerationStore();
 
-  const { settings, updateAIProvider } = useSettingsStore();
+  const { settings } = useSettingsStore();
   const { addItem } = useCanvasStore();
   const { addAsset } = useFileStore();
   const log = useLogStore((s) => s.log);
   const selectedItems = useCanvasStore((s) => s.getSelectedItems());
   const selectedItem = selectedItems[0];
 
-  const [localApiKey, setLocalApiKey] = useState(settings.aiProvider.apiKey);
-
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
 
-    // Save API key if changed
-    if (localApiKey !== settings.aiProvider.apiKey) {
-      updateAIProvider({ apiKey: localApiKey });
-    }
-
-    if (!localApiKey) {
-      alert('Please enter your NanoBanana API key in the settings below');
+    if (!settings.aiProvider.apiKey) {
+      alert('Please enter your NanoBanana API key in Settings (⌘,)');
       return;
     }
 
@@ -125,7 +117,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           negativePrompt,
           width: genWidth,
           height: genHeight,
-          apiKey: localApiKey,
+          apiKey: settings.aiProvider.apiKey,
         }),
       });
 
@@ -213,14 +205,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     negativePrompt,
     genWidth,
     genHeight,
-    localApiKey,
+    settings.aiProvider.apiKey,
     settings,
     startGeneration,
     completeJob,
     failJob,
     addItem,
     addAsset,
-    updateAIProvider,
     log,
   ]);
 
@@ -301,33 +292,6 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           >
             {isGenerating ? 'Generating...' : 'Generate'}
           </Button>
-        </CollapsibleSection>
-
-        {/* API Settings */}
-        <CollapsibleSection
-          title="API Settings"
-          icon={<Sliders size={14} />}
-          defaultOpen={!settings.aiProvider.apiKey}
-        >
-          <div className={styles.formGroup}>
-            <Input
-              label="NanoBanana API Key"
-              type="password"
-              placeholder="Enter your API key..."
-              value={localApiKey}
-              onChange={(e) => setLocalApiKey(e.target.value)}
-            />
-            <p className={styles.hint}>
-              Get your API key from{' '}
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Google AI Studio
-              </a>
-            </p>
-          </div>
         </CollapsibleSection>
 
         {/* Selected Item Properties */}
