@@ -6,3 +6,4 @@ export { Canvas } from './Canvas';
 export { Timeline } from './Timeline';
 export { SettingsModal } from './SettingsModal';
 export { ActionLog } from './ActionLog';
+export { DashboardLayout } from './DashboardLayout';

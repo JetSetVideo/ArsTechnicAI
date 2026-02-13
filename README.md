@@ -116,6 +116,60 @@ ARSTECHNICAI_NANOBANANA_API_KEY=
 ARSTECHNICAI_SENTRY_DSN=
 ```
 
+### Plug frontend to local backend + PostgreSQL (Ubuntu)
+
+You can run the UI in this repo and delegate generation requests to your own backend (for example Python/FastAPI + PostgreSQL) on the same machine.
+
+1. Copy environment template:
+
+```bash
+cp .env.example .env.local
+```
+
+2. Enable backend delegation in `.env.local`:
+
+```bash
+BACKEND_GENERATION_ENABLED=true
+BACKEND_URL=http://localhost:8000
+BACKEND_GENERATION_PATH=/api/v1/generate
+```
+
+3. Start PostgreSQL locally (Docker example):
+
+```bash
+docker run --name arstechnicai-postgres \
+  -e POSTGRES_USER=ars \
+  -e POSTGRES_PASSWORD=ars_pass \
+  -e POSTGRES_DB=ars_technicai \
+  -p 5432:5432 -d postgres:16
+```
+
+4. Start your backend on Ubuntu (example URL `http://localhost:8000`) and point it to PostgreSQL:
+
+```bash
+export DATABASE_URL="postgresql://ars:ars_pass@localhost:5432/ars_technicai"
+# then run your backend server (uvicorn, gunicorn, etc.)
+```
+
+5. Run this frontend:
+
+```bash
+npm run dev
+```
+
+When enabled, `POST /api/generate` in this frontend will try your backend first and only fall back to direct provider calls if possible.
+
+Backend response contract (minimum):
+
+```json
+{
+  "dataUrl": "data:image/png;base64,...",
+  "imageUrl": "https://optional-hosted-image",
+  "seed": 12345,
+  "modelUsed": "optional-model-name"
+}
+```
+
 ---
 
 ## Repository map

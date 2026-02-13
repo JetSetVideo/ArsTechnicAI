@@ -6,14 +6,28 @@ interface GenerateRequest {
   width: number;
   height: number;
   apiKey: string;
+  model?: string;
+  endpoint?: string;
+  /**
+   * If true, allow falling back to placeholder images when the upstream
+   * provider fails. Defaults to false because placeholder mode can mask
+   * configuration/API issues.
+   */
+  allowPlaceholderFallback?: boolean;
 }
 
 interface GenerateResponse {
   imageUrl?: string;
   dataUrl?: string;
   seed?: number;
+  modelUsed?: string;
   error?: string;
   errorCode?: string;
+}
+
+interface BackendGenerationAttempt {
+  result?: GenerateResponse;
+  error?: string;
 }
 
 // Error codes that map to frontend ERROR_CODES
@@ -32,6 +46,80 @@ type APIErrorCode =
   | 'SERVER_ERROR'
   | 'SERVICE_UNAVAILABLE'
   | 'UNKNOWN_ERROR';
+
+function isBackendGenerationEnabled(): boolean {
+  return (
+    process.env.BACKEND_GENERATION_ENABLED === 'true' &&
+    typeof process.env.BACKEND_URL === 'string' &&
+    process.env.BACKEND_URL.trim().length > 0
+  );
+}
+
+async function attemptBackendGeneration(payload: GenerateRequest): Promise<BackendGenerationAttempt | null> {
+  if (!isBackendGenerationEnabled()) {
+    return null;
+  }
+
+  const backendBase = process.env.BACKEND_URL!.trim();
+  const generationPath = process.env.BACKEND_GENERATION_PATH?.trim() || '/api/v1/generate';
+
+  let endpoint: string;
+  try {
+    endpoint = new URL(generationPath, backendBase.endsWith('/') ? backendBase : `${backendBase}/`).toString();
+  } catch {
+    return {
+      error: 'Invalid BACKEND_URL/BACKEND_GENERATION_PATH configuration.',
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    const backendApiKey = process.env.BACKEND_API_KEY?.trim();
+    if (backendApiKey) {
+      headers.Authorization = `Bearer ${backendApiKey}`;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      let message = `Backend returned HTTP ${response.status}`;
+      try {
+        const body = await response.json();
+        if (typeof body?.error === 'string') {
+          message = body.error;
+        }
+      } catch {
+        // Ignore JSON parsing failures for backend error bodies.
+      }
+      return { error: message };
+    }
+
+    const body = (await response.json()) as GenerateResponse;
+    if (!body?.dataUrl && !body?.imageUrl) {
+      return { error: 'Backend response missing image data.' };
+    }
+
+    return { result: body };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { error: 'Backend request timed out.' };
+    }
+    return { error: 'Could not reach backend service.' };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function createError(
   res: NextApiResponse<GenerateResponse>,
@@ -54,8 +142,9 @@ export default async function handler(
     return createError(res, 405, 'Method not allowed', 'UNKNOWN_ERROR');
   }
 
-  const { prompt, negativePrompt, width, height, apiKey } =
+  const { prompt, negativePrompt, width, height, apiKey, model, endpoint, allowPlaceholderFallback } =
     req.body as GenerateRequest;
+  const backendEnabled = isBackendGenerationEnabled();
 
   // ═══════════════════════════════════════════════════════════
   // INPUT VALIDATION
@@ -80,25 +169,6 @@ export default async function handler(
     );
   }
 
-  // Validate API key
-  if (!apiKey || typeof apiKey !== 'string') {
-    return createError(
-      res,
-      400,
-      'API key is required. Please add your Google Nano Banana API key in Settings.',
-      'MISSING_API_KEY'
-    );
-  }
-
-  if (apiKey.trim().length < 10) {
-    return createError(
-      res,
-      400,
-      'API key appears to be invalid. Please check your settings.',
-      'INVALID_API_KEY'
-    );
-  }
-
   // Validate dimensions
   const validWidth = Number(width) || 1024;
   const validHeight = Number(height) || 1024;
@@ -117,8 +187,144 @@ export default async function handler(
   // ═══════════════════════════════════════════════════════════
   
   try {
-    // Google Imagen API endpoint (NanoBanana refers to Google's API)
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`;
+    // If a local backend is configured (Python + PostgreSQL stack), try it first.
+    const backendAttempt = await attemptBackendGeneration({
+      prompt,
+      negativePrompt,
+      width: validWidth,
+      height: validHeight,
+      apiKey,
+      model,
+      endpoint,
+      allowPlaceholderFallback,
+    });
+
+    if (backendAttempt?.result) {
+      return res.status(200).json(backendAttempt.result);
+    }
+
+    // No backend result: either backend is disabled, or it failed.
+    // If backend is enabled and no provider API key is present, we cannot fall back.
+    if (backendEnabled && (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10)) {
+      return createError(
+        res,
+        503,
+        backendAttempt?.error
+          ? `Backend generation failed: ${backendAttempt.error}`
+          : 'Backend generation is enabled but unavailable.',
+        'SERVICE_UNAVAILABLE'
+      );
+    }
+
+    if (backendEnabled && backendAttempt?.error) {
+      console.warn(`[Generation] Backend failed, falling back to direct provider call: ${backendAttempt.error}`);
+    }
+
+    // Validate API key (required for direct provider mode)
+    if (!apiKey || typeof apiKey !== 'string') {
+      return createError(
+        res,
+        400,
+        'API key is required. Please add your Google Nano Banana API key in Settings.',
+        'MISSING_API_KEY'
+      );
+    }
+
+    if (apiKey.trim().length < 10) {
+      return createError(
+        res,
+        400,
+        'API key appears to be invalid. Please check your settings.',
+        'INVALID_API_KEY'
+      );
+    }
+
+    // Google Imagen via Gemini API (API key auth)
+    // Docs: https://ai.google.dev/gemini-api/docs/imagen (REST uses x-goog-api-key header)
+    const modelName = (typeof model === 'string' && model.trim().length > 0)
+      ? model.trim()
+      : 'imagen-3.0-generate-002';
+
+    // Basic allowlist validation for model name to avoid path injection
+    if (!/^[a-z0-9.\-_]+$/i.test(modelName)) {
+      return createError(
+        res,
+        400,
+        'Invalid model name. Please check your Settings → API keys → Model.',
+        'GENERATION_FAILED'
+      );
+    }
+
+    // Endpoint normalization:
+    // - Allow either a base endpoint (https://generativelanguage.googleapis.com/v1beta)
+    // - Or a full predict URL pasted by the user
+    const rawEndpoint = (typeof endpoint === 'string') ? endpoint.trim() : '';
+
+    // Detect Vertex AI endpoints early: they don't work with API-key auth.
+    if (rawEndpoint.includes('aiplatform.googleapis.com') || rawEndpoint.match(/-aiplatform\.googleapis\.com/)) {
+      return createError(
+        res,
+        400,
+        'This looks like a Vertex AI endpoint. Vertex AI Imagen requires OAuth (gcloud/ADC), not an API key. Use the Gemini endpoint: https://generativelanguage.googleapis.com/v1beta',
+        'GENERATION_FAILED'
+      );
+    }
+
+    const defaultBase = 'https://generativelanguage.googleapis.com/v1beta';
+    let apiEndpoint = '';
+    let effectiveBase = rawEndpoint || defaultBase;
+
+    // If user pasted a full URL to :predict, use it directly (after safety checks).
+    if (effectiveBase.includes('/models/') && effectiveBase.includes(':predict')) {
+      try {
+        const u = new URL(effectiveBase);
+        if (u.origin !== 'https://generativelanguage.googleapis.com') {
+          return createError(
+            res,
+            400,
+            'Invalid endpoint host. Please use https://generativelanguage.googleapis.com',
+            'GENERATION_FAILED'
+          );
+        }
+        // Strip query params (never accept key via URL query)
+        apiEndpoint = `${u.origin}${u.pathname}`;
+      } catch {
+        return createError(
+          res,
+          400,
+          'Invalid endpoint URL. Use https://generativelanguage.googleapis.com/v1beta (or leave it blank).',
+          'GENERATION_FAILED'
+        );
+      }
+    } else {
+      // Normalize base endpoint
+      effectiveBase = effectiveBase.replace(/\/+$/, '');
+      // If they accidentally included /models, remove it
+      effectiveBase = effectiveBase.replace(/\/models\/?$/i, '');
+      // Ensure v1beta is used for Imagen REST predict
+      if (effectiveBase === 'https://generativelanguage.googleapis.com') {
+        effectiveBase = defaultBase;
+      } else if (effectiveBase === 'https://generativelanguage.googleapis.com/v1') {
+        effectiveBase = defaultBase;
+      } else if (effectiveBase.startsWith('https://generativelanguage.googleapis.com/') && !effectiveBase.includes('/v1beta')) {
+        // If user typed some other path under the domain, prefer v1beta for Imagen
+        effectiveBase = defaultBase;
+      }
+
+      // Prevent SSRF by restricting custom endpoints to the Gemini API host
+      if (!effectiveBase.startsWith('https://generativelanguage.googleapis.com')) {
+        return createError(
+          res,
+          400,
+          'Invalid endpoint. Please use the default Gemini API endpoint.',
+          'GENERATION_FAILED'
+        );
+      }
+
+      apiEndpoint = `${effectiveBase}/models/${modelName}:predict`;
+    }
+
+    console.log(`[Generation] Provider endpoint: ${apiEndpoint} (model: ${modelName})`);
 
     // Calculate aspect ratio
     let aspectRatio = '1:1';
@@ -133,33 +339,81 @@ export default async function handler(
       aspectRatio = '3:4';
     }
 
-    const requestBody = {
+    const promptWithNeg = negativePrompt?.trim()
+      ? `${trimmedPrompt}\n\nAvoid: ${negativePrompt.trim()}`
+      : trimmedPrompt;
+
+    // Gemini Imagen REST parameters (a subset; keep conservative to avoid 400s)
+    const requestBody: Record<string, any> = {
       instances: [
         {
-          prompt: trimmedPrompt,
+          prompt: promptWithNeg,
         },
       ],
       parameters: {
         sampleCount: 1,
         aspectRatio,
-        ...(negativePrompt && { negativePrompt }),
       },
     };
+
+    // Optional: request higher resolution on Imagen 4 models when user asks for larger canvas
+    const maxDim = Math.max(validWidth, validHeight);
+    const isImagen4 = modelName.startsWith('imagen-4.');
+    if (isImagen4 && maxDim >= 1536) {
+      requestBody.parameters.imageSize = '2K';
+    }
 
     // Set up timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
 
-    let response: Response;
-    try {
-      response = await fetch(endpoint, {
+    const baseForModels = apiEndpoint.split('/models/')[0];
+
+    async function callProvider(modelToUse: string): Promise<Response> {
+      const endpointForModel = `${baseForModels}/models/${modelToUse}:predict`;
+      return await fetch(endpointForModel, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // Gemini API key auth
+          'x-goog-api-key': apiKey.trim(),
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
+    }
+
+    let response: Response;
+    let modelUsed = modelName;
+    try {
+      response = await callProvider(modelUsed);
+
+      // Methodical fallback: if the model id is wrong or not enabled, try known Imagen variants.
+      if (response.status === 404) {
+        const fallbacks = [
+          'imagen-4.0-generate-001',
+          'imagen-4.0-fast-generate-001',
+          'imagen-4.0-ultra-generate-001',
+          'imagen-3.0-generate-002',
+        ].filter((m) => m !== modelUsed);
+
+        for (const candidate of fallbacks) {
+          console.log(`[Generation] Model not found (${modelUsed}); trying ${candidate}...`);
+          const next = await callProvider(candidate);
+          if (next.ok) {
+            response = next;
+            modelUsed = candidate;
+            console.log(`[Generation] Using model: ${modelUsed}`);
+            break;
+          }
+          // If it's not 404, keep the latest response so error handling reports the real issue.
+          if (next.status !== 404) {
+            response = next;
+            modelUsed = candidate;
+            break;
+          }
+        }
+      }
     } catch (fetchError) {
       clearTimeout(timeoutId);
       
@@ -194,7 +448,7 @@ export default async function handler(
         // Response might not be JSON
       }
 
-      const apiMessage = errorData.error?.message || '';
+      const apiMessage = errorData.error?.message || errorData.message || '';
       const lowerMessage = apiMessage.toLowerCase();
 
       // Parse specific error types from Google's API
@@ -212,8 +466,26 @@ export default async function handler(
               'CONTENT_FILTERED'
             );
           }
-          // Fall through to demo mode for other 400 errors
-          break;
+          // Some Gemini API key errors come back as 400
+          if (lowerMessage.includes('api key') || lowerMessage.includes('invalid key') || lowerMessage.includes('key not valid')) {
+            return createError(
+              res,
+              401,
+              'Invalid API key. Please verify your Gemini API key in Settings.',
+              'INVALID_API_KEY'
+            );
+          }
+          // Do not hide config errors by default
+          if (allowPlaceholderFallback) {
+            console.log('Upstream returned 400; falling back to placeholder mode (explicitly enabled).');
+            return await generatePlaceholder(res, validWidth, validHeight, trimmedPrompt);
+          }
+          return createError(
+            res,
+            400,
+            apiMessage || 'The image provider rejected the request. Please check your model/endpoint settings.',
+            'GENERATION_FAILED'
+          );
 
         case 401:
           return createError(
@@ -240,8 +512,16 @@ export default async function handler(
           );
 
         case 404:
-          // Model not found - fall through to demo mode
-          break;
+          if (allowPlaceholderFallback) {
+            console.log('Upstream returned 404; falling back to placeholder mode (explicitly enabled).');
+            return await generatePlaceholder(res, validWidth, validHeight, trimmedPrompt);
+          }
+          return createError(
+            res,
+            404,
+            `Model not found. Check Settings → API keys → Model (try imagen-3.0-generate-002 or imagen-4.0-generate-001) and Endpoint (should be https://generativelanguage.googleapis.com/v1beta).`,
+            'SERVICE_UNAVAILABLE'
+          );
 
         case 429:
           return createError(
@@ -268,13 +548,6 @@ export default async function handler(
             'The API request timed out. Please try again.',
             'TIMEOUT'
           );
-      }
-
-      // For 400/404 errors that might be model availability issues,
-      // fall through to demo placeholder mode
-      if (response.status === 404 || response.status === 400) {
-        console.log('Falling back to demo placeholder mode');
-        return await generatePlaceholder(res, validWidth, validHeight, trimmedPrompt);
       }
 
       // Generic error for other cases
@@ -311,12 +584,23 @@ export default async function handler(
       return res.status(200).json({
         dataUrl,
         seed: Math.floor(Math.random() * 1000000),
+        // Helpful for debugging which model actually produced the result
+        // (frontend safely ignores unknown fields)
+        modelUsed,
       });
     }
 
-    // No predictions returned - try placeholder
-    console.log('No predictions returned, falling back to placeholder');
-    return await generatePlaceholder(res, validWidth, validHeight, trimmedPrompt);
+    // No predictions returned
+    if (allowPlaceholderFallback) {
+      console.log('No predictions returned; falling back to placeholder mode (explicitly enabled).');
+      return await generatePlaceholder(res, validWidth, validHeight, trimmedPrompt);
+    }
+    return createError(
+      res,
+      502,
+      'The image provider returned no image data. Please try again, or change model settings.',
+      'GENERATION_FAILED'
+    );
 
   } catch (error) {
     console.error('Generation error:', error);

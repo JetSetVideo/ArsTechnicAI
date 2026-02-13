@@ -95,11 +95,23 @@
   opacity: 0.8;
 }
 
-/* Filename tag - positioned outside top-left corner */
-.filenameTag {
+/* Tag row — counter-scaled via inline style so tags stay readable at any zoom */
+.tagRow {
   position: absolute;
-  top: -26px;
+  top: -32px;
   left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+/* Filename tag */
+.filenameTag {
   padding: 4px 10px;
   background: rgba(26, 26, 31, 0.95);
   color: var(--text-primary);
@@ -109,19 +121,15 @@
   border-radius: var(--radius-sm, 4px);
   border: 1px solid var(--border-color);
   white-space: nowrap;
-  max-width: 280px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 0;
-  transition: all 0.15s ease;
-  pointer-events: none;
-  z-index: 10;
   cursor: text;
   box-shadow: var(--shadow-sm);
 }
 
-.canvasItem:hover .filenameTag,
-.canvasItem.selected .filenameTag {
+.canvasItem:hover .tagRow,
+.canvasItem.selected .tagRow {
   opacity: 1;
   pointer-events: auto;
 }
@@ -129,6 +137,139 @@
 .filenameTag:hover {
   background: rgba(34, 34, 40, 0.98);
   border-color: var(--border-strong);
+}
+
+/* Prompt + version tags */
+.promptTag,
+.versionTag {
+  padding: 4px 8px;
+  background: rgba(18, 18, 21, 0.95);
+  color: var(--text-secondary);
+  font-size: var(--font-2xs, 0.625rem);
+  font-weight: 600;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.promptTag:hover,
+.versionTag:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.versionTag {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+/* Prompt overlay */
+.promptOverlay {
+  position: absolute;
+  top: -140px;
+  left: 0;
+  max-width: 320px;
+  padding: 10px 12px;
+  background: rgba(18, 18, 21, 0.98);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+}
+
+.promptTitle {
+  font-size: var(--font-2xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.promptText {
+  font-size: var(--font-xs);
+  color: var(--text-primary);
+  line-height: 1.4;
+  max-height: 80px;
+  overflow: auto;
+}
+
+/* Version overlay */
+.versionOverlay {
+  position: absolute;
+  top: -160px;
+  right: 0;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: rgba(18, 18, 21, 0.98);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+}
+
+.versionTitle {
+  font-size: var(--font-2xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.versionList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 140px;
+  overflow: auto;
+}
+
+.versionOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.versionOption:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.versionActive {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-primary-alpha);
+}
+
+.versionBadge {
+  font-family: var(--font-mono);
+  font-size: var(--font-2xs);
+}
+
+.versionName {
+  flex: 1;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.versionEmpty {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  text-align: center;
+  padding: 8px 0;
 }
 
 /* Editable filename input */
@@ -198,6 +339,38 @@
   white-space: nowrap;
 }
 
+/* Prompt card — styled note for prompt assets on canvas */
+.promptCard {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(30, 30, 38, 0.98) 0%, rgba(22, 22, 28, 0.98) 100%);
+  border: 1.5px solid var(--accent-primary-alpha, rgba(0, 212, 170, 0.25));
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.promptCardIcon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.promptCardText {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow: auto;
+  flex: 1;
+  word-break: break-word;
+  font-family: var(--font-mono);
+}
+
 /* Selection handles */
 .handle {
   position: absolute;
@@ -246,6 +419,34 @@
   background: rgba(0, 0, 0, 0.7);
   border-radius: 4px;
   color: var(--text-muted);
+}
+
+/* Link indicators */
+.linkDot {
+  position: absolute;
+  bottom: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.linkDotLeft {
+  left: 6px;
+}
+
+.linkDotRight {
+  right: 6px;
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 /* Empty state */

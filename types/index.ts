@@ -35,6 +35,10 @@ export interface AssetMetadata {
   model?: string;
   seed?: number;
   parentId?: UUID;
+  promptId?: UUID;
+  lineageId?: UUID;
+  version?: string;
+  parentAssetId?: UUID;
 }
 
 export interface ImageAsset extends Asset {
@@ -63,6 +67,10 @@ export interface CanvasItem {
   src?: string;
   prompt?: string;
   name: string;
+  promptId?: UUID;
+  lineageId?: UUID;
+  version?: string;
+  parentAssetId?: UUID;
   createdAt: Timestamp;
 }
 
@@ -215,3 +223,8 @@ export interface WorkspaceLayout {
 }
 
 export type WorkspaceMode = 'create' | 'rework' | 'composite' | 'timeline';
+
+// ------------------------------------------------------------
+// Dashboard Types (re-exported)
+// ------------------------------------------------------------
+export * from './dashboard';

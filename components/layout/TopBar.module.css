@@ -25,6 +25,13 @@
   font-size: 0.875rem;
   font-weight: 600;
   flex-shrink: 0;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast, 0.1s);
+}
+
+.appName:hover {
+  opacity: 0.8;
 }
 
 .searchWrap {

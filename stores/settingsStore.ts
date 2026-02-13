@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AppSettings, AIProviderSettings, AppearanceSettings } from '@/types';
+import { STORAGE_KEYS } from '@/constants/workspace';
 
 interface SettingsState {
   settings: AppSettings;
@@ -24,7 +25,8 @@ const defaultAIProvider: AIProviderSettings = {
   provider: 'nanobanana',
   apiKey: '',
   endpoint: 'https://generativelanguage.googleapis.com/v1beta',
-  model: 'imagen-3.0-generate-001',
+  // Gemini API Imagen model (see https://ai.google.dev/gemini-api/docs/imagen)
+  model: 'imagen-3.0-generate-002',
   defaultWidth: 1024,
   defaultHeight: 1024,
   defaultSteps: 50,
@@ -112,7 +114,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
     }),
     {
-      name: 'ars-technicai-settings',
+      name: STORAGE_KEYS.settings,
       // Version for migrations
       version: 1,
       // Deep merge stored state with defaults to handle missing properties
@@ -122,6 +124,15 @@ export const useSettingsStore = create<SettingsState>()(
           return currentState;
         }
         
+        const mergedAiProvider = {
+          ...defaultAIProvider,
+          ...(persisted.settings.aiProvider ?? {}),
+        };
+        // Migration: older builds used a non-working Imagen model id.
+        if (mergedAiProvider.model === 'imagen-3.0-generate-001') {
+          mergedAiProvider.model = defaultAIProvider.model;
+        }
+
         // Deep merge settings with defaults
         return {
           ...currentState,
@@ -134,8 +145,7 @@ export const useSettingsStore = create<SettingsState>()(
               ...(persisted.settings.appearance ?? {}),
             },
             aiProvider: {
-              ...defaultAIProvider,
-              ...(persisted.settings.aiProvider ?? {}),
+              ...mergedAiProvider,
             },
           },
         };

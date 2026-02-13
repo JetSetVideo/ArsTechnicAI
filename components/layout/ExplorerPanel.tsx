@@ -8,18 +8,17 @@ import {
   Music,
   ChevronRight,
   ChevronDown,
-  Plus,
   Upload,
-  MoreHorizontal,
   Trash2,
-  Edit,
-  Copy,
+  Pencil,
+  FolderPlus,
 } from 'lucide-react';
-import { useFileStore, useLogStore, useCanvasStore } from '@/stores';
+import { useFileStore, useLogStore } from '@/stores';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import styles from './ExplorerPanel.module.css';
-import type { FileNode, Asset } from '@/types';
+import type { FileNode } from '@/types';
+import { WORKSPACE_DEFAULTS, WORKSPACE_PROTECTED_PATHS, WORKSPACE_ROOT_PATHS } from '@/constants/workspace';
 
 interface ExplorerPanelProps {
   width: number;
@@ -52,6 +51,15 @@ interface FileTreeItemProps {
   onSelect: (node: FileNode) => void;
   onToggle: (path: string) => void;
   onDragStart: (e: React.DragEvent, node: FileNode) => void;
+  onDropNode: (sourcePath: string, targetPath: string) => void;
+  onStartRename: (node: FileNode) => void;
+  onDeleteNode: (node: FileNode) => void;
+  onContextMenu: (e: React.MouseEvent, node: FileNode) => void;
+  editingPath: string | null;
+  editingName: string;
+  onEditingNameChange: (value: string) => void;
+  onRenameSubmit: () => void;
+  onRenameCancel: () => void;
   isSelected: boolean;
   isExpanded: boolean;
 }
@@ -62,19 +70,39 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
   onSelect,
   onToggle,
   onDragStart,
+  onDropNode,
+  onStartRename,
+  onDeleteNode,
+  onContextMenu,
+  editingPath,
+  editingName,
+  onEditingNameChange,
+  onRenameSubmit,
+  onRenameCancel,
   isSelected,
   isExpanded,
 }) => {
-  const hasChildren = node.type === 'folder' && node.children && node.children.length > 0;
-
   return (
     <div className={styles.treeItem}>
       <div
         className={`${styles.treeItemRow} ${isSelected ? styles.selected : ''}`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => onSelect(node)}
-        draggable={node.type === 'file'}
+        onContextMenu={(e) => onContextMenu(e, node)}
+        draggable={!(node.type === 'folder' && ['/', '/projects', '/imports', '/library', '/prompts'].includes(node.path))}
         onDragStart={(e) => onDragStart(e, node)}
+        onDragOver={(e) => {
+          if (node.type === 'folder') e.preventDefault();
+        }}
+        onDrop={(e) => {
+          if (node.type !== 'folder') return;
+          const sourcePath = e.dataTransfer.getData('application/x-file-node-path');
+          if (!sourcePath) return;
+          e.preventDefault();
+          onDropNode(sourcePath, node.path);
+        }}
+        role="treeitem"
+        aria-selected={isSelected}
       >
         {node.type === 'folder' ? (
           <button
@@ -91,13 +119,53 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
         )}
 
         <span className={styles.icon}>{getFileIcon({ ...node, expanded: isExpanded })}</span>
-        <span className={styles.name}>{node.name}</span>
+        {editingPath === node.path ? (
+          <input
+            className={styles.renameInput}
+            value={editingName}
+            autoFocus
+            onChange={(e) => onEditingNameChange(e.target.value)}
+            onBlur={onRenameSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onRenameSubmit();
+              if (e.key === 'Escape') onRenameCancel();
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className={styles.name}>{node.name}</span>
+        )}
 
         {node.asset?.thumbnail && (
           <div className={styles.thumbnail}>
             <img src={node.asset.thumbnail} alt="" />
           </div>
         )}
+
+        <div className={styles.rowActions}>
+          <button
+            type="button"
+            className={styles.rowActionButton}
+            title="Rename"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartRename(node);
+            }}
+          >
+            <Pencil size={12} />
+          </button>
+          <button
+            type="button"
+            className={styles.rowActionButton}
+            title="Delete"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteNode(node);
+            }}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
       </div>
 
       {node.type === 'folder' && isExpanded && node.children && (
@@ -116,9 +184,18 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({
   node,
   depth,
 }) => {
-  const { selectedPath, expandedPaths, selectPath, toggleExpanded } = useFileStore();
-  const { addItemFromAsset } = useCanvasStore();
+  const {
+    selectedPath,
+    expandedPaths,
+    selectPath,
+    toggleExpanded,
+    moveNode,
+    renameNode,
+    deleteNode,
+  } = useFileStore();
   const log = useLogStore((s) => s.log);
+  const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   const handleSelect = useCallback(
     (n: FileNode) => {
@@ -134,11 +211,58 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({
     (e: React.DragEvent, n: FileNode) => {
       if (n.asset) {
         e.dataTransfer.setData('application/json', JSON.stringify(n.asset));
+        e.dataTransfer.setData('application/x-file-node-path', n.path);
         e.dataTransfer.effectAllowed = 'copy';
         log('file_import', `Started dragging ${n.name}`);
       }
     },
     [log]
+  );
+
+  const handleDropNode = useCallback(
+    (sourcePath: string, targetPath: string) => {
+      if (sourcePath === targetPath) return;
+      const moved = moveNode(sourcePath, targetPath);
+      if (moved) {
+        log('folder_open', `Moved ${sourcePath} to ${targetPath}`);
+      }
+    },
+    [moveNode, log]
+  );
+
+  const handleStartRename = useCallback((n: FileNode) => {
+    setEditingPath(n.path);
+    setEditingName(n.name);
+  }, []);
+
+  const handleRenameSubmit = useCallback(() => {
+    if (!editingPath) return;
+    const value = editingName.trim();
+    if (value) {
+      const renamed = renameNode(editingPath, value);
+      if (renamed) log('settings_change', `Renamed item to ${value}`);
+    }
+    setEditingPath(null);
+    setEditingName('');
+  }, [editingPath, editingName, renameNode, log]);
+
+  const handleDelete = useCallback(
+    (n: FileNode) => {
+      const ok = window.confirm(`Delete "${n.name}"?`);
+      if (!ok) return;
+      if (deleteNode(n.path)) {
+        log('canvas_remove', `Deleted ${n.path}`);
+      }
+    },
+    [deleteNode, log]
+  );
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, n: FileNode) => {
+      e.preventDefault();
+      handleSelect(n);
+    },
+    [handleSelect]
   );
 
   return (
@@ -148,6 +272,18 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({
       onSelect={handleSelect}
       onToggle={toggleExpanded}
       onDragStart={handleDragStart}
+      onDropNode={handleDropNode}
+      onStartRename={handleStartRename}
+      onDeleteNode={handleDelete}
+      onContextMenu={handleContextMenu}
+      editingPath={editingPath}
+      editingName={editingName}
+      onEditingNameChange={setEditingName}
+      onRenameSubmit={handleRenameSubmit}
+      onRenameCancel={() => {
+        setEditingPath(null);
+        setEditingName('');
+      }}
       isSelected={selectedPath === node.path}
       isExpanded={expandedPaths.has(node.path)}
     />
@@ -155,7 +291,16 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({
 };
 
 export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
-  const { rootNodes, initializeFileStructure, importFiles } = useFileStore();
+  const {
+    rootNodes,
+    selectedPath,
+    initializeFileStructure,
+    importFiles,
+    createFolder,
+    findNodeByPath,
+    deleteNode,
+    renameNode,
+  } = useFileStore();
   const log = useLogStore((s) => s.log);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [filter, setFilter] = useState('');
@@ -163,7 +308,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
   // Initialize file structure on mount
   useEffect(() => {
     if (rootNodes.length === 0) {
-      initializeFileStructure('Untitled Project');
+      initializeFileStructure(WORKSPACE_DEFAULTS.projectName);
     }
   }, [rootNodes.length, initializeFileStructure]);
 
@@ -187,26 +332,78 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
     [importFiles, log]
   );
 
-  const filteredNodes = filter
-    ? rootNodes.filter(
-        (n) =>
-          n.name.toLowerCase().includes(filter.toLowerCase()) ||
-          n.children?.some((c) =>
-            c.name.toLowerCase().includes(filter.toLowerCase())
-          )
-      )
-    : rootNodes;
+  const handleNewFolder = useCallback(() => {
+    const base =
+      selectedPath && findNodeByPath(selectedPath)?.type === 'folder'
+        ? selectedPath
+        : WORKSPACE_ROOT_PATHS.library;
+    let index = 1;
+    let folderName = `New Folder`;
+    while (findNodeByPath(`${base}/${folderName}`)) {
+      index += 1;
+      folderName = `New Folder ${index}`;
+    }
+    const created = createFolder(base, folderName);
+    if (created) {
+      log('folder_create', `Created folder ${created.path}`);
+    }
+  }, [selectedPath, findNodeByPath, createFolder, log]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!selectedPath) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const node = findNodeByPath(selectedPath);
+        if (!node) return;
+        if (WORKSPACE_PROTECTED_PATHS.has(node.path)) return;
+        if (deleteNode(node.path)) {
+          log('canvas_remove', `Deleted ${node.path}`);
+        }
+      }
+      if (e.key === 'F2') {
+        const node = findNodeByPath(selectedPath);
+        if (!node) return;
+        const next = window.prompt('Rename item', node.name);
+        if (!next || !next.trim()) return;
+        if (renameNode(node.path, next.trim())) {
+          log('settings_change', `Renamed ${node.path} to ${next.trim()}`);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedPath, findNodeByPath, deleteNode, renameNode, log]);
+
+  const filterTree = useCallback((nodes: FileNode[], query: string): FileNode[] => {
+    if (!query.trim()) return nodes;
+    const q = query.toLowerCase();
+    return nodes
+      .map((node) => {
+        const childMatches = node.children ? filterTree(node.children, query) : [];
+        const selfMatches = node.name.toLowerCase().includes(q);
+        if (selfMatches || childMatches.length > 0) {
+          return {
+            ...node,
+            children: node.children ? childMatches : node.children,
+          };
+        }
+        return null;
+      })
+      .filter((n): n is FileNode => n !== null);
+  }, []);
+
+  const filteredNodes = filterTree(rootNodes, filter);
 
   return (
-    <aside className={styles.explorer} style={{ width }}>
+    <aside className={styles.explorer} style={{ width }} data-density="compact">
       <div className={styles.header}>
         <h2 className={styles.title}>Explorer</h2>
         <div className={styles.headerActions}>
           <Button variant="ghost" size="sm" onClick={handleImportClick} title="Import files">
             <Upload size={14} />
           </Button>
-          <Button variant="ghost" size="sm" title="New folder">
-            <Plus size={14} />
+          <Button variant="ghost" size="sm" onClick={handleNewFolder} title="New folder">
+            <FolderPlus size={14} />
           </Button>
         </div>
       </div>

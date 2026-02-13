@@ -1,0 +1,125 @@
+// Prisma Schema for ArsTechnicAI User Management
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User Model with Comprehensive Authentication Support
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String    @unique
+  passwordHash  String?   // Nullable for OAuth users
+  publicKey     String?   
+  
+  // OAuth Integration
+  googleId      String?   @unique
+  githubId      String?   @unique
+  
+  // Profile Information
+  profileImage  String?
+  bio           String?
+  
+  // Authentication Metadata
+  createdAt     DateTime  @default(now())
+  lastLogin     DateTime?
+  
+  // Authorization
+  roles         UserRole[] 
+  
+  // Relationships
+  projects          Project[]
+  sessions         UserSession[]
+  generationJobs   GenerationJob[]
+  
+  // Preferences and Settings
+  preferences    Json?
+  notifications Json?
+  
+  // Account Status
+  isActive      Boolean   @default(true)
+  isBanned      Boolean   @default(false)
+  
+  // Two-Factor Authentication
+  twoFactorSecret String?
+  isTwoFactorEnabled Boolean @default(false)
+}
+
+// Role-Based Access Control
+model UserRole {
+  id        String   @id @default(cuid())
+  name      RoleType @unique
+  users     User[]
+}
+
+// User Sessions for Enhanced Security
+model UserSession {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  
+  // Session Tracking
+  ip        String
+  device    String
+  location  String?
+  
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+// Project Model (Example of User-Project Relationship)
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  creatorId   String
+  creator     User     @relation(fields: [creatorId], references: [id])
+  
+  generationJobs GenerationJob[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Generation Job Model for tracking AI content generation
+model GenerationJob {
+  id          String   @id @default(cuid())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  
+  type        String   // text, image, video, audio
+  prompt      String
+  parameters  Json?
+  
+  status      String   // pending, completed, failed
+  result      String?
+  error       String?
+  
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+}
+
+// Enum for Predefined Roles
+enum RoleType {
+  USER
+  CREATOR
+  ADMIN
+  SUPERADMIN
+}
+
+// Enum for Authentication Providers
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  GITHUB
+}

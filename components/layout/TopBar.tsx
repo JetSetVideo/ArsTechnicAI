@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import {
   ChevronDown,
   Settings,
@@ -15,11 +16,13 @@ import {
   HelpCircle,
   FileText,
   Clock,
-  Trash2,
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { Button } from '../ui/Button';
-import { useLogStore, useCanvasStore, useFileStore } from '@/stores';
+import { useLogStore, useCanvasStore, useFileStore, useUserStore } from '@/stores';
+import { useProjectsStore } from '@/stores/projectsStore';
+import { saveCanvasState, loadCanvasState } from '@/hooks/useProjectSync';
+import { formatRelativeTime } from '@/utils/date';
 import styles from './TopBar.module.css';
 import type { WorkspaceMode, SearchScope } from '@/types';
 
@@ -58,13 +61,6 @@ const modes: { id: WorkspaceMode; label: string; icon: React.ReactNode }[] = [
   { id: 'timeline', label: 'Timeline', icon: <Film size={16} /> },
 ];
 
-// Demo recent projects
-const recentProjects = [
-  { id: '1', name: 'Comic Book Project', lastModified: '2 hours ago' },
-  { id: '2', name: 'Character Designs', lastModified: 'Yesterday' },
-  { id: '3', name: 'Storyboard Draft', lastModified: '3 days ago' },
-];
-
 export const TopBar: React.FC<TopBarProps> = ({
   currentMode,
   onModeChange,
@@ -81,6 +77,31 @@ export const TopBar: React.FC<TopBarProps> = ({
   const log = useLogStore((s) => s.log);
   const canvasStore = useCanvasStore();
   const fileStore = useFileStore();
+  const currentProject = useUserStore((s) => s.currentProject);
+  const recentUserProjects = useUserStore((s) => s.recentProjects);
+  const switchProjectUser = useUserStore((s) => s.switchProject);
+  const recentDashboardProjects = useProjectsStore((s) => s.getRecentProjects(5));
+  
+  // Merge recent projects from both stores, dedup by id
+  const recentProjects = (() => {
+    const seen = new Set<string>();
+    const merged: { id: string; name: string; lastModified: string }[] = [];
+    
+    // Dashboard recent first (more authoritative)
+    for (const p of recentDashboardProjects) {
+      if (seen.has(p.id) || p.id === currentProject?.id) continue;
+      seen.add(p.id);
+      merged.push({ id: p.id, name: p.name, lastModified: formatRelativeTime(p.modifiedAt) });
+    }
+    // Then userStore recent
+    for (const p of recentUserProjects) {
+      if (seen.has(p.id) || p.id === currentProject?.id) continue;
+      seen.add(p.id);
+      merged.push({ id: p.id, name: p.name, lastModified: formatRelativeTime(p.modifiedAt) });
+    }
+    return merged.slice(0, 5);
+  })();
+
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,7 +138,19 @@ export const TopBar: React.FC<TopBarProps> = ({
   );
 
   const handleSave = useCallback(() => {
-    // Create project data object
+    // Also save canvas state to localStorage for per-project persistence
+    if (currentProject?.id) {
+      saveCanvasState(currentProject.id);
+    }
+
+    // Update modified timestamp in projectsStore
+    if (currentProject?.id) {
+      useProjectsStore.getState().updateProject(currentProject.id, {
+        assetCount: canvasStore.items.length,
+      });
+    }
+
+    // Create project data object for file export
     const projectData: ProjectData = {
       name: projectName,
       version: '1.0.0',
@@ -148,21 +181,44 @@ export const TopBar: React.FC<TopBarProps> = ({
 
     setMenuOpen(false);
     log('file_export', `Project saved: ${projectName}`);
-  }, [projectName, canvasStore.items, canvasStore.viewport, fileStore.rootNodes, log]);
+  }, [currentProject?.id, projectName, canvasStore.items, canvasStore.viewport, fileStore.rootNodes, log]);
 
   const handleNewProject = useCallback(() => {
+    // Save current canvas state before creating new project
+    if (currentProject?.id) {
+      saveCanvasState(currentProject.id);
+    }
+
     // Clear canvas
     canvasStore.clearCanvas();
     canvasStore.resetViewport();
+
+    // Create a new project in userStore (which generates a new ID)
+    const newProj = useUserStore.getState().createNewProject();
+
+    // Register in projectsStore
+    useProjectsStore.setState((state) => ({
+      projects: [
+        {
+          id: newProj.id,
+          name: newProj.name,
+          createdAt: newProj.createdAt,
+          modifiedAt: newProj.modifiedAt,
+          assetCount: 0,
+          tags: [],
+          isFavorite: false,
+        },
+        ...state.projects.filter((p) => p.id !== newProj.id),
+      ],
+    }));
     
-    // Reset file store with default project structure
-    fileStore.initializeFileStructure('Untitled Project');
+    // Reset file store with new project structure
+    fileStore.initializeFileStructure(newProj.name);
     
-    // Reset project name
-    onProjectNameChange('Untitled Project');
+    onProjectNameChange(newProj.name);
     setMenuOpen(false);
-    log('folder_create', 'Created new project');
-  }, [canvasStore, fileStore, onProjectNameChange, log]);
+    log('folder_create', `Created new project: ${newProj.name}`);
+  }, [currentProject?.id, canvasStore, fileStore, onProjectNameChange, log]);
 
   const handleOpenProjectClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -211,23 +267,38 @@ export const TopBar: React.FC<TopBarProps> = ({
     [canvasStore, fileStore, onProjectNameChange, log]
   );
 
-  const handleOpenRecentProject = useCallback((projectNameFromRecent: string) => {
-    // For demo purposes, just update the project name
-    // In a real app, you'd load from local storage or a database
-    onProjectNameChange(projectNameFromRecent);
+  const handleOpenRecentProject = useCallback((projectId: string, name: string) => {
+    // Save current project's canvas state first
+    if (currentProject?.id) {
+      saveCanvasState(currentProject.id);
+    }
+
+    // Switch project in userStore
+    switchProjectUser(projectId);
+
+    // Load saved canvas state for the opened project
+    loadCanvasState(projectId);
+
+    // Update file structure
+    fileStore.setCurrentProject(name);
+
+    // Mark opened in projectsStore
+    useProjectsStore.getState().openProject(projectId);
+
+    onProjectNameChange(name);
     setMenuOpen(false);
-    log('folder_open', `Opened project: ${projectNameFromRecent}`);
-  }, [onProjectNameChange, log]);
+    log('folder_open', `Opened project: ${name}`);
+  }, [currentProject?.id, switchProjectUser, fileStore, onProjectNameChange, log]);
 
   return (
     <header className={styles.topBar}>
       {/* Top row: App name | Search | Panel toggles tag */}
       <div className={styles.row}>
-        <div className={styles.appName}>
+        <Link href="/home" className={styles.appName} title="Go to Dashboard">
           <span className={styles.logoArs}>Ars</span>
           <span className={styles.logoTechnic}>Technic</span>
           <span className={styles.logoAI}>AI</span>
-        </div>
+        </Link>
 
         <div className={styles.searchWrap}>
           <SearchBar onSearch={handleSearch} placeholder="Search files or Google images..." />
@@ -295,22 +366,28 @@ export const TopBar: React.FC<TopBarProps> = ({
 
                 <div className={styles.menuSection}>
                   <div className={styles.menuLabel}>Recent Projects</div>
-                  {recentProjects.map((project) => (
-                    <button
-                      key={project.id}
-                      className={styles.menuItem}
-                      onClick={() => handleOpenRecentProject(project.name)}
-                    >
-                      <FileText size={14} />
-                      <span className={styles.menuItemContent}>
-                        <span className={styles.projectTitle}>{project.name}</span>
-                        <span className={styles.projectMeta}>
-                          <Clock size={10} />
-                          {project.lastModified}
+                  {recentProjects.length > 0 ? (
+                    recentProjects.map((project) => (
+                      <button
+                        key={project.id}
+                        className={styles.menuItem}
+                        onClick={() => handleOpenRecentProject(project.id, project.name)}
+                      >
+                        <FileText size={14} />
+                        <span className={styles.menuItemContent}>
+                          <span className={styles.projectTitle}>{project.name}</span>
+                          <span className={styles.projectMeta}>
+                            <Clock size={10} />
+                            {project.lastModified}
+                          </span>
                         </span>
-                      </span>
-                    </button>
-                  ))}
+                      </button>
+                    ))
+                  ) : (
+                    <div className={styles.menuLabel} style={{ opacity: 0.5 }}>
+                      No recent projects
+                    </div>
+                  )}
                 </div>
 
                 <div className={styles.menuDivider} />

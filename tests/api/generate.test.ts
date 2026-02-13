@@ -115,7 +115,7 @@ describe('Generate API Validation', () => {
         apiKey: 'AIzaSyB-1234567890abcdefghijklmnop',
         width: 1024,
         height: 1024,
-        model: 'imagen-3.0-generate-001',
+        model: 'imagen-3.0-generate-002',
       };
       
       expect(validPayload.prompt).toBeDefined();
@@ -127,11 +127,11 @@ describe('Generate API Validation', () => {
     it('should have default values for optional fields', () => {
       const defaultWidth = 1024;
       const defaultHeight = 1024;
-      const defaultModel = 'imagen-3.0-generate-001';
+      const defaultModel = 'imagen-3.0-generate-002';
       
       expect(defaultWidth).toBe(1024);
       expect(defaultHeight).toBe(1024);
-      expect(defaultModel).toBe('imagen-3.0-generate-001');
+      expect(defaultModel).toBe('imagen-3.0-generate-002');
     });
   });
 
@@ -142,7 +142,7 @@ describe('Generate API Validation', () => {
         dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg...',
         width: 1024,
         height: 1024,
-        model: 'imagen-3.0-generate-001',
+        model: 'imagen-3.0-generate-002',
         seed: 12345,
       };
       

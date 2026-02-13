@@ -37,12 +37,12 @@ describe('GenerationService', () => {
     it('should have valid default values', () => {
       expect(GENERATION_CONFIG.DEFAULT_WIDTH).toBe(1024);
       expect(GENERATION_CONFIG.DEFAULT_HEIGHT).toBe(1024);
-      expect(GENERATION_CONFIG.DEFAULT_MODEL).toBe('imagen-3.0-generate-001');
+      expect(GENERATION_CONFIG.DEFAULT_MODEL).toBe('imagen-3.0-generate-002');
     });
 
     it('should have supported models', () => {
       expect(GENERATION_CONFIG.SUPPORTED_MODELS.length).toBeGreaterThan(0);
-      expect(GENERATION_CONFIG.SUPPORTED_MODELS).toContain('imagen-3.0-generate-001');
+      expect(GENERATION_CONFIG.SUPPORTED_MODELS).toContain('imagen-3.0-generate-002');
     });
   });
 
@@ -300,14 +300,14 @@ describe('GenerationService', () => {
         'data:image/png;base64,test',
         1024,
         1024,
-        'imagen-3.0-generate-001',
+        'imagen-3.0-generate-002',
         12345
       );
       
       expect(result.imageUrl).toBe('data:image/png;base64,test');
       expect(result.width).toBe(1024);
       expect(result.height).toBe(1024);
-      expect(result.model).toBe('imagen-3.0-generate-001');
+      expect(result.model).toBe('imagen-3.0-generate-002');
       expect(result.seed).toBe(12345);
     });
   });

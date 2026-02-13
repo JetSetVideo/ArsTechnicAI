@@ -30,14 +30,19 @@
   --accent-primary: #00d4aa;
   --accent-primary-alpha: rgba(0, 212, 170, 0.15);
   --accent-secondary: #7c3aed;
+  --accent-secondary-alpha: rgba(124, 58, 237, 0.15);
   --accent-tertiary: #f59e0b;
   --accent-gradient: linear-gradient(135deg, #00d4aa 0%, #7c3aed 100%);
   
   /* Status Colors */
+  --success: #22c55e;
   --success-solid: #22c55e;
+  --success-alpha: rgba(34, 197, 94, 0.15);
   --success-bg: rgba(34, 197, 94, 0.1);
+  --warning: #f97316;
   --warning-solid: #f97316;
   --warning-bg: rgba(249, 115, 22, 0.1);
+  --error: #ef4444;
   --error-solid: #ef4444;
   --error-hover: #dc2626;
   --error-bg: rgba(239, 68, 68, 0.1);
@@ -150,6 +155,10 @@ body {
   line-height: 1.5;
   background: var(--bg-primary);
   color: var(--text-primary);
+}
+
+/* Editor page needs overflow hidden; dashboard pages scroll */
+body.editor-page {
   overflow: hidden;
 }
 

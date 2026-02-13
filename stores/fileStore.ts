@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import type { FileNode, Asset, ImageAsset } from '@/types';
+import { projectPathFromName } from '@/utils/project';
+import {
+  STORAGE_KEYS,
+  WORKSPACE_DEFAULTS,
+  WORKSPACE_PROTECTED_PATHS,
+  WORKSPACE_ROOT_NAMES,
+  WORKSPACE_ROOT_PATHS,
+} from '@/constants/workspace';
 
 // ════════════════════════════════════════════════════════════════════════════
 // FILE STORE - Manages file tree and assets
@@ -21,11 +29,19 @@ interface FileState {
   updateAsset: (id: string, updates: Partial<Asset>) => void;
   removeAsset: (id: string) => void;
   getAsset: (id: string) => Asset | undefined;
+  findPromptAsset: (promptText: string) => Asset | undefined;
+  createPromptAsset: (promptText: string) => Asset;
+  getAssetsByLineage: (lineageId: string) => Asset[];
+  getAssetsByParentId: (parentAssetId: string) => Asset[];
 
   // Folder operations
   addFileToFolder: (folderPath: string, fileName: string, asset: Asset) => FileNode | null;
   createFolder: (parentPath: string, name: string) => FileNode | null;
   ensureFolderExists: (path: string, name: string) => void;
+  findNodeByPath: (path: string) => FileNode | null;
+  deleteNode: (path: string) => boolean;
+  renameNode: (path: string, newName: string) => boolean;
+  moveNode: (sourcePath: string, targetFolderPath: string) => boolean;
 
   // Navigation
   selectPath: (path: string | null) => void;
@@ -35,6 +51,7 @@ interface FileState {
 
   // Project management
   setCurrentProject: (projectName: string) => void;
+  switchToProject: (projectName: string) => void;
   getProjectGeneratedPath: () => string;
 
   // File import from browser
@@ -60,6 +77,68 @@ const createFileNode = (
   asset,
 });
 
+const createProjectFolderNode = (projectName: string, projectPath: string): FileNode => ({
+  id: uuidv4(),
+  name: projectName,
+  type: 'folder',
+  path: projectPath,
+  children: [
+    {
+      id: uuidv4(),
+      name: 'Generated',
+      type: 'folder',
+      path: `${projectPath}/generated`,
+      children: [],
+      expanded: true,
+    },
+    {
+      id: uuidv4(),
+      name: 'Exports',
+      type: 'folder',
+      path: `${projectPath}/exports`,
+      children: [],
+      expanded: false,
+    },
+  ],
+  expanded: true,
+});
+
+const normalizePath = (path: string) => path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+
+const getParentPath = (path: string) => {
+  const normalized = normalizePath(path);
+  if (normalized === '/') return '/';
+  const parts = normalized.split('/');
+  parts.pop();
+  const parent = parts.join('/');
+  return parent || '/';
+};
+
+const getBaseName = (path: string) => {
+  const normalized = normalizePath(path);
+  if (normalized === '/') return '/';
+  const parts = normalized.split('/');
+  return parts[parts.length - 1] || '';
+};
+
+const findNodeByPathInTree = (nodes: FileNode[], targetPath: string): FileNode | null => {
+  const normalizedTarget = normalizePath(targetPath);
+  for (const node of nodes) {
+    if (normalizePath(node.path) === normalizedTarget) return node;
+    if (node.children) {
+      const found = findNodeByPathInTree(node.children, normalizedTarget);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const listDescendantNodes = (node: FileNode): FileNode[] => {
+  const out: FileNode[] = [node];
+  (node.children || []).forEach((child) => out.push(...listDescendantNodes(child)));
+  return out;
+};
+
 export const useFileStore = create<FileState>()(
   persist(
     (set, get) => ({
@@ -67,7 +146,7 @@ export const useFileStore = create<FileState>()(
       assets: new Map(),
       selectedPath: null,
       expandedPaths: new Set(),
-      currentProjectPath: '/projects/untitled-project',
+      currentProjectPath: projectPathFromName(WORKSPACE_DEFAULTS.projectName),
 
       setRootNodes: (nodes) => set({ rootNodes: nodes }),
 
@@ -108,6 +187,51 @@ export const useFileStore = create<FileState>()(
       },
 
       getAsset: (id) => get().assets.get(id),
+
+      findPromptAsset: (promptText) => {
+        const normalized = promptText.trim();
+        if (!normalized) return undefined;
+        return Array.from(get().assets.values()).find(
+          (asset) =>
+            asset.type === 'prompt' &&
+            typeof asset.metadata?.prompt === 'string' &&
+            asset.metadata.prompt.trim() === normalized
+        );
+      },
+
+      createPromptAsset: (promptText) => {
+        const normalized = promptText.trim();
+        const promptAsset: Asset = {
+          id: uuidv4(),
+          name: normalized.slice(0, 60) || 'Untitled Prompt',
+          type: 'prompt',
+          path: `/prompts/${normalized.slice(0, 60).replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'prompt'}.txt`,
+          createdAt: Date.now(),
+          modifiedAt: Date.now(),
+          metadata: {
+            prompt: normalized,
+          },
+        };
+
+        get().ensureFolderExists('/prompts', 'Prompts');
+        get().addAssetToFolder(promptAsset, '/prompts');
+
+        return promptAsset;
+      },
+
+      getAssetsByLineage: (lineageId) => {
+        if (!lineageId) return [];
+        return Array.from(get().assets.values()).filter(
+          (asset) => asset.metadata?.lineageId === lineageId
+        );
+      },
+
+      getAssetsByParentId: (parentAssetId) => {
+        if (!parentAssetId) return [];
+        return Array.from(get().assets.values()).filter(
+          (asset) => asset.metadata?.parentAssetId === parentAssetId
+        );
+      },
 
       // Add a file to a specific folder in the tree
       addFileToFolder: (folderPath, fileName, asset) => {
@@ -205,6 +329,231 @@ export const useFileStore = create<FileState>()(
         }
       },
 
+      findNodeByPath: (path) => {
+        return findNodeByPathInTree(get().rootNodes, path);
+      },
+
+      deleteNode: (path) => {
+        const targetPath = normalizePath(path);
+        if (WORKSPACE_PROTECTED_PATHS.has(targetPath)) {
+          return false;
+        }
+
+        const sourceNode = findNodeByPathInTree(get().rootNodes, targetPath);
+        if (!sourceNode) return false;
+        const descendantAssetIds = listDescendantNodes(sourceNode)
+          .map((node) => node.asset?.id)
+          .filter((id): id is string => Boolean(id));
+
+        let removed = false;
+        set((state) => {
+          const removeFromTree = (nodes: FileNode[]): FileNode[] =>
+            nodes
+              .filter((node) => {
+                const keep = normalizePath(node.path) !== targetPath;
+                if (!keep) removed = true;
+                return keep;
+              })
+              .map((node) =>
+                node.children ? { ...node, children: removeFromTree(node.children) } : node
+              );
+
+          const nextAssets = new Map(state.assets);
+          descendantAssetIds.forEach((id) => nextAssets.delete(id));
+
+          const nextSelectedPath =
+            state.selectedPath && state.selectedPath.startsWith(targetPath)
+              ? null
+              : state.selectedPath;
+
+          const nextExpanded = new Set(
+            Array.from(state.expandedPaths).filter((p) => !p.startsWith(targetPath))
+          );
+
+          return {
+            rootNodes: removeFromTree(state.rootNodes),
+            assets: nextAssets,
+            selectedPath: nextSelectedPath,
+            expandedPaths: nextExpanded,
+          };
+        });
+
+        return removed;
+      },
+
+      renameNode: (path, newName) => {
+        const targetPath = normalizePath(path);
+        const safeName = newName.trim();
+        if (!safeName || targetPath === '/') return false;
+
+        const sourceNode = findNodeByPathInTree(get().rootNodes, targetPath);
+        if (!sourceNode) return false;
+
+        const parentPath = getParentPath(targetPath);
+        const nextPath = normalizePath(`${parentPath}/${safeName}`);
+        if (nextPath === targetPath) return true;
+        if (findNodeByPathInTree(get().rootNodes, nextPath)) return false;
+
+        const descendants = listDescendantNodes(sourceNode);
+        const assetPathChanges = descendants
+          .filter((node) => node.asset?.id)
+          .map((node) => ({
+            id: node.asset!.id,
+            oldPath: normalizePath(node.asset!.path),
+            newPath: normalizePath(node.asset!.path).replace(targetPath, nextPath),
+          }));
+
+        let renamed = false;
+        set((state) => {
+          const renameInTree = (nodes: FileNode[]): FileNode[] =>
+            nodes.map((node) => {
+              const nodePath = normalizePath(node.path);
+              if (nodePath === targetPath || nodePath.startsWith(`${targetPath}/`)) {
+                renamed = true;
+                const updatedPath = nodePath.replace(targetPath, nextPath);
+                const updatedAsset = node.asset
+                  ? {
+                      ...node.asset,
+                      path: normalizePath(node.asset.path).replace(targetPath, nextPath),
+                      modifiedAt: Date.now(),
+                    }
+                  : undefined;
+                return {
+                  ...node,
+                  name: nodePath === targetPath ? safeName : getBaseName(updatedPath),
+                  path: updatedPath,
+                  asset: updatedAsset,
+                  children: node.children ? renameInTree(node.children) : node.children,
+                };
+              }
+              return node.children
+                ? { ...node, children: renameInTree(node.children) }
+                : node;
+            });
+
+          const nextAssets = new Map(state.assets);
+          assetPathChanges.forEach(({ id, newPath }) => {
+            const existing = nextAssets.get(id);
+            if (existing) nextAssets.set(id, { ...existing, path: newPath, modifiedAt: Date.now() });
+          });
+
+          const nextExpanded = new Set<string>();
+          state.expandedPaths.forEach((p) => {
+            if (p === targetPath || p.startsWith(`${targetPath}/`)) {
+              nextExpanded.add(p.replace(targetPath, nextPath));
+            } else {
+              nextExpanded.add(p);
+            }
+          });
+
+          const nextSelectedPath =
+            state.selectedPath && (state.selectedPath === targetPath || state.selectedPath.startsWith(`${targetPath}/`))
+              ? state.selectedPath.replace(targetPath, nextPath)
+              : state.selectedPath;
+
+          return {
+            rootNodes: renameInTree(state.rootNodes),
+            assets: nextAssets,
+            expandedPaths: nextExpanded,
+            selectedPath: nextSelectedPath,
+          };
+        });
+
+        return renamed;
+      },
+
+      moveNode: (sourcePath, targetFolderPath) => {
+        const source = normalizePath(sourcePath);
+        const target = normalizePath(targetFolderPath);
+        if (!source || source === '/' || source === target) return false;
+
+        const sourceNode = findNodeByPathInTree(get().rootNodes, source);
+        const targetNode = findNodeByPathInTree(get().rootNodes, target);
+        if (!sourceNode || !targetNode || targetNode.type !== 'folder') return false;
+        if (target.startsWith(`${source}/`)) return false;
+
+        const destinationPath = normalizePath(`${target}/${sourceNode.name}`);
+        if (findNodeByPathInTree(get().rootNodes, destinationPath)) return false;
+
+        const descendants = listDescendantNodes(sourceNode);
+        const assetPathChanges = descendants
+          .filter((node) => node.asset?.id)
+          .map((node) => ({
+            id: node.asset!.id,
+            newPath: normalizePath(node.asset!.path).replace(source, destinationPath),
+          }));
+
+        let moved = false;
+        set((state) => {
+          const removeNode = (nodes: FileNode[]): FileNode[] =>
+            nodes
+              .filter((node) => normalizePath(node.path) !== source)
+              .map((node) =>
+                node.children ? { ...node, children: removeNode(node.children) } : node
+              );
+
+          const updateSubtreePaths = (node: FileNode): FileNode => {
+            const nodePath = normalizePath(node.path);
+            const nextPath = nodePath.replace(source, destinationPath);
+            return {
+              ...node,
+              path: nextPath,
+              asset: node.asset
+                ? { ...node.asset, path: normalizePath(node.asset.path).replace(source, destinationPath), modifiedAt: Date.now() }
+                : undefined,
+              children: node.children?.map(updateSubtreePaths),
+            };
+          };
+
+          const sourceTreeNode = findNodeByPathInTree(state.rootNodes, source);
+          if (!sourceTreeNode) return state;
+          const movedNode = updateSubtreePaths(sourceTreeNode);
+
+          const insertNode = (nodes: FileNode[]): FileNode[] =>
+            nodes.map((node) => {
+              if (normalizePath(node.path) === target && node.type === 'folder') {
+                moved = true;
+                const children = node.children || [];
+                return { ...node, children: [...children, movedNode] };
+              }
+              return node.children ? { ...node, children: insertNode(node.children) } : node;
+            });
+
+          const withoutSource = removeNode(state.rootNodes);
+          const withTarget = insertNode(withoutSource);
+
+          const nextAssets = new Map(state.assets);
+          assetPathChanges.forEach(({ id, newPath }) => {
+            const existing = nextAssets.get(id);
+            if (existing) nextAssets.set(id, { ...existing, path: newPath, modifiedAt: Date.now() });
+          });
+
+          const nextExpanded = new Set<string>();
+          state.expandedPaths.forEach((p) => {
+            if (p === source || p.startsWith(`${source}/`)) {
+              nextExpanded.add(p.replace(source, destinationPath));
+            } else {
+              nextExpanded.add(p);
+            }
+          });
+          nextExpanded.add(target);
+
+          const nextSelectedPath =
+            state.selectedPath && (state.selectedPath === source || state.selectedPath.startsWith(`${source}/`))
+              ? state.selectedPath.replace(source, destinationPath)
+              : state.selectedPath;
+
+          return {
+            rootNodes: withTarget,
+            assets: nextAssets,
+            expandedPaths: nextExpanded,
+            selectedPath: nextSelectedPath,
+          };
+        });
+
+        return moved;
+      },
+
       selectPath: (path) => set({ selectedPath: path }),
 
       toggleExpanded: (path) => {
@@ -236,12 +585,56 @@ export const useFileStore = create<FileState>()(
       },
 
       setCurrentProject: (projectName) => {
-        const projectPath = `/projects/${projectName.toLowerCase().replace(/\s+/g, '-')}`;
-        set({ currentProjectPath: projectPath });
-        
-        // Ensure project folder exists with Generated subfolder
-        get().ensureFolderExists(projectPath, projectName);
-        get().ensureFolderExists(`${projectPath}/generated`, 'Generated');
+        get().switchToProject(projectName);
+      },
+
+      switchToProject: (projectName) => {
+        const safeName = projectName.trim() || WORKSPACE_DEFAULTS.projectName;
+        const projectPath = projectPathFromName(safeName);
+        const state = get();
+
+        // Avoid rebuilding tree when already on the same project.
+        if (state.currentProjectPath === projectPath && state.rootNodes.length > 0) {
+          return;
+        }
+
+        // If tree is empty, initialize from scratch.
+        if (state.rootNodes.length === 0) {
+          get().initializeFileStructure(safeName);
+          return;
+        }
+
+        const pickRootFolder = (path: string, defaultName: string) =>
+          state.rootNodes.find((node) => node.type === 'folder' && node.path === path) ||
+          createFileNode(defaultName, 'folder', path);
+
+        const importsFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.imports, WORKSPACE_ROOT_NAMES.imports);
+        const libraryFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.library, WORKSPACE_ROOT_NAMES.library);
+        const promptsFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.prompts, WORKSPACE_ROOT_NAMES.prompts);
+
+        const projectsRoot =
+          state.rootNodes.find((node) => node.type === 'folder' && node.path === WORKSPACE_ROOT_PATHS.projects) ||
+          createFileNode(WORKSPACE_ROOT_NAMES.projects, 'folder', WORKSPACE_ROOT_PATHS.projects);
+
+        const nextProjectsRoot: FileNode = {
+          ...projectsRoot,
+          children: [createProjectFolderNode(safeName, projectPath)],
+          expanded: true,
+        };
+
+        set({
+          rootNodes: [importsFolder, libraryFolder, nextProjectsRoot, promptsFolder],
+          currentProjectPath: projectPath,
+          selectedPath: null,
+          expandedPaths: new Set([
+            WORKSPACE_ROOT_PATHS.imports,
+            WORKSPACE_ROOT_PATHS.library,
+            WORKSPACE_ROOT_PATHS.projects,
+            projectPath,
+            `${projectPath}/generated`,
+            WORKSPACE_ROOT_PATHS.prompts,
+          ]),
+        });
       },
 
       getProjectGeneratedPath: () => {
@@ -274,7 +667,7 @@ export const useFileStore = create<FileState>()(
             id: uuidv4(),
             name: file.name,
             type: 'image',
-            path: `/imports/${file.name}`,
+            path: `${WORKSPACE_ROOT_PATHS.library}/${file.name}`,
             size: file.size,
             createdAt: Date.now(),
             modifiedAt: Date.now(),
@@ -289,8 +682,8 @@ export const useFileStore = create<FileState>()(
             },
           };
 
-          // Add to assets and tree
-          get().addAssetToFolder(asset, '/imports');
+          // Add to assets and shared Library so assets can be reused across projects
+          get().addAssetToFolder(asset, '/library');
           importedAssets.push(asset);
         }
 
@@ -298,58 +691,42 @@ export const useFileStore = create<FileState>()(
       },
 
       // Initialize file structure with project support
-      initializeFileStructure: (projectName = 'Untitled Project') => {
-        const projectSlug = projectName.toLowerCase().replace(/\s+/g, '-');
-        const projectPath = `/projects/${projectSlug}`;
+      initializeFileStructure: (projectName = WORKSPACE_DEFAULTS.projectName) => {
+        const safeName = projectName.trim() || WORKSPACE_DEFAULTS.projectName;
+        const projectPath = projectPathFromName(safeName);
 
         const structure: FileNode[] = [
           {
             id: uuidv4(),
-            name: 'Imports',
+            name: WORKSPACE_ROOT_NAMES.imports,
             type: 'folder',
-            path: '/imports',
+            path: WORKSPACE_ROOT_PATHS.imports,
             children: [],
             expanded: true,
           },
           {
             id: uuidv4(),
-            name: 'Projects',
+            name: WORKSPACE_ROOT_NAMES.library,
             type: 'folder',
-            path: '/projects',
+            path: WORKSPACE_ROOT_PATHS.library,
+            children: [],
+            expanded: true,
+          },
+          {
+            id: uuidv4(),
+            name: WORKSPACE_ROOT_NAMES.projects,
+            type: 'folder',
+            path: WORKSPACE_ROOT_PATHS.projects,
             children: [
-              {
-                id: uuidv4(),
-                name: projectName,
-                type: 'folder',
-                path: projectPath,
-                children: [
-                  {
-                    id: uuidv4(),
-                    name: 'Generated',
-                    type: 'folder',
-                    path: `${projectPath}/generated`,
-                    children: [],
-                    expanded: true,
-                  },
-                  {
-                    id: uuidv4(),
-                    name: 'Exports',
-                    type: 'folder',
-                    path: `${projectPath}/exports`,
-                    children: [],
-                    expanded: false,
-                  },
-                ],
-                expanded: true,
-              },
+              createProjectFolderNode(safeName, projectPath),
             ],
             expanded: true,
           },
           {
             id: uuidv4(),
-            name: 'Prompts',
+            name: WORKSPACE_ROOT_NAMES.prompts,
             type: 'folder',
-            path: '/prompts',
+            path: WORKSPACE_ROOT_PATHS.prompts,
             children: [],
             expanded: false,
           },
@@ -358,12 +735,18 @@ export const useFileStore = create<FileState>()(
         set({
           rootNodes: structure,
           currentProjectPath: projectPath,
-          expandedPaths: new Set(['/imports', '/projects', projectPath, `${projectPath}/generated`]),
+          expandedPaths: new Set([
+            WORKSPACE_ROOT_PATHS.imports,
+            WORKSPACE_ROOT_PATHS.library,
+            WORKSPACE_ROOT_PATHS.projects,
+            projectPath,
+            `${projectPath}/generated`,
+          ]),
         });
       },
     }),
     {
-      name: 'ars-technicai-files',
+      name: STORAGE_KEYS.files,
       // Custom serialization for Map and Set
       storage: {
         getItem: (name) => {

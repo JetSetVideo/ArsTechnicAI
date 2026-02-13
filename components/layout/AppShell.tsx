@@ -7,6 +7,7 @@ import { Timeline } from './Timeline';
 import { SettingsModal } from './SettingsModal';
 import { ActionLog } from './ActionLog';
 import { useLogStore, useUserStore, useFileStore } from '@/stores';
+import { useProjectSync, saveCanvasState, loadCanvasState } from '@/hooks/useProjectSync';
 import styles from './AppShell.module.css';
 import type { WorkspaceMode, WorkspaceLayout } from '@/types';
 
@@ -33,6 +34,9 @@ export const AppShell: React.FC = () => {
   const { setCurrentProject } = useFileStore();
   const projectName = currentProject.name;
 
+  // Sync editor projects ↔ dashboard projects
+  useProjectSync();
+
   // Initialize user info and device capabilities on mount
   useEffect(() => {
     refreshDeviceInfo();
@@ -42,7 +46,23 @@ export const AppShell: React.FC = () => {
     
     // Initialize file structure with current project
     setCurrentProject(currentProject.name);
+
+    // Load canvas state for the current project
+    loadCanvasState(currentProject.id);
   }, []);
+
+  // Auto-save canvas state periodically and on unmount
+  useEffect(() => {
+    const interval = setInterval(() => {
+      saveCanvasState(currentProject.id);
+    }, 15000); // Save every 15 seconds
+
+    return () => {
+      clearInterval(interval);
+      // Save on unmount (navigating away from editor)
+      saveCanvasState(currentProject.id);
+    };
+  }, [currentProject.id]);
 
   // Sync project name changes with both stores
   const setProjectName = useCallback((name: string) => {

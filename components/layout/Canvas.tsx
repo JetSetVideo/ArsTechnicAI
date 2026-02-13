@@ -5,12 +5,14 @@ import {
   Maximize,
   Grid3X3,
   Lock,
+  Link2,
   Trash2,
   Copy,
   Layers,
   ImageOff,
+  FileText,
 } from 'lucide-react';
-import { useCanvasStore, useLogStore, useSettingsStore } from '@/stores';
+import { useCanvasStore, useFileStore, useLogStore, useSettingsStore } from '@/stores';
 import { Button } from '../ui/Button';
 import styles from './Canvas.module.css';
 import type { CanvasItem, Asset } from '@/types';
@@ -41,6 +43,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     bringToFront,
   } = useCanvasStore();
 
+  const { getAsset, getAssetsByLineage, getAssetsByParentId, updateAsset } = useFileStore();
   const { settings } = useSettingsStore();
   const log = useLogStore((s) => s.log);
 
@@ -49,6 +52,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(settings.showGrid);
+  const [promptOverlayItemId, setPromptOverlayItemId] = useState<string | null>(null);
+  const [versionOverlayItemId, setVersionOverlayItemId] = useState<string | null>(null);
   
   // Editable filename tag state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -179,6 +184,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
           const img = new Image();
           img.onload = () => {
+            // Scale dropped images to a reasonable size for the viewport
+            const maxDim = Math.min(320, Math.round(window.innerWidth * 0.2));
+            const scaleFactor = Math.min(1, maxDim / Math.max(img.width, img.height));
             addItem({
               type: 'image',
               x: x + index * 20,
@@ -186,7 +194,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
               width: img.width,
               height: img.height,
               rotation: 0,
-              scale: Math.min(1, 400 / Math.max(img.width, img.height)),
+              scale: scaleFactor,
               locked: false,
               visible: true,
               src: dataUrl,
@@ -215,6 +223,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     (e: React.MouseEvent) => {
       if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains(styles.canvasContent)) {
         clearSelection();
+        setPromptOverlayItemId(null);
+        setVersionOverlayItemId(null);
       }
     },
     [clearSelection]
@@ -275,6 +285,38 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     }
   }, []);
 
+  const handleLinkSelected = useCallback(() => {
+    if (selectedIds.length < 2) return;
+
+    const parentItem = items.find((i) => i.id === selectedIds[0]);
+    if (!parentItem) return;
+
+    const parentAsset = parentItem.assetId ? getAsset(parentItem.assetId) : undefined;
+    const lineageId = parentAsset?.metadata?.lineageId || parentAsset?.id || parentItem.assetId || parentItem.id;
+    const parentRefId = parentItem.assetId || parentItem.id;
+
+    selectedIds.slice(1).forEach((childId) => {
+      const childItem = items.find((i) => i.id === childId);
+      updateItem(childId, {
+        parentAssetId: parentRefId,
+        lineageId,
+      });
+
+      if (childItem?.assetId) {
+        const childAsset = getAsset(childItem.assetId);
+        updateAsset(childItem.assetId, {
+          metadata: {
+            ...childAsset?.metadata,
+            parentAssetId: parentRefId,
+            lineageId,
+          },
+        });
+      }
+    });
+
+    log('canvas_move', `Linked ${selectedIds.length} items`);
+  }, [items, selectedIds, getAsset, updateAsset, updateItem, log]);
+
   // Handle wheel for zoom
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -293,6 +335,11 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     },
     [viewport, setViewport]
   );
+
+  // Tag counter-scale: inversely proportional to zoom, dampened with sqrt
+  // so tags don't grow too large when zoomed out or vanish when zoomed in.
+  // Clamped between 0.5x (zoomed in) and 2.5x (zoomed out).
+  const tagScale = Math.min(2.5, Math.max(0.5, 1 / Math.pow(viewport.zoom, 0.5)));
 
   return (
     <div className={styles.canvasWrapper}>
@@ -351,6 +398,16 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
               >
                 <Copy size={16} />
               </Button>
+              {selectedIds.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLinkSelected}
+                  title="Link selected items"
+                >
+                  <Link2 size={16} />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -391,6 +448,30 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           }}
         >
           {items.map((item) => {
+            const asset = item.assetId ? getAsset(item.assetId) : undefined;
+            const isPromptItem = item.type === 'placeholder' || asset?.type === 'prompt';
+            const promptText = asset?.metadata?.prompt || item.prompt || '';
+            const versionLabel = asset?.metadata?.version || item.version || '1.0';
+            const lineageId = asset?.metadata?.lineageId || item.lineageId;
+            const lineageAssets = lineageId ? getAssetsByLineage(lineageId) : [];
+            const children = asset?.id ? getAssetsByParentId(asset.id) : [];
+            const hasParent = Boolean(asset?.metadata?.parentAssetId || item.parentAssetId);
+            const hasChildren = children.length > 0;
+            const versionOptions = lineageAssets
+              .map((entry) => ({
+                id: entry.id,
+                version: entry.metadata?.version || '1.0',
+                src: entry.thumbnail || '',
+                name: entry.name,
+                prompt: entry.metadata?.prompt,
+                model: entry.metadata?.model,
+              }))
+              .sort((a, b) => {
+                const [aMajor, aMinor = '0'] = a.version.split('.');
+                const [bMajor, bMinor = '0'] = b.version.split('.');
+                const majorDiff = Number(aMajor) - Number(bMajor);
+                return majorDiff !== 0 ? majorDiff : Number(aMinor) - Number(bMinor);
+              });
             // Check if item has a valid src and hasn't failed to load
             const hasValidSrc = item.src && item.src.length > 10 && !failedImages.has(item.id);
             
@@ -422,7 +503,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                 }}
                 onMouseDown={(e) => handleItemMouseDown(e, item)}
               >
-                {/* Filename tag - top left corner outside the item */}
+                {/* Filename + prompt/version tags */}
                 {settings.appearance?.showFilenames !== false && (
                   editingItemId === item.id ? (
                     <input
@@ -438,25 +519,119 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                     />
                   ) : (
                     <div 
-                      className={styles.filenameTag} 
-                      title={`${item.name} (double-click to rename)`}
-                      onDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                      className={styles.tagRow}
+                      style={{
+                        transform: `scale(${tagScale})`,
+                        transformOrigin: 'bottom left',
+                      }}
                     >
-                      {item.name.length > 30 ? `${item.name.slice(0, 27)}...` : item.name}
+                      <div 
+                        className={styles.filenameTag} 
+                        title={`${item.name} (double-click to rename)`}
+                        onDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                      >
+                        {item.name.length > 30 ? `${item.name.slice(0, 27)}...` : item.name}
+                      </div>
+                      {promptText && (
+                        <button
+                          className={styles.promptTag}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPromptOverlayItemId(promptOverlayItemId === item.id ? null : item.id);
+                            setVersionOverlayItemId(null);
+                          }}
+                          title="View prompt"
+                        >
+                          Prompt
+                        </button>
+                      )}
+                      <button
+                        className={styles.versionTag}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setVersionOverlayItemId(versionOverlayItemId === item.id ? null : item.id);
+                          setPromptOverlayItemId(null);
+                        }}
+                        title="Select version"
+                      >
+                        v{versionLabel}
+                      </button>
                     </div>
                   )
                 )}
 
+                {/* Prompt overlay */}
+                {promptOverlayItemId === item.id && promptText && (
+                  <div
+                    className={styles.promptOverlay}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className={styles.promptTitle}>Prompt</div>
+                    <div className={styles.promptText}>{promptText}</div>
+                  </div>
+                )}
+
+                {/* Version overlay */}
+                {versionOverlayItemId === item.id && (
+                  <div
+                    className={styles.versionOverlay}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className={styles.versionTitle}>Versions</div>
+                    <div className={styles.versionList}>
+                      {versionOptions.length > 0 ? (
+                        versionOptions.map((option) => (
+                          <button
+                            key={option.id}
+                            className={`${styles.versionOption} ${
+                              option.id === item.assetId ? styles.versionActive : ''
+                            }`}
+                            onClick={() => {
+                              if (!option.src) return;
+                              updateItem(item.id, {
+                                assetId: option.id,
+                                src: option.src,
+                                name: option.name,
+                                prompt: option.prompt || item.prompt,
+                                version: option.version,
+                                lineageId,
+                              });
+                              setVersionOverlayItemId(null);
+                            }}
+                          >
+                            <span className={styles.versionBadge}>v{option.version}</span>
+                            <span className={styles.versionName}>
+                              {option.name}
+                              {option.model ? ` · ${option.model}` : ''}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className={styles.versionEmpty}>No versions found</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Content wrapper */}
                 <div className={styles.itemContent}>
-                  {hasValidSrc ? (
+                  {isPromptItem && promptText ? (
+                    /* Prompt card: show prompt text as a styled note */
+                    <div className={styles.promptCard}>
+                      <div className={styles.promptCardIcon}>
+                        <FileText size={18} />
+                      </div>
+                      <div className={styles.promptCardText}>
+                        {promptText}
+                      </div>
+                    </div>
+                  ) : hasValidSrc ? (
                     <img
                       src={item.src}
                       alt={item.name}
                       className={styles.itemImage}
                       draggable={false}
                       onError={() => {
-                        // Mark this image as failed
                         console.error(`[Canvas] Failed to load image: ${item.name}`, {
                           srcPreview: item.src?.slice(0, 100),
                           srcLength: item.src?.length,
@@ -464,7 +639,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                         setFailedImages(prev => new Set(prev).add(item.id));
                       }}
                       onLoad={() => {
-                        // Image loaded successfully - remove from failed set if it was there
                         console.log(`[Canvas] Image loaded successfully: ${item.name}`);
                         if (failedImages.has(item.id)) {
                           setFailedImages(prev => {
@@ -486,7 +660,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                       ) : !item.src ? (
                         <>
                           <Layers size={32} />
-                          <span>No image source</span>
+                          <span>Blueprint</span>
                           <span className={styles.placeholderName}>{item.name}</span>
                         </>
                       ) : (
@@ -514,6 +688,16 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                 {item.locked && (
                   <div className={styles.lockIndicator}>
                     <Lock size={12} />
+                  </div>
+                )}
+
+                {/* Link indicators */}
+                {hasParent && (
+                  <div className={`${styles.linkDot} ${styles.linkDotLeft}`} title="Linked to parent" />
+                )}
+                {hasChildren && (
+                  <div className={`${styles.linkDot} ${styles.linkDotRight}`} title={`${children.length} linked outputs`}>
+                    {children.length}
                   </div>
                 )}
               </div>

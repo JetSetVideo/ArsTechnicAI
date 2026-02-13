@@ -1,9 +1,57 @@
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { projectPathFromName } from '@/utils/project';
 
 // Dynamic import to avoid SSR issues with stores
 const AppShell = dynamic(
   () => import('@/components/layout/AppShell').then((mod) => mod.AppShell),
+  { ssr: false }
+);
+
+// Project loader that handles ?project= query param
+const ProjectLoader = dynamic(
+  () =>
+    Promise.resolve(function ProjectLoaderInner() {
+      const router = useRouter();
+      const projectId = router.query.project as string | undefined;
+
+      useEffect(() => {
+        if (!projectId) return;
+
+        // Load canvas state for the requested project
+        const { loadCanvasState } = require('@/hooks/useProjectSync');
+        const { useProjectsStore } = require('@/stores/projectsStore');
+        const { useUserStore } = require('@/stores/userStore');
+        const { useFileStore } = require('@/stores/fileStore');
+
+        const dashProject = useProjectsStore.getState().getProject(projectId);
+        if (dashProject) {
+          // Switch to this project in userStore
+          const userState = useUserStore.getState();
+          if (userState.currentProject.id !== projectId) {
+            useUserStore.setState({
+              currentProject: {
+                id: dashProject.id,
+                name: dashProject.name,
+                createdAt: dashProject.createdAt,
+                modifiedAt: dashProject.modifiedAt,
+                path: projectPathFromName(dashProject.name),
+              },
+            });
+
+            // Switch file tree to this project while preserving shared folders.
+            useFileStore.getState().switchToProject(dashProject.name);
+
+            // Load saved canvas
+            loadCanvasState(projectId);
+          }
+        }
+      }, [projectId]);
+
+      return null;
+    }),
   { ssr: false }
 );
 
@@ -20,6 +68,7 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
+      <ProjectLoader />
       <AppShell />
     </>
   );

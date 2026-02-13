@@ -60,12 +60,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   addItemFromAsset: (asset, x, y) => {
     const metadata = asset.metadata || {};
-    const width = metadata.width || 512;
-    const height = metadata.height || 512;
+    const isPrompt = asset.type === 'prompt';
+    
+    // Default size proportional to screen, ~1/4 viewport width, max 320px
+    const screenW = typeof window !== 'undefined' ? window.innerWidth : 1920;
+    const screenH = typeof window !== 'undefined' ? window.innerHeight : 1080;
+    const defaultSize = Math.min(320, Math.round(screenW * 0.2));
+    
+    const width = metadata.width || (isPrompt ? Math.min(280, defaultSize) : defaultSize);
+    const height = metadata.height || (isPrompt ? Math.min(180, Math.round(defaultSize * 0.6)) : defaultSize);
 
     return get().addItem({
       assetId: asset.id,
-      type: 'image',
+      type: isPrompt ? 'placeholder' : 'image',
       x,
       y,
       width,
@@ -74,8 +81,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       scale: 1,
       locked: false,
       visible: true,
-      src: (asset as any).dataUrl || asset.thumbnail || '',
+      src: isPrompt ? '' : ((asset as any).dataUrl || asset.thumbnail || ''),
       name: asset.name,
+      prompt: metadata.prompt || (isPrompt ? asset.name : undefined),
+      promptId: metadata.promptId || (isPrompt ? asset.id : undefined),
+      lineageId: metadata.lineageId,
+      version: metadata.version,
+      parentAssetId: metadata.parentAssetId,
     });
   },
 

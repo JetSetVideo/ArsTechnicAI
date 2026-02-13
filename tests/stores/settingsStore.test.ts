@@ -62,7 +62,7 @@ describe('SettingsStore', () => {
       const state = useSettingsStore.getState();
       
       expect(state.settings.aiProvider.provider).toBe('nanobanana');
-      expect(state.settings.aiProvider.model).toBe('imagen-3.0-generate-001');
+      expect(state.settings.aiProvider.model).toBe('imagen-3.0-generate-002');
       expect(state.settings.aiProvider.defaultWidth).toBe(1024);
       expect(state.settings.aiProvider.defaultHeight).toBe(1024);
     });
@@ -172,7 +172,7 @@ describe('SettingsStore', () => {
       expect(state.settings.theme).toBe('dark');
       expect(state.settings.showGrid).toBe(true);
       expect(state.settings.aiProvider.apiKey).toBe('');
-      expect(state.settings.aiProvider.model).toBe('imagen-3.0-generate-001');
+      expect(state.settings.aiProvider.model).toBe('imagen-3.0-generate-002');
       expect(state.settings.appearance.fontSize).toBe('medium');
       expect(state.settings.appearance.compactMode).toBe(false);
     });

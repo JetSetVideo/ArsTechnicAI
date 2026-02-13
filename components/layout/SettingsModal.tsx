@@ -126,7 +126,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     label="Model"
                     value={localModel}
                     onChange={(e) => setLocalModel(e.target.value)}
-                    placeholder="imagen-3.0-generate-001"
+                    placeholder="imagen-3.0-generate-002"
                   />
                 </div>
 

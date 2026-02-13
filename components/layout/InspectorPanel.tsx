@@ -18,7 +18,9 @@ import {
   useToastStore,
   ERROR_CODES,
   parseAPIError,
+  useUserStore,
 } from '@/stores';
+import { useProjectsStore } from '@/stores/projectsStore';
 import styles from './InspectorPanel.module.css';
 import type { GenerationResult } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -88,11 +90,20 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
   const { settings } = useSettingsStore();
   const { addItem, updateItem } = useCanvasStore();
-  const { addAssetToFolder, updateAsset, getProjectGeneratedPath } = useFileStore();
+  const {
+    addAssetToFolder,
+    updateAsset,
+    getProjectGeneratedPath,
+    getAsset,
+    findPromptAsset,
+    createPromptAsset,
+    getAssetsByLineage,
+  } = useFileStore();
   const log = useLogStore((s) => s.log);
   const toast = useToastStore();
   const selectedItems = useCanvasStore((s) => s.getSelectedItems());
   const selectedItem = selectedItems[0];
+  const currentProject = useUserStore((s) => s.currentProject);
 
   // Handler for renaming selected item
   const handleRenameItem = useCallback((newName: string) => {
@@ -126,6 +137,23 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       updateItem(selectedItem.id, { rotation: value % 360 });
     }
   }, [selectedItem, updateItem]);
+
+  const getNextVersionLabel = useCallback((existingVersions: string[]) => {
+    if (existingVersions.length === 0) return '1.0';
+
+    const parsed = existingVersions
+      .map((v) => {
+        const [major, minor = '0'] = v.split('.');
+        return {
+          major: Number(major) || 1,
+          minor: Number(minor) || 0,
+        };
+      })
+      .sort((a, b) => (a.major - b.major) || (a.minor - b.minor));
+
+    const latest = parsed[parsed.length - 1];
+    return `${latest.major}.${latest.minor + 1}`;
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     // ═══════════════════════════════════════════════════════════
@@ -209,6 +237,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           width: genWidth,
           height: genHeight,
           apiKey: settings.aiProvider.apiKey,
+          model: settings.aiProvider.model,
+          endpoint: settings.aiProvider.endpoint,
+          // Placeholder fallback can mask config issues; keep it off by default.
+          allowPlaceholderFallback: false,
         }),
         signal: controller.signal,
       });
@@ -307,7 +339,23 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         srcPreview: imageSrc.slice(0, 80),
       });
 
-      // Add to canvas
+      // Prepare prompt and lineage metadata
+      const existingPrompt = findPromptAsset(prompt);
+      const promptAsset = existingPrompt || createPromptAsset(prompt);
+
+      const selectedAsset = selectedItem?.assetId ? getAsset(selectedItem.assetId) : undefined;
+      const lineageId = selectedAsset?.metadata?.lineageId || selectedAsset?.id || uuidv4();
+      const parentAssetId = selectedAsset?.id;
+      const lineageAssets = getAssetsByLineage(lineageId);
+      const existingVersions = lineageAssets
+        .map((asset) => asset.metadata?.version)
+        .filter((v): v is string => typeof v === 'string');
+      const versionLabel = getNextVersionLabel(existingVersions);
+
+      // Create asset id and add to canvas — scale to ~20% of viewport
+      const assetId = uuidv4();
+      const maxDim = Math.min(320, Math.round(window.innerWidth * 0.2));
+      const genScale = Math.min(1, maxDim / Math.max(genWidth, genHeight));
       const canvasItem = addItem({
         type: 'generated',
         x: 100 + Math.random() * 200,
@@ -315,19 +363,23 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         width: genWidth,
         height: genHeight,
         rotation: 0,
-        scale: 0.5,
+        scale: genScale,
         locked: false,
         visible: true,
         src: imageSrc,
         prompt,
         name: filename,
+        assetId,
+        promptId: promptAsset.id,
+        lineageId,
+        parentAssetId,
+        version: versionLabel,
       });
 
       console.log('[Generation] Canvas item created:', canvasItem?.id);
 
       // Add to file system and project folder
       const generatedFolderPath = getProjectGeneratedPath();
-      const assetId = uuidv4();
       
       console.log('[Generation] Adding to folder:', generatedFolderPath);
       
@@ -346,10 +398,19 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             prompt,
             model: settings.aiProvider.model,
             seed: generationResult.seed,
+            promptId: promptAsset.id,
+            lineageId,
+            parentAssetId,
+            version: versionLabel,
           },
         },
         generatedFolderPath
       );
+
+      // Update dashboard project card preview + stats from actual generation output.
+      useProjectsStore.getState().updateProject(currentProject.id, {
+        thumbnail: imageSrc,
+      });
 
       // Show success toast
       toast.success(
@@ -428,9 +489,16 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     addItem,
     addAssetToFolder,
     getProjectGeneratedPath,
+    getAsset,
+    findPromptAsset,
+    createPromptAsset,
+    getAssetsByLineage,
+    getNextVersionLabel,
+    selectedItem,
     log,
     toast,
     onOpenSettings,
+    currentProject.id,
   ]);
 
   const recentJobs = jobs.slice(0, 5);

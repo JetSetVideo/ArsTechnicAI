@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { projectPathFromName } from '@/utils/project';
+import { STORAGE_KEYS, WORKSPACE_DEFAULTS } from '@/constants/workspace';
 
 // ════════════════════════════════════════════════════════════════════════════
 // USER & DEVICE INFORMATION STORE
@@ -165,10 +167,10 @@ function getDefaultDeviceInfo(): DeviceInfo {
 function createDefaultProject(): ProjectInfo {
   return {
     id: uuidv4(),
-    name: 'Untitled Project',
+    name: WORKSPACE_DEFAULTS.projectName,
     createdAt: Date.now(),
     modifiedAt: Date.now(),
-    path: '/projects/untitled-project',
+    path: projectPathFromName(WORKSPACE_DEFAULTS.projectName),
   };
 }
 
@@ -209,13 +211,13 @@ export const useUserStore = create<UserState>()(
         }));
       },
 
-      createNewProject: (name = 'Untitled Project') => {
+      createNewProject: (name = WORKSPACE_DEFAULTS.projectName) => {
         const project: ProjectInfo = {
           id: uuidv4(),
           name,
           createdAt: Date.now(),
           modifiedAt: Date.now(),
-          path: `/projects/${name.toLowerCase().replace(/\s+/g, '-')}`,
+          path: projectPathFromName(name),
         };
 
         set((state) => ({
@@ -284,7 +286,7 @@ export const useUserStore = create<UserState>()(
       },
     }),
     {
-      name: 'ars-technicai-user',
+      name: STORAGE_KEYS.user,
       // Only persist certain fields (not device info, refreshed each session)
       partialize: (state) => ({
         currentProject: state.currentProject,

@@ -36,12 +36,15 @@ export const GENERATION_CONFIG = {
 
   // Supported models
   SUPPORTED_MODELS: [
-    'imagen-3.0-generate-001',
-    'imagen-3.0-fast-generate-001',
+    // Gemini API Imagen models
+    'imagen-3.0-generate-002',
+    'imagen-4.0-generate-001',
+    'imagen-4.0-fast-generate-001',
+    'imagen-4.0-ultra-generate-001',
   ] as const,
 
   // Default model
-  DEFAULT_MODEL: 'imagen-3.0-generate-001',
+  DEFAULT_MODEL: 'imagen-3.0-generate-002',
 } as const;
 
 export type SupportedModel = typeof GENERATION_CONFIG.SUPPORTED_MODELS[number];
