@@ -20,6 +20,9 @@ import {
 import { useRouter } from 'next/router';
 import styles from './DashboardLayout.module.css';
 import { Button } from '../ui';
+import { ConnectionBanner } from '../ui/ConnectionBanner';
+import { SettingsModal } from './SettingsModal';
+import { HelpModal } from './HelpModal';
 import type { DashboardTab } from '../../types/dashboard';
 import { useProjectSync, saveCanvasState } from '../../hooks/useProjectSync';
 import { useUserStore } from '../../stores/userStore';
@@ -59,6 +62,8 @@ export function DashboardLayout() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<DashboardTab>('projects');
   const [searchQuery, setSearchQuery] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Project sync hook — bridges userStore + projectsStore
   const { openProjectFromDashboard } = useProjectSync();
@@ -77,7 +82,7 @@ export function DashboardLayout() {
   }, [router, currentProject.id, openProjectFromDashboard]);
 
   const handleOpenSettings = useCallback(() => {
-    setActiveTab('profile');
+    setSettingsOpen(true);
   }, []);
 
   // Render active tab content
@@ -129,10 +134,13 @@ export function DashboardLayout() {
 
   return (
     <div className={styles.dashboard}>
+      <ConnectionBanner />
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <Link href="/home" className={styles.appName} title="Dashboard Home">
-            Ars Technic AI
+            <span className={styles.logoArs}>Ars</span>
+            <span className={styles.logoTechnic}>Technic</span>
+            <span className={styles.logoAI}>AI</span>
           </Link>
 
           <div className={styles.searchBar}>
@@ -155,12 +163,23 @@ export function DashboardLayout() {
             >
               <Settings size={18} />
             </Button>
-            <Button variant="ghost" size="sm" title="Help">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setHelpOpen(true)}
+              title="Help"
+            >
               <HelpCircle size={18} />
             </Button>
           </div>
         </div>
       </header>
+
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+      <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
 
       {/* Tab Navigation */}
       <nav className={styles.tabNav}>

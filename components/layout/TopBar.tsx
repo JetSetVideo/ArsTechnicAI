@@ -47,6 +47,7 @@ interface TopBarProps {
   onToggleInspector: () => void;
   onToggleTimeline: () => void;
   onOpenSettings: () => void;
+  onOpenHelp?: () => void;
   explorerVisible: boolean;
   inspectorVisible: boolean;
   timelineVisible: boolean;
@@ -68,6 +69,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleInspector,
   onToggleTimeline,
   onOpenSettings,
+  onOpenHelp,
   explorerVisible,
   inspectorVisible,
   timelineVisible,
@@ -398,6 +400,12 @@ export const TopBar: React.FC<TopBarProps> = ({
                     <span>Settings</span>
                     <kbd>⌘,</kbd>
                   </button>
+                  {onOpenHelp && (
+                    <button className={styles.menuItem} onClick={onOpenHelp}>
+                      <HelpCircle size={14} />
+                      <span>Help</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -423,13 +431,28 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
 
         <div className={styles.section}>
-          <div className={styles.actions}>
-            <Button variant="ghost" size="sm" onClick={onOpenSettings} title="Settings">
-              <Settings size={16} />
-            </Button>
-            <Button variant="ghost" size="sm" title="Help">
-              <HelpCircle size={16} />
-            </Button>
+          <div className={styles.panelTag}>
+            <button
+              className={`${styles.toggleButton} ${explorerVisible ? styles.active : ''}`}
+              onClick={onToggleExplorer}
+              title="Toggle Explorer (⌘1)"
+            >
+              <PanelLeft size={18} />
+            </button>
+            <button
+              className={`${styles.toggleButton} ${timelineVisible ? styles.active : ''}`}
+              onClick={onToggleTimeline}
+              title="Toggle Timeline (⌘2)"
+            >
+              <PanelBottom size={18} />
+            </button>
+            <button
+              className={`${styles.toggleButton} ${inspectorVisible ? styles.active : ''}`}
+              onClick={onToggleInspector}
+              title="Toggle Inspector (⌘3)"
+            >
+              <PanelRight size={18} />
+            </button>
           </div>
         </div>
       </div>

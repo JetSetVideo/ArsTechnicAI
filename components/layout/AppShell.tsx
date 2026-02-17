@@ -5,6 +5,7 @@ import { InspectorPanel } from './InspectorPanel';
 import { Canvas } from './Canvas';
 import { Timeline } from './Timeline';
 import { SettingsModal } from './SettingsModal';
+import { HelpModal } from './HelpModal';
 import { ActionLog } from './ActionLog';
 import { useLogStore, useUserStore, useFileStore } from '@/stores';
 import { useProjectSync, saveCanvasState, loadCanvasState } from '@/hooks/useProjectSync';
@@ -26,6 +27,7 @@ export const AppShell: React.FC = () => {
   const [mode, setMode] = useState<WorkspaceMode>('create');
   const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [timelineHeight, setTimelineHeight] = useState(160);
   const log = useLogStore((s) => s.log);
   
@@ -232,6 +234,7 @@ export const AppShell: React.FC = () => {
         onToggleInspector={() => togglePanel('inspector')}
         onToggleTimeline={() => togglePanel('timeline')}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenHelp={() => setHelpOpen(true)}
         explorerVisible={layout.explorer.visible}
         inspectorVisible={layout.inspector.visible}
         timelineVisible={layout.timeline.visible}
@@ -284,6 +287,7 @@ export const AppShell: React.FC = () => {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+      <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 };

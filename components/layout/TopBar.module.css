@@ -20,8 +20,11 @@
 
 .appName {
   display: flex;
-  align-items: baseline;
-  gap: 0.125rem;
+  align-items: center;
+  gap: 3px;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: middle;
   font-size: 0.875rem;
   font-weight: 600;
   flex-shrink: 0;
@@ -45,8 +48,10 @@
 .panelTag {
   display: inline-flex;
   align-items: center;
-  gap: 0.125rem;
-  padding: 0.25rem 0.5rem;
+  justify-content: center;
+  gap: 2px;
+  margin: 1px;
+  padding: 0;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: 8px;

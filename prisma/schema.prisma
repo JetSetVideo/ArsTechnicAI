@@ -123,3 +123,39 @@ enum AuthProvider {
   GOOGLE
   GITHUB
 }
+
+// Anonymous telemetry (no PII) — device/usage/health snapshots
+model TelemetrySnapshot {
+  id               String   @id @default(cuid())
+  sessionId        String
+  clientSignature  String   // Offline-unique: version + env hash
+  deviceTier       String?
+  connectivityTier String?
+  platform         String?
+  screenWidth      Int?
+  screenHeight     Int?
+  sessionStartedAt DateTime
+  sessionDurationMs Int
+  generationsCount Int      @default(0)
+  importsCount     Int      @default(0)
+  exportsCount     Int      @default(0)
+  projectsOpened   Int      @default(0)
+  canvasItems      Int      @default(0)
+  healthStatus     String?
+  healthServices   Json?
+  healthCheckedAt  DateTime?
+  appVersion       String?
+  payload          Json?    // Full snapshot for flexibility
+  createdAt        DateTime @default(now())
+}
+
+// Error events for bug tracking (with client signature)
+model TelemetryErrorEvent {
+  id              String   @id @default(cuid())
+  sessionId       String
+  clientSignature String
+  code            String
+  message         String   @db.Text
+  context         Json?
+  createdAt       DateTime @default(now())
+}

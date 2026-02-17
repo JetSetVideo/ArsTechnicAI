@@ -361,6 +361,8 @@ User Input → Component → Store → Persistence (localStorage)
 | **Project** | Name, paths, timestamps | localStorage | Continuity |
 | **Settings** | Theme, API keys, preferences | localStorage | Personalization |
 | **Actions** | Type, timestamp, metadata | localStorage | Undo/analytics |
+| **Telemetry** | Device, session, usage, paths, logs, health | localStorage + backend | Bug/performance tracking |
+| **Errors** | Code, message, clientSignature | localStorage + backend | Error correlation |
 
 ### 4.3 Recommended Data Strategy
 
@@ -381,6 +383,8 @@ Phase 3 (Scale): Full Cloud
 - Usage-based optimization
 - ML-powered suggestions based on history
 ```
+
+> **Telemetry & Health**: See `docs/HEALTH_ERROR_SYSTEM_PLAN.md` for the health/error/telemetry pipeline. **Implemented**: Client signature (offline-unique version fingerprint), gather → digest → store → sync at startup, error store with backend sync, Settings > About (client signature display, telemetry toggle). API: `/api/telemetry/snapshot`, `/api/telemetry/events`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 This document describes how Ars TechnicAI's codebase and product modules are organized. It is the "map" that `README.md` and `Design.md` reference.
 
-> **See also**: `ARCHITECTURE.md` for critical analysis and technical roadmap.
+> **See also**: `ARCHITECTURE.md` for critical analysis and technical roadmap. `docs/HEALTH_ERROR_SYSTEM_PLAN.md` for the health/error/telemetry pipeline and client signature.
 
 ---
 
@@ -24,13 +24,18 @@ The repository is a **Next.js 14 Pages Router** app executed via **Deno 2** task
 │   │   ├── Timeline.tsx     # Bottom panel - video timeline
 │   │   ├── ActionLog.tsx    # Floating activity log
 │   │   └── SettingsModal.tsx# Settings dialog
+│   ├── contexts/
+│   │   └── TelemetryProvider.tsx # Gather → digest → store → sync at startup
 │   └── ui/                  # Reusable primitives
 │       ├── Button.tsx
+│       ├── ConnectionBanner.tsx  # Startup connection status (green/orange/red)
 │       ├── Input.tsx
 │       ├── SearchBar.tsx
 │       └── Toast.tsx        # Notification system
 ├── stores/                  # Zustand state management
 │   ├── canvasStore.ts       # Canvas items, viewport, selection
+│   ├── telemetryStore.ts    # Telemetry snapshots, health, sync state
+│   ├── errorStore.ts        # Persisted error events for sync
 │   ├── fileStore.ts         # File tree, assets (with persistence)
 │   ├── generationStore.ts   # AI job queue
 │   ├── logStore.ts          # Action history
@@ -41,15 +46,25 @@ The repository is a **Next.js 14 Pages Router** app executed via **Deno 2** task
 ├── pages/
 │   ├── _app.tsx             # App wrapper
 │   ├── _document.tsx        # HTML document
-│   ├── index.tsx            # Main entry
+│   ├── index.tsx            # Redirects to /home; editor when ?project=
+│   ├── home.tsx             # Dashboard (projects, AI tools, agents, profile)
 │   └── api/
 │       ├── generate.ts      # AI generation endpoint
+│       ├── health.ts        # Home server / PostgreSQL health check
+│       ├── telemetry/
+│       │   ├── snapshot.ts   # Receive telemetry snapshots
+│       │   └── events.ts     # Batch error events
 │       └── test-image.ts    # Debug endpoint
+├── services/
+│   └── telemetry/           # Gather, digest, sync
 ├── types/
-│   └── index.ts             # All TypeScript definitions
+│   ├── index.ts             # All TypeScript definitions
+│   └── telemetry.ts         # Telemetry snapshot, error event types
 ├── styles/
 │   ├── globals.css          # Design tokens + reset
 │   └── Home.module.css
+├── utils/
+│   └── clientSignature.ts   # Offline-unique version fingerprint
 └── [config files]
 ```
 
@@ -65,7 +80,7 @@ The repository is a **Next.js 14 Pages Router** app executed via **Deno 2** task
 ┌─────────────────────────────────────────────────────────────┐
 │                      Zustand Stores                          │
 ├──────────┬──────────┬──────────┬──────────┬────────────────┤
-│ canvas   │ file     │ settings │ log      │ toast │ user   │
+│ canvas   │ file     │ settings │ log      │ toast │ user   │ telemetry │ error │
 │ Store    │ Store    │ Store    │ Store    │ Store │ Store  │
 ├──────────┴──────────┴──────────┴──────────┴────────────────┤
 │                   Persistence Layer                          │
@@ -272,3 +287,4 @@ ExplorerPanel.handleFileChange()
 | `Prompt.md` | PRD + feature inventory |
 | `Structure.md` | Boundaries and file layout (this doc) |
 | `ARCHITECTURE.md` | **Critical analysis + technical roadmap** |
+| `docs/HEALTH_ERROR_SYSTEM_PLAN.md` | Health/error/telemetry pipeline, client signature, data audit |

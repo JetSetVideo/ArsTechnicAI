@@ -10,7 +10,7 @@ const AppShell = dynamic(
   { ssr: false }
 );
 
-// Project loader that handles ?project= query param
+// Project loader that handles ?project= query param and redirects to /home when no project
 const ProjectLoader = dynamic(
   () =>
     Promise.resolve(function ProjectLoaderInner() {
@@ -18,7 +18,11 @@ const ProjectLoader = dynamic(
       const projectId = router.query.project as string | undefined;
 
       useEffect(() => {
-        if (!projectId) return;
+        // If no project, redirect to home page (dashboard with projects and options)
+        if (!projectId) {
+          router.replace('/home');
+          return;
+        }
 
         // Load canvas state for the requested project
         const { loadCanvasState } = require('@/hooks/useProjectSync');
@@ -48,14 +52,17 @@ const ProjectLoader = dynamic(
             loadCanvasState(projectId);
           }
         }
-      }, [projectId]);
+      }, [projectId, router]);
 
       return null;
     }),
   { ssr: false }
 );
 
-export default function Home() {
+export default function EditorPage() {
+  const router = useRouter();
+  const projectId = router.query.project as string | undefined;
+
   return (
     <>
       <Head>
@@ -69,7 +76,7 @@ export default function Home() {
       </Head>
 
       <ProjectLoader />
-      <AppShell />
+      {projectId && <AppShell />}
     </>
   );
 }

@@ -52,7 +52,19 @@ export const useToastStore = create<ToastState>((set, get) => ({
       toasts: [...state.toasts, newToast],
     }));
 
-    // Auto-remove after duration (if not persistent)
+    if (toast.type === 'error' || toast.type === 'warning') {
+      try {
+        const { useErrorStore } = require('./errorStore');
+        useErrorStore.getState().append({
+          code: toast.title,
+          message: toast.message,
+          context: { type: toast.type },
+        });
+      } catch {
+        // Avoid circular import or runtime errors
+      }
+    }
+
     if (newToast.duration) {
       setTimeout(() => {
         get().removeToast(id);

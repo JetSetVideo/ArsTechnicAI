@@ -75,6 +75,12 @@ For detailed component specs and CSS terms, see `Design.md`.
 | Action Log | ✅ Complete | Activity tracking |
 | Toast Notifications | ✅ Complete | Error handling with codes |
 | User Profiling | ✅ Complete | Anonymous device/session info |
+| Home Page Landing | ✅ Complete | Redirects `/` → `/home` at startup |
+| Connection Banner | ✅ Complete | Green/orange/red status for home server |
+| Health Check API | ✅ Complete | Probes BACKEND_URL and PostgreSQL |
+| Telemetry Pipeline | ✅ Complete | Gather, digest, store, sync at startup |
+| Client Signature | ✅ Complete | Offline-unique code (Settings > About) |
+| Error Store | ✅ Complete | Persisted errors, synced to backend |
 
 > **Roadmap**: ffmpeg-based video processing, WebGL canvas renderer, collaborative editing, cloud sync. See `ARCHITECTURE.md` for detailed analysis.
 
@@ -93,12 +99,24 @@ deno task install
 deno task dev
 ```
 
+The app starts at **http://localhost:3000** and lands on the **home page** (`/home`) where projects and options are shown. From there you can open a project to access the canvas editor.
+
 ### Production build
 
 ```bash
 deno task build
 deno task start
 ```
+
+### Database migration (optional)
+
+If you use PostgreSQL (DATABASE_URL set), run migrations to create telemetry tables:
+
+```bash
+npx prisma migrate dev --name add_telemetry
+```
+
+This creates `TelemetrySnapshot` and `TelemetryErrorEvent` tables for telemetry sync.
 
 ---
 
@@ -115,6 +133,24 @@ ARSTECHNICAI_NANOBANANA_API_KEY=
 # Optional: telemetry / error reporting
 ARSTECHNICAI_SENTRY_DSN=
 ```
+
+### Startup connection to home server
+
+At startup, the app tries to connect to your **home server** (configured via `BACKEND_URL`, e.g. your desktop hosting PostgreSQL). A **connection banner** appears at the top:
+
+- **Green**: All services connected (Backend API, PostgreSQL). Ephemeral—auto-dismisses after a few seconds.
+- **Orange**: Degraded (partial connectivity).
+- **Red**: Cannot reach the home server. Use the X button to dismiss.
+
+Configure `BACKEND_URL` in `.env.local` to point to your home server (e.g. `http://192.168.1.100:8000` or `http://your-desktop.local:8000`).
+
+The app runs locally and accesses **local assets** via the Explorer panel—you can import files from your machine and store project data in the browser. Backend/PostgreSQL connectivity is optional for generation and persistence on your home server.
+
+### Telemetry & Client Signature
+
+At startup, the app **gathers** device, session, usage, paths, logs, and settings data; **digests** it into derived metrics (device tier, connectivity tier); and **stores** snapshots locally. Errors are persisted in the error store. When telemetry sync is enabled (Settings > About), snapshots and error events are sent to the backend.
+
+A **client signature** (e.g. `v1.0.0-a3f2c1`) uniquely identifies your version + environment for bug/performance tracking. It is computed offline and shown in Settings > About. You can copy it when reporting bugs.
 
 ### Plug frontend to local backend + PostgreSQL (Ubuntu)
 

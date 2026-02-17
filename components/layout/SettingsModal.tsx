@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Palette, Keyboard, Save, RotateCcw } from 'lucide-react';
+import { X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { useSettingsStore, useLogStore } from '@/stores';
+import { useSettingsStore, useLogStore, useTelemetryStore } from '@/stores';
+import { computeClientSignature, APP_VERSION } from '@/utils/clientSignature';
+import { deriveDeviceTier, deriveConnectivityTier } from '@/utils/clientSignature';
+import { useUserStore } from '@/stores/userStore';
 import styles from './SettingsModal.module.css';
 
 interface SettingsModalProps {
@@ -10,7 +13,7 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-type SettingsTab = 'api' | 'appearance' | 'shortcuts';
+type SettingsTab = 'api' | 'appearance' | 'shortcuts' | 'about';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -19,6 +22,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const { settings, updateSettings, updateAIProvider, updateAppearance, resetSettings } =
     useSettingsStore();
   const log = useLogStore((s) => s.log);
+  const deviceInfo = useUserStore((s) => s.deviceInfo);
+  const telemetryEnabled = useTelemetryStore((s) => s.telemetryEnabled);
+  const setTelemetryEnabled = useTelemetryStore((s) => s.setTelemetryEnabled);
+  const latestSnapshot = useTelemetryStore((s) => s.getLatestSnapshot());
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('api');
   const [localApiKey, setLocalApiKey] = useState(settings.aiProvider.apiKey);
@@ -52,10 +59,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const deviceTier = deviceInfo
+    ? deriveDeviceTier(deviceInfo.hardwareConcurrency, deviceInfo.deviceMemory)
+    : 'unknown';
+  const connectivityTier = deviceInfo
+    ? deriveConnectivityTier(deviceInfo.connectionEffectiveType)
+    : 'unknown';
+  const clientSignature =
+    latestSnapshot?.clientSignature ?? computeClientSignature(deviceTier, connectivityTier);
+
+  const handleCopySignature = () => {
+    navigator.clipboard?.writeText(clientSignature);
+    log('settings_change', 'Copied client signature to clipboard');
+  };
+
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'api', label: 'API Keys', icon: <Key size={16} /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
     { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={16} /> },
+    { id: 'about', label: 'About', icon: <Info size={16} /> },
   ];
 
   return (
@@ -259,6 +281,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
+            {activeTab === 'about' && (
+              <div className={styles.section}>
+                <h3>Client Signature</h3>
+                <p className={styles.description}>
+                  Unique code for your current app version and environment. Use it when reporting
+                  bugs so we can correlate issues with your setup.
+                </p>
+                <div className={styles.signatureRow}>
+                  <code className={styles.signatureCode}>{clientSignature}</code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopySignature}
+                    icon={<Copy size={14} />}
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <h3>Telemetry</h3>
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={telemetryEnabled}
+                    onChange={(e) => setTelemetryEnabled(e.target.checked)}
+                  />
+                  <span>Allow telemetry sync (device/usage stats to backend)</span>
+                </label>
+                <p className={styles.description} style={{ marginTop: 8, fontSize: '0.75rem' }}>
+                  When enabled, anonymous usage and error data is sent to help improve the app. No
+                  PII is collected. Data is stored locally first and synced when online.
+                </p>
+              </div>
+            )}
+
             {activeTab === 'shortcuts' && (
               <div className={styles.section}>
                 <h3>Keyboard Shortcuts</h3>
@@ -314,9 +370,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className={styles.footer}>
-          <Button variant="ghost" onClick={handleReset} icon={<RotateCcw size={14} />}>
-            Reset to Defaults
-          </Button>
+          <div className={styles.footerLeft}>
+            <Button variant="ghost" onClick={handleReset} icon={<RotateCcw size={14} />}>
+              Reset to Defaults
+            </Button>
+            <span className={styles.versionLabel}>
+              Development version {APP_VERSION}
+            </span>
+          </div>
           <div className={styles.footerRight}>
             <Button variant="secondary" onClick={onClose}>
               Cancel

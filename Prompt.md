@@ -202,6 +202,13 @@ Providers vary (REST, websocket, human-in-the-loop). Ars TechnicAI needs:
 | Toast System | ✅ Complete | Error codes, categorized notifications |
 | User Profiling | ✅ Complete | Anonymous session/device info |
 | Responsive Design | ✅ Complete | Desktop/tablet/mobile breakpoints |
+| Home Page Landing | ✅ Complete | App starts at /home (projects and options) |
+| Connection Banner | ✅ Complete | Green/orange/red status for home server at startup |
+| Health Check API | ✅ Complete | Probes BACKEND_URL and PostgreSQL |
+| Telemetry Pipeline | ✅ Complete | Gather, digest, store, sync user/device/usage at startup |
+| Client Signature | ✅ Complete | Offline-unique code for bug/performance tracking |
+| Error Store | ✅ Complete | Persisted error events, synced to backend |
+| Settings > About | ✅ Complete | Client signature display, telemetry toggle |
 
 ### In Progress
 

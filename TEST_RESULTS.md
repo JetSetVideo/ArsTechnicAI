@@ -1,6 +1,6 @@
 # ArsTechnicAI Test Results
 
-**Date:** February 3, 2026  
+**Date:** February 17, 2026  
 **Test Framework:** Vitest v1.6.1  
 **Environment:** JSDOM (browser-like environment)  
 **Runtime:** Deno 2.6.x with Next.js 14.2.15
@@ -509,6 +509,25 @@ Tests are configured via `vitest.config.ts`:
 5. **Add E2E tests**: Playwright or Cypress for full workflow testing
 6. **Mock API calls**: Test actual fetch behavior
 
+### Health Check API
+
+The `/api/health` endpoint probes the home server (BACKEND_URL) and PostgreSQL status:
+
+- Returns `status`: `ok` | `degraded` | `error`
+- Returns `services`: Backend API, PostgreSQL
+- Used by ConnectionBanner for green/orange/red display
+
+### Telemetry Pipeline (Implemented)
+
+The telemetry system gathers, digests, stores, and syncs user/device/usage data at startup:
+
+- **Client Signature**: Offline-unique code (e.g. `v1.0.0-a3f2c1`) for bug/performance tracking
+- **Gather**: Device, session, usage, paths, logs, settings, projects, canvas from stores
+- **Digest**: Derived metrics (device tier, connectivity tier, log counts by type)
+- **Store**: `telemetryStore`, `errorStore` (Zustand + persist)
+- **Sync**: POST `/api/telemetry/snapshot`, POST `/api/telemetry/events`
+- **Settings > About**: Client signature display, telemetry toggle
+
 ### Future Backend Integration (Python3 + PostgreSQL)
 
 When the backend is added:
@@ -518,6 +537,7 @@ When the backend is added:
 - Add authentication flow tests
 - Test file upload/download
 - Add rate limiting tests
+- Add health check API tests
 
 ---
 

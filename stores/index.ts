@@ -16,3 +16,5 @@ export { useTechniquesStore } from './techniquesStore';
 export { useAgentsStore } from './agentsStore';
 export { useProfileStore } from './profileStore';
 export { useSocialStore, PLATFORM_INFO } from './socialStore';
+export { useTelemetryStore } from './telemetryStore';
+export { useErrorStore } from './errorStore';

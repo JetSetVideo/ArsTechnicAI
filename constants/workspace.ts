@@ -40,9 +40,13 @@ export const STORAGE_KEYS = {
   social: 'ars-technicai-social',
   canvasStates: 'ars-technicai-canvas-states',
   workspaceWipeFlag: 'ars-technicai-workspace-wiped-v1',
+  telemetry: 'ars-technicai-telemetry',
+  errors: 'ars-technicai-errors',
 } as const;
 
 export const WORKSPACE_DATA_KEYS_TO_CLEAR = [
+  STORAGE_KEYS.telemetry,
+  STORAGE_KEYS.errors,
   STORAGE_KEYS.files,
   STORAGE_KEYS.user,
   STORAGE_KEYS.projects,

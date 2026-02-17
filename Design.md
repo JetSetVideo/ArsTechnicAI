@@ -626,6 +626,8 @@ Users can adjust in Settings > Appearance:
 | SearchBar | ✅ | ✅ | Scope chips, shortcuts |
 | Toast | ✅ | ✅ | Error codes, progress |
 | TopBar | ✅ | ✅ | Mode switcher, menu |
+| ConnectionBanner | ✅ | ✅ | Green/orange/red, X dismiss, ephemeral when ok |
+| Settings > About | ✅ | ✅ | Client signature, telemetry toggle |
 | Explorer | ✅ | ✅ | Tree, drag-drop |
 | Canvas | ✅ | ✅ | Pan/zoom, selection |
 | Inspector | ✅ | ✅ | Forms, properties |
@@ -633,6 +635,14 @@ Users can adjust in Settings > Appearance:
 | Modal | ✅ | ✅ | Focus trap, escape |
 | Tooltip | ❌ | ❌ | Not implemented |
 | Combobox | ❌ | ❌ | Using native select |
+
+### ArsTechnicAI Title Style
+
+The ArsTechnicAI logo is styled consistently across the canvas TopBar and home DashboardLayout:
+
+- **Ars**: `font-family: var(--font-serif)`, italic, primary text
+- **Technic**: `font-family: var(--font-mono)`, secondary text
+- **AI**: `background: var(--accent-gradient)`, gradient clip text, mono, bold
 
 ### Accessibility Status
 
@@ -670,3 +680,12 @@ Based on the critical analysis in `ARCHITECTURE.md`:
 1. **Add themes** beyond dark mode
 2. **Implement custom keyboard shortcuts**
 3. **Add animation preferences** (reduced motion)
+
+Generally speaking, buttons can have 4 modes: activated, neutral, pushed, disabled.
+Those states are typically represented by the following CSS style:
+- colored background, border, text color with outer shadow.
+- white text with black border and background, no shadow, feels flat.
+- A dark color of the activated style, with a dark inner shadow and light outter shadow to feel encasted.
+- No shadow at all and the text color is a dark grey color to feel disabled.
+
+The default state is the neutral style.
