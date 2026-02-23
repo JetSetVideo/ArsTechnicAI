@@ -36,6 +36,7 @@ The repository is a **Next.js 14 Pages Router** app executed via **Deno 2** task
 │   ├── canvasStore.ts       # Canvas items, viewport, selection
 │   ├── telemetryStore.ts    # Telemetry snapshots, health, sync state
 │   ├── errorStore.ts        # Persisted error events for sync
+│   ├── productionStore.ts   # Project production tracking (idea→script→prompt→runs)
 │   ├── fileStore.ts         # File tree, assets (with persistence)
 │   ├── generationStore.ts   # AI job queue
 │   ├── logStore.ts          # Action history
@@ -59,6 +60,7 @@ The repository is a **Next.js 14 Pages Router** app executed via **Deno 2** task
 │   └── telemetry/           # Gather, digest, sync
 ├── types/
 │   ├── index.ts             # All TypeScript definitions
+│   ├── production.ts        # Production-tracking schema (story, prompts, model runs)
 │   └── telemetry.ts         # Telemetry snapshot, error event types
 ├── styles/
 │   ├── globals.css          # Design tokens + reset

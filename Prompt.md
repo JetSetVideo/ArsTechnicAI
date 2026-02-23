@@ -138,6 +138,18 @@ Assets are first-class; everything should be searchable, taggable, and linkable.
 - Variables with types: string/number/enum/asset
 - Optional constraints: min/max, regex, allowed values
 - Provider capability mapping (some providers don’t support certain params)
+- Version history with model context (provider, model, seed, size, steps, guidance, errors, outputs)
+
+### Prompt run provenance (implemented)
+
+For each generation run, the system tracks:
+
+- Prompt draft and prompt version labels (`v1`, `v2`, ...)
+- Provider + model
+- Generation params (negative prompt, seed, width/height, steps, guidance)
+- Run status (`queued`, `running`, `completed`, `failed`, `cancelled`)
+- Output asset IDs and generation job IDs
+- Error message when runs fail
 
 ### Vocab libraries (structured)
 

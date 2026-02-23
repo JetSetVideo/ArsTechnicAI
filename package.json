@@ -33,6 +33,7 @@
     "@types/uuid": "^9.0.1",
     "eslint": "^8.40.0",
     "eslint-config-next": "^13.4.1",
+    "jsdom": "^28.1.0",
     "prisma": "^5.0.0",
     "typescript": "^5.0.4"
   }

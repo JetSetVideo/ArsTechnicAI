@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useProjectsStore } from '@/stores/projectsStore';
+import { useProductionStore } from '@/stores/productionStore';
 import { useUserStore } from '@/stores/userStore';
 import { projectPathFromName } from '@/utils/project';
 import { STORAGE_KEYS, WORKSPACE_DATA_KEYS_TO_CLEAR, WORKSPACE_DEFAULTS } from '@/constants/workspace';
@@ -72,10 +73,16 @@ export function useProjectSync() {
       currentProject.modifiedAt,
       currentProject.createdAt
     );
+    useProductionStore
+      .getState()
+      .ensureProjectRecord({ projectId: currentProject.id, projectName: currentProject.name });
 
     // Sync recent projects
     recentProjects.forEach((proj) => {
       ensureProjectInDashboard(proj.id, proj.name, proj.modifiedAt, proj.createdAt);
+      useProductionStore
+        .getState()
+        .ensureProjectRecord({ projectId: proj.id, projectName: proj.name });
     });
   }, [currentProject, ensureProjectInDashboard, recentProjects]);
 
@@ -93,6 +100,9 @@ export function useProjectSync() {
 
       // Mark as opened in projectsStore
       openProject(projectId);
+      useProductionStore
+        .getState()
+        .ensureProjectRecord({ projectId: dashProject.id, projectName: dashProject.name });
 
       // Check if the project exists in userStore's recent list
       const inRecent = recentProjects.find((p) => p.id === projectId);
@@ -147,6 +157,10 @@ export function useProjectSync() {
           ...state.recentProjects.filter((p) => p.id !== dashProject.id),
         ].slice(0, 10),
       }));
+
+      useProductionStore
+        .getState()
+        .ensureProjectRecord({ projectId: dashProject.id, projectName: dashProject.name });
 
       return dashProject;
     },
@@ -219,6 +233,11 @@ export function clearAllWorkspaceData() {
     sortOrder: 'desc',
     filterTags: [],
     showFavoritesOnly: false,
+  });
+
+  useProductionStore.setState({
+    records: {},
+    currentProjectId: null,
   });
 
   const defaultProjectPath = projectPathFromName(WORKSPACE_DEFAULTS.projectName);

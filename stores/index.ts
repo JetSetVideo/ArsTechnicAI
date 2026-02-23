@@ -9,12 +9,8 @@ export type { Toast, ToastType, ErrorCode } from './toastStore';
 export { useUserStore } from './userStore';
 export type { DeviceInfo, UserSession, ProjectInfo } from './userStore';
 
-// Dashboard stores
+// Dashboard & pipeline stores
 export { useProjectsStore } from './projectsStore';
-export { useModulesStore } from './modulesStore';
-export { useTechniquesStore } from './techniquesStore';
-export { useAgentsStore } from './agentsStore';
-export { useProfileStore } from './profileStore';
-export { useSocialStore, PLATFORM_INFO } from './socialStore';
 export { useTelemetryStore } from './telemetryStore';
 export { useErrorStore } from './errorStore';
+export { useProductionStore } from './productionStore';

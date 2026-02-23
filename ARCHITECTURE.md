@@ -276,6 +276,16 @@ Recommended State:
 └─────────────────────────────────────────┘
 ```
 
+### 1.7 Production tracking subsystem (implemented)
+
+A dedicated production domain now tracks per-project creative artifacts from ideation to generated outputs:
+
+- Idea cards, glossary terms, script segments, source references, dialogue lines
+- Prompt drafts, prompt versions, and model execution runs
+- Ordered timeline events so production context is preserved in sequence
+
+This subsystem is local-first (Zustand + persistence) and designed to be backend-sync ready (records are keyed by `projectId` and contain normalized provenance fields).
+
 ---
 
 ## 2. Innovation History & Patterns

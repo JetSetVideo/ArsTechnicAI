@@ -81,8 +81,23 @@ For detailed component specs and CSS terms, see `Design.md`.
 | Telemetry Pipeline | ✅ Complete | Gather, digest, store, sync at startup |
 | Client Signature | ✅ Complete | Offline-unique code (Settings > About) |
 | Error Store | ✅ Complete | Persisted errors, synced to backend |
+| Production Tracking | ✅ Complete | Tracks ideas, glossary, script, sources, dialogue, prompt versions, model runs |
 
 > **Roadmap**: ffmpeg-based video processing, WebGL canvas renderer, collaborative editing, cloud sync. See `ARCHITECTURE.md` for detailed analysis.
+
+## Production tracking system
+
+Ars TechnicAI now includes a local-first production tracking domain that keeps all creation inputs in one ordered project timeline:
+
+- Idea cards and story notes
+- Glossary/terminology for consistency
+- Script segments (outline, beats, scenes, shotlist, voiceover)
+- Source references (image/audio/video/text/url/document)
+- Dialogue lines
+- Prompt drafts and prompt versions
+- Model runs (provider/model/status/seed/size/params/error/output assets)
+
+Each generation from Inspector automatically records prompt version + model run under the active project, so provenance remains reproducible.
 
 ---
 
