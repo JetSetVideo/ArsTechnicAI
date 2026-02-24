@@ -50,15 +50,28 @@ interface FileState {
   collapsePath: (path: string) => void;
 
   // Project management
-  setCurrentProject: (projectName: string) => void;
-  switchToProject: (projectName: string) => void;
+  setCurrentProject: (projectName: string, projectId?: string) => void;
+  switchToProject: (projectName: string, projectId?: string) => void;
   getProjectGeneratedPath: () => string;
+  saveProjectFileState: (projectId: string, projectName: string) => void;
+  loadProjectFileState: (projectId: string, projectName: string) => boolean;
+  exportProjectFileState: (projectName: string) => SavedProjectFileState;
+  applyProjectFileState: (projectName: string, snapshot: SavedProjectFileState) => void;
 
   // File import from browser
   importFiles: (files: FileList) => Promise<ImageAsset[]>;
 
   // Initialize structure
   initializeFileStructure: (projectName?: string) => void;
+}
+
+export interface SavedProjectFileState {
+  projectPath: string;
+  projectNode: FileNode;
+  projectAssets: [string, Asset][];
+  selectedPath: string | null;
+  expandedPaths: string[];
+  savedAt: number;
 }
 
 // Helper to create file node
@@ -102,6 +115,30 @@ const createProjectFolderNode = (projectName: string, projectPath: string): File
   ],
   expanded: true,
 });
+
+const FILE_STATES_STORAGE_KEY = STORAGE_KEYS.fileStates;
+const SHARED_ASSET_PREFIXES = [
+  `${WORKSPACE_ROOT_PATHS.library}/`,
+  `${WORKSPACE_ROOT_PATHS.imports}/`,
+  `${WORKSPACE_ROOT_PATHS.prompts}/`,
+];
+
+function loadSavedFileStates(): Record<string, SavedProjectFileState> {
+  try {
+    const raw = localStorage.getItem(FILE_STATES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSavedFileStates(states: Record<string, SavedProjectFileState>) {
+  try {
+    localStorage.setItem(FILE_STATES_STORAGE_KEY, JSON.stringify(states));
+  } catch (error) {
+    console.warn('[FileStore] Failed to persist project file state:', error);
+  }
+}
 
 const normalizePath = (path: string) => path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
 
@@ -584,14 +621,118 @@ export const useFileStore = create<FileState>()(
         });
       },
 
-      setCurrentProject: (projectName) => {
-        get().switchToProject(projectName);
+      setCurrentProject: (projectName, projectId) => {
+        get().switchToProject(projectName, projectId);
       },
 
-      switchToProject: (projectName) => {
+      exportProjectFileState: (projectName) => {
         const safeName = projectName.trim() || WORKSPACE_DEFAULTS.projectName;
         const projectPath = projectPathFromName(safeName);
         const state = get();
+
+        const projectsRoot = state.rootNodes.find(
+          (node) => node.type === 'folder' && normalizePath(node.path) === WORKSPACE_ROOT_PATHS.projects
+        );
+        const currentProjectNode =
+          (projectsRoot?.children || []).find((child) => normalizePath(child.path) === projectPath) ||
+          createProjectFolderNode(safeName, projectPath);
+
+        const projectAssets = Array.from(state.assets.entries()).filter(([, asset]) =>
+          normalizePath(asset.path).startsWith(`${projectPath}/`)
+        );
+
+        const expandedPaths = Array.from(state.expandedPaths).filter(
+          (path) =>
+            path.startsWith(projectPath) ||
+            path === WORKSPACE_ROOT_PATHS.projects ||
+            path === WORKSPACE_ROOT_PATHS.library ||
+            path === WORKSPACE_ROOT_PATHS.imports ||
+            path === WORKSPACE_ROOT_PATHS.prompts
+        );
+
+        const selectedPath =
+          state.selectedPath && state.selectedPath.startsWith(projectPath) ? state.selectedPath : null;
+
+        return {
+          projectPath,
+          projectNode: currentProjectNode,
+          projectAssets,
+          selectedPath,
+          expandedPaths,
+          savedAt: Date.now(),
+        };
+      },
+
+      applyProjectFileState: (projectName, snapshot) => {
+        const safeName = projectName.trim() || WORKSPACE_DEFAULTS.projectName;
+        const projectPath = snapshot.projectPath || projectPathFromName(safeName);
+        const state = get();
+
+        const pickRootFolder = (path: string, defaultName: string) =>
+          state.rootNodes.find((node) => node.type === 'folder' && normalizePath(node.path) === path) ||
+          createFileNode(defaultName, 'folder', path);
+
+        const importsFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.imports, WORKSPACE_ROOT_NAMES.imports);
+        const libraryFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.library, WORKSPACE_ROOT_NAMES.library);
+        const promptsFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.prompts, WORKSPACE_ROOT_NAMES.prompts);
+
+        const nextProjectsRoot: FileNode = {
+          id: uuidv4(),
+          name: WORKSPACE_ROOT_NAMES.projects,
+          type: 'folder',
+          path: WORKSPACE_ROOT_PATHS.projects,
+          children: [snapshot.projectNode || createProjectFolderNode(safeName, projectPath)],
+          expanded: true,
+        };
+
+        const sharedAssets = Array.from(state.assets.entries()).filter(([, asset]) =>
+          SHARED_ASSET_PREFIXES.some((prefix) => normalizePath(asset.path).startsWith(prefix))
+        );
+
+        set({
+          rootNodes: [importsFolder, libraryFolder, nextProjectsRoot, promptsFolder],
+          assets: new Map([...sharedAssets, ...(snapshot.projectAssets || [])]),
+          currentProjectPath: projectPath,
+          selectedPath: snapshot.selectedPath || null,
+          expandedPaths: new Set(
+            snapshot.expandedPaths?.length
+              ? snapshot.expandedPaths
+              : [
+                  WORKSPACE_ROOT_PATHS.imports,
+                  WORKSPACE_ROOT_PATHS.library,
+                  WORKSPACE_ROOT_PATHS.projects,
+                  projectPath,
+                  `${projectPath}/generated`,
+                  WORKSPACE_ROOT_PATHS.prompts,
+                ]
+          ),
+        });
+      },
+
+      saveProjectFileState: (projectId, projectName) => {
+        if (!projectId || typeof window === 'undefined') return;
+        const states = loadSavedFileStates();
+        states[projectId] = get().exportProjectFileState(projectName);
+        saveSavedFileStates(states);
+      },
+
+      loadProjectFileState: (projectId, projectName) => {
+        if (!projectId || typeof window === 'undefined') return false;
+        const states = loadSavedFileStates();
+        const snapshot = states[projectId];
+        if (!snapshot) return false;
+        get().applyProjectFileState(projectName, snapshot);
+        return true;
+      },
+
+      switchToProject: (projectName, projectId) => {
+        const safeName = projectName.trim() || WORKSPACE_DEFAULTS.projectName;
+        const projectPath = projectPathFromName(safeName);
+        const state = get();
+
+        if (projectId && get().loadProjectFileState(projectId, safeName)) {
+          return;
+        }
 
         // Avoid rebuilding tree when already on the same project.
         if (state.currentProjectPath === projectPath && state.rootNodes.length > 0) {
@@ -604,36 +745,20 @@ export const useFileStore = create<FileState>()(
           return;
         }
 
-        const pickRootFolder = (path: string, defaultName: string) =>
-          state.rootNodes.find((node) => node.type === 'folder' && node.path === path) ||
-          createFileNode(defaultName, 'folder', path);
-
-        const importsFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.imports, WORKSPACE_ROOT_NAMES.imports);
-        const libraryFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.library, WORKSPACE_ROOT_NAMES.library);
-        const promptsFolder = pickRootFolder(WORKSPACE_ROOT_PATHS.prompts, WORKSPACE_ROOT_NAMES.prompts);
-
-        const projectsRoot =
-          state.rootNodes.find((node) => node.type === 'folder' && node.path === WORKSPACE_ROOT_PATHS.projects) ||
-          createFileNode(WORKSPACE_ROOT_NAMES.projects, 'folder', WORKSPACE_ROOT_PATHS.projects);
-
-        const nextProjectsRoot: FileNode = {
-          ...projectsRoot,
-          children: [createProjectFolderNode(safeName, projectPath)],
-          expanded: true,
-        };
-
-        set({
-          rootNodes: [importsFolder, libraryFolder, nextProjectsRoot, promptsFolder],
-          currentProjectPath: projectPath,
+        get().applyProjectFileState(safeName, {
+          projectPath,
+          projectNode: createProjectFolderNode(safeName, projectPath),
+          projectAssets: [],
           selectedPath: null,
-          expandedPaths: new Set([
+          expandedPaths: [
             WORKSPACE_ROOT_PATHS.imports,
             WORKSPACE_ROOT_PATHS.library,
             WORKSPACE_ROOT_PATHS.projects,
             projectPath,
             `${projectPath}/generated`,
             WORKSPACE_ROOT_PATHS.prompts,
-          ]),
+          ],
+          savedAt: Date.now(),
         });
       },
 

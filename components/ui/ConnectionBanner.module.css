@@ -3,7 +3,7 @@
  * Green (ok), Orange (degraded), Red (error)
  */
 
-.banner {
+.connectionBannerStatusRootAtStartup {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -24,22 +24,22 @@
   }
 }
 
-.statusOk {
+.connectionBannerStatusVariantOk {
   background: var(--success-bg);
   border-color: rgba(34, 197, 94, 0.3);
 }
 
-.statusDegraded {
+.connectionBannerStatusVariantDegraded {
   background: var(--warning-bg);
   border-color: rgba(249, 115, 22, 0.3);
 }
 
-.statusError {
+.connectionBannerStatusVariantError {
   background: var(--error-bg);
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-.content {
+.connectionBannerStatusContentRegion {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -47,23 +47,23 @@
   min-width: 0;
 }
 
-.icon {
+.connectionBannerStatusIconByState {
   flex-shrink: 0;
 }
 
-.statusOk .icon {
+.connectionBannerStatusVariantOk .connectionBannerStatusIconByState {
   color: var(--success);
 }
 
-.statusDegraded .icon {
+.connectionBannerStatusVariantDegraded .connectionBannerStatusIconByState {
   color: var(--warning);
 }
 
-.statusError .icon {
+.connectionBannerStatusVariantError .connectionBannerStatusIconByState {
   color: var(--error);
 }
 
-.text {
+.connectionBannerStatusTextRegion {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -71,24 +71,24 @@
   font-size: var(--font-sm);
 }
 
-.label {
+.connectionBannerStatusLabelPrimary {
   font-weight: 600;
   margin-inline-end: var(--space-2);
 }
 
-.serviceOk {
+.connectionBannerServiceStatusOk {
   color: var(--success);
 }
 
-.serviceFail {
+.connectionBannerServiceStatusNotOk {
   color: var(--text-secondary);
 }
 
-.statusError .serviceFail {
+.connectionBannerStatusVariantError .connectionBannerServiceStatusNotOk {
   color: var(--error);
 }
 
-.closeButton {
+.connectionBannerDismissButtonByUser {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -104,7 +104,7 @@
   flex-shrink: 0;
 }
 
-.closeButton:hover {
+.connectionBannerDismissButtonByUser:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
 }

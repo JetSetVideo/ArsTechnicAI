@@ -21,14 +21,25 @@ export interface HealthResponse {
   timestamp: number;
 }
 
-const BACKEND_URL = process.env.BACKEND_URL?.trim() || 'http://localhost:8000';
 const HEALTH_TIMEOUT_MS = 5000;
 
 async function checkBackendHealth(): Promise<ServiceStatus> {
+  const configuredBackend = process.env.BACKEND_URL?.trim();
+
+  // Default mode: backend is bundled in this same Next.js server (/api/* routes).
+  // In this mode, don't probe an external URL and don't show red warnings.
+  if (!configuredBackend) {
+    return {
+      name: 'Backend API',
+      status: 'ok',
+      message: 'Using local Next.js API routes',
+    };
+  }
+
   const urls = [
-    `${BACKEND_URL}/health`,
-    `${BACKEND_URL}/api/health`,
-    `${BACKEND_URL}/`,
+    `${configuredBackend}/health`,
+    `${configuredBackend}/api/health`,
+    `${configuredBackend}/`,
   ];
 
   for (const url of urls) {
@@ -55,7 +66,7 @@ async function checkBackendHealth(): Promise<ServiceStatus> {
   return {
     name: 'Backend API',
     status: 'error',
-    message: `Cannot reach ${BACKEND_URL}`,
+    message: `Cannot reach ${configuredBackend}`,
   };
 }
 

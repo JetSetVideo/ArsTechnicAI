@@ -4,7 +4,7 @@
  * Compact dashboard with integrated top bar + search.
  */
 
-.dashboard {
+.dashboardLayoutRootPageRegion {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -16,26 +16,26 @@
    HEADER
    ============================================ */
 
-.header {
+.dashboardLayoutHeaderPrimaryAtTop {
   padding: var(--space-3) var(--space-6);
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-secondary);
 }
 
-.headerTop {
+.dashboardLayoutHeaderPrimaryContentRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-3);
 }
 
-.headerActions {
+.dashboardLayoutHeaderPrimaryActionsRight {
   display: flex;
   gap: var(--space-2);
   flex-shrink: 0;
 }
 
-.appName {
+.dashboardLayoutHeaderBrandLinkHome {
   display: flex;
   align-items: baseline;
   gap: 0.125rem;
@@ -48,23 +48,23 @@
   transition: opacity var(--transition-fast, 0.1s);
 }
 
-.appName:hover {
+.dashboardLayoutHeaderBrandLinkHome:hover {
   opacity: 0.8;
 }
 
-.logoArs {
+.dashboardLayoutHeaderBrandLogoArs {
   font-family: var(--font-serif);
   font-style: italic;
   color: var(--text-primary);
 }
 
-.logoTechnic {
+.dashboardLayoutHeaderBrandLogoTechnic {
   font-family: var(--font-mono);
   color: var(--text-secondary);
   font-weight: 400;
 }
 
-.logoAI {
+.dashboardLayoutHeaderBrandLogoAi {
   background: var(--accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -73,7 +73,7 @@
   font-weight: 700;
 }
 
-.searchBar {
+.dashboardLayoutHeaderSearchContainer {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -87,17 +87,17 @@
   width: 100%;
 }
 
-.searchBar:focus-within {
+.dashboardLayoutHeaderSearchContainer:focus-within {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 2px var(--accent-primary-alpha);
 }
 
-.searchIcon {
+.dashboardLayoutHeaderSearchIcon {
   color: var(--text-muted);
   flex-shrink: 0;
 }
 
-.searchInput {
+.dashboardLayoutHeaderSearchInputField {
   flex: 1;
   background: transparent;
   border: none;
@@ -106,7 +106,7 @@
   font-size: var(--font-sm);
 }
 
-.searchInput::placeholder {
+.dashboardLayoutHeaderSearchInputField::placeholder {
   color: var(--text-muted);
 }
 
@@ -114,13 +114,13 @@
    MAIN CONTENT
    ============================================ */
 
-.main {
+.dashboardLayoutMainContentRegion {
   flex: 1;
   padding: var(--space-6);
   overflow-y: auto;
 }
 
-.tabContent {
+.dashboardLayoutMainProjectsContentRegion {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
@@ -133,45 +133,45 @@
    ============================================ */
 
 @media (max-width: 1024px) {
-  .header {
+  .dashboardLayoutHeaderPrimaryAtTop {
     padding: var(--space-3) var(--space-4);
   }
 
-  .main {
+  .dashboardLayoutMainContentRegion {
     padding: var(--space-4);
   }
 
-  .appName {
+  .dashboardLayoutHeaderBrandLinkHome {
     font-size: var(--font-sm);
   }
 }
 
 @media (max-width: 768px) {
-  .header {
+  .dashboardLayoutHeaderPrimaryAtTop {
     padding: var(--space-3);
   }
 
-  .headerTop {
+  .dashboardLayoutHeaderPrimaryContentRow {
     flex-wrap: wrap;
   }
 
-  .searchBar {
+  .dashboardLayoutHeaderSearchContainer {
     order: 3;
     flex-basis: 100%;
     max-width: none;
   }
 
-  .main {
+  .dashboardLayoutMainContentRegion {
     padding: var(--space-3);
   }
 
-  .tabContent {
+  .dashboardLayoutMainProjectsContentRegion {
     gap: var(--space-4);
   }
 }
 
 @media (max-width: 480px) {
-  .searchBar {
+  .dashboardLayoutHeaderSearchContainer {
     padding: var(--space-2);
   }
 }

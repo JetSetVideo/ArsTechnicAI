@@ -8,7 +8,7 @@ import { SettingsModal } from './SettingsModal';
 import { HelpModal } from './HelpModal';
 import { ActionLog } from './ActionLog';
 import { useLogStore, useUserStore, useFileStore } from '@/stores';
-import { useProjectSync, saveCanvasState, loadCanvasState } from '@/hooks/useProjectSync';
+import { useProjectSync, saveProjectWorkspaceState, loadProjectWorkspaceState } from '@/hooks/useProjectSync';
 import styles from './AppShell.module.css';
 import type { WorkspaceMode, WorkspaceLayout } from '@/types';
 
@@ -46,32 +46,30 @@ export const AppShell: React.FC = () => {
     // Log device info for debugging
     console.log('[AppShell] Device info gathered:', deviceInfo);
     
-    // Initialize file structure with current project
-    setCurrentProject(currentProject.name);
-
-    // Load canvas state for the current project
-    loadCanvasState(currentProject.id);
-  }, []);
+    // Initialize file structure with current project and hydrate saved workspace.
+    setCurrentProject(currentProject.name, currentProject.id);
+    void loadProjectWorkspaceState(currentProject.id, currentProject.name);
+  }, [currentProject.id, currentProject.name, refreshDeviceInfo, setCurrentProject]);
 
   // Auto-save canvas state periodically and on unmount
   useEffect(() => {
     const interval = setInterval(() => {
-      saveCanvasState(currentProject.id);
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
     }, 15000); // Save every 15 seconds
 
     return () => {
       clearInterval(interval);
       // Save on unmount (navigating away from editor)
-      saveCanvasState(currentProject.id);
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
     };
-  }, [currentProject.id]);
+  }, [currentProject.id, currentProject.name]);
 
   // Sync project name changes with both stores
   const setProjectName = useCallback((name: string) => {
     updateProject({ name });
-    setCurrentProject(name);
+    setCurrentProject(name, currentProject.id);
     log('settings_change', `Project renamed to: ${name}`, { projectName: name });
-  }, [updateProject, setCurrentProject, log]);
+  }, [updateProject, setCurrentProject, log, currentProject.id]);
 
   // Refs for resize handling
   const isResizingExplorer = useRef(false);
@@ -226,7 +224,7 @@ export const AppShell: React.FC = () => {
   );
 
   return (
-    <div className={styles.shell}>
+    <div id="app-shell-layout-root" className={styles.appShellLayoutRoot}>
       <TopBar
         currentMode={mode}
         onModeChange={handleModeChange}
@@ -242,24 +240,24 @@ export const AppShell: React.FC = () => {
         onProjectNameChange={setProjectName}
       />
 
-      <div className={styles.workspace}>
+      <div id="app-shell-workspace-region" className={styles.appShellWorkspaceRegion}>
         {layout.explorer.visible && (
           <>
             <ExplorerPanel width={layout.explorer.width} />
             <div
-              className={styles.resizeHandle}
+              className={styles.appShellResizeHandleSidePanelsIdle}
               onMouseDown={handleExplorerResizeStart}
             />
           </>
         )}
 
-        <div className={styles.mainArea}>
+        <div id="app-shell-main-canvas-region" className={styles.appShellWorkspaceMainCanvasRegion}>
           <Canvas showTimeline={layout.timeline.visible} />
 
           {layout.timeline.visible && (
             <>
               <div
-                className={styles.resizeHandleHorizontal}
+                className={styles.appShellResizeHandleTimelineIdle}
                 onMouseDown={handleTimelineResizeStart}
               />
               <Timeline height={timelineHeight} />
@@ -270,7 +268,7 @@ export const AppShell: React.FC = () => {
         {layout.inspector.visible && (
           <>
             <div
-              className={styles.resizeHandle}
+              className={styles.appShellResizeHandleSidePanelsIdle}
               onMouseDown={handleInspectorResizeStart}
             />
             <InspectorPanel

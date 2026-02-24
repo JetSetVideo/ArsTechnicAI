@@ -22,6 +22,21 @@ const nextConfig = {
     buildActivity: true,
     buildActivityPosition: 'bottom-right',
   },
+
+  // Optional cross-machine API proxy:
+  // When API_PROXY_TARGET is set (for example to your Ubuntu server),
+  // local frontend /api calls are forwarded to that backend.
+  async rewrites() {
+    const target = process.env.API_PROXY_TARGET?.trim();
+    if (!target) return [];
+
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${target.replace(/\/+$/, '')}/api/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

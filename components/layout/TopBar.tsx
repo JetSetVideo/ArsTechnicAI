@@ -21,7 +21,7 @@ import { SearchBar } from '../ui/SearchBar';
 import { Button } from '../ui/Button';
 import { useLogStore, useCanvasStore, useFileStore, useUserStore } from '@/stores';
 import { useProjectsStore } from '@/stores/projectsStore';
-import { saveCanvasState, loadCanvasState } from '@/hooks/useProjectSync';
+import { saveProjectWorkspaceState, loadProjectWorkspaceState } from '@/hooks/useProjectSync';
 import { formatRelativeTime } from '@/utils/date';
 import styles from './TopBar.module.css';
 import type { WorkspaceMode, SearchScope } from '@/types';
@@ -142,7 +142,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const handleSave = useCallback(() => {
     // Also save canvas state to localStorage for per-project persistence
     if (currentProject?.id) {
-      saveCanvasState(currentProject.id);
+      void saveProjectWorkspaceState(currentProject.id, projectName);
     }
 
     // Update modified timestamp in projectsStore
@@ -188,7 +188,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const handleNewProject = useCallback(() => {
     // Save current canvas state before creating new project
     if (currentProject?.id) {
-      saveCanvasState(currentProject.id);
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
     }
 
     // Clear canvas
@@ -272,17 +272,15 @@ export const TopBar: React.FC<TopBarProps> = ({
   const handleOpenRecentProject = useCallback((projectId: string, name: string) => {
     // Save current project's canvas state first
     if (currentProject?.id) {
-      saveCanvasState(currentProject.id);
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
     }
 
     // Switch project in userStore
     switchProjectUser(projectId);
 
-    // Load saved canvas state for the opened project
-    loadCanvasState(projectId);
-
-    // Update file structure
-    fileStore.setCurrentProject(name);
+    // Restore saved workspace state for the opened project
+    fileStore.setCurrentProject(name, projectId);
+    void loadProjectWorkspaceState(projectId, name);
 
     // Mark opened in projectsStore
     useProjectsStore.getState().openProject(projectId);

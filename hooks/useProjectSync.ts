@@ -95,8 +95,8 @@ export function useProjectSync() {
       const dashProject = useProjectsStore.getState().getProject(projectId);
       if (!dashProject) return;
 
-      // Save current project's canvas state before switching
-      saveCanvasState(currentProject.id);
+      // Save current project's workspace state before switching
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
 
       // Mark as opened in projectsStore
       openProject(projectId);
@@ -125,8 +125,9 @@ export function useProjectSync() {
         }));
       }
 
-      // Always switch file tree to the selected project context.
-      switchToProjectFiles(dashProject.name);
+      // Switch and restore workspace state for the selected project.
+      switchToProjectFiles(dashProject.name, dashProject.id);
+      void loadProjectWorkspaceState(dashProject.id, dashProject.name);
     },
     [currentProject.id, recentProjects, switchProjectUser, openProject, switchToProjectFiles]
   );
@@ -139,8 +140,8 @@ export function useProjectSync() {
       // Create in projectsStore first
       const dashProject = useProjectsStore.getState().addProject({ name, tags });
 
-      // Save current canvas state
-      saveCanvasState(currentProject.id);
+      // Save current workspace state before switching
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
 
       // Create matching entry in userStore
       // We use the dashboard project's ID to keep them in sync
@@ -202,6 +203,106 @@ interface SavedCanvasState {
   items: any[];
   viewport: { x: number; y: number; zoom: number };
   savedAt: number;
+}
+
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('token');
+}
+
+async function syncWorkspaceStateToCloud(projectId: string, payload: SavedWorkspaceState) {
+  const token = getAuthToken();
+  if (!token) return;
+
+  try {
+    await fetch(`/api/projects/${projectId}/state`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ state: payload }),
+    });
+  } catch {
+    // Local-first by design: cloud sync is best effort.
+  }
+}
+
+async function loadWorkspaceStateFromCloud(projectId: string): Promise<SavedWorkspaceState | null> {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`/api/projects/${projectId}/state`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { state?: SavedWorkspaceState };
+    return body?.state || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveProjectWorkspaceState(projectId: string, projectName: string) {
+  if (!projectId || typeof window === 'undefined') return;
+
+  saveCanvasState(projectId);
+  useFileStore.getState().saveProjectFileState(projectId, projectName);
+
+  const canvasStates = loadCanvasStates();
+  const savedCanvas = canvasStates[projectId];
+  if (!savedCanvas) return;
+
+  const payload: SavedWorkspaceState = {
+    version: 1,
+    savedAt: Date.now(),
+    canvas: savedCanvas,
+    files: useFileStore.getState().exportProjectFileState(projectName),
+  };
+
+  await syncWorkspaceStateToCloud(projectId, payload);
+}
+
+export async function loadProjectWorkspaceState(projectId: string, projectName: string): Promise<boolean> {
+  if (!projectId || typeof window === 'undefined') return false;
+
+  const localCanvasLoaded = loadCanvasState(projectId);
+  const localFilesLoaded = useFileStore.getState().loadProjectFileState(projectId, projectName);
+  if (localCanvasLoaded || localFilesLoaded) {
+    return true;
+  }
+
+  const cloudState = await loadWorkspaceStateFromCloud(projectId);
+  if (!cloudState) return false;
+
+  useCanvasStore.setState({
+    items: cloudState.canvas?.items || [],
+    viewport: cloudState.canvas?.viewport || { x: 0, y: 0, zoom: 1 },
+    selectedIds: [],
+    clipboard: [],
+  });
+  useFileStore.getState().applyProjectFileState(projectName, cloudState.files);
+
+  const canvasStates = loadCanvasStates();
+  canvasStates[projectId] = {
+    items: cloudState.canvas?.items || [],
+    viewport: cloudState.canvas?.viewport || { x: 0, y: 0, zoom: 1 },
+    savedAt: Date.now(),
+  };
+  localStorage.setItem(CANVAS_STATES_KEY, JSON.stringify(canvasStates));
+  useFileStore.getState().saveProjectFileState(projectId, projectName);
+
+  return true;
+}
+
+interface SavedWorkspaceState {
+  version: 1;
+  savedAt: number;
+  canvas: SavedCanvasState;
+  files: ReturnType<typeof useFileStore.getState.exportProjectFileState>;
 }
 
 export function clearAllWorkspaceData() {

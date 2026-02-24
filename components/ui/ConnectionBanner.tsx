@@ -71,10 +71,10 @@ export const ConnectionBanner: React.FC = () => {
 
   const statusClass =
     data.status === 'ok'
-      ? styles.statusOk
+      ? styles.connectionBannerStatusVariantOk
       : data.status === 'degraded'
-        ? styles.statusDegraded
-        : styles.statusError;
+        ? styles.connectionBannerStatusVariantDegraded
+        : styles.connectionBannerStatusVariantError;
 
   const Icon =
     data.status === 'ok'
@@ -91,22 +91,27 @@ export const ConnectionBanner: React.FC = () => {
         : 'Connection error';
 
   return (
-    <div className={`${styles.banner} ${statusClass}`} role="status" aria-live="polite">
-      <div className={styles.content}>
-        <Icon size={18} className={styles.icon} />
-        <div className={styles.text}>
-          <span className={styles.label}>{statusLabel}</span>
+    <div
+      id="connection-banner-status-at-startup"
+      className={`${styles.connectionBannerStatusRootAtStartup} ${statusClass}`}
+      role="status"
+      aria-live="polite"
+    >
+      <div className={styles.connectionBannerStatusContentRegion}>
+        <Icon size={18} className={styles.connectionBannerStatusIconByState} />
+        <div className={styles.connectionBannerStatusTextRegion}>
+          <span className={styles.connectionBannerStatusLabelPrimary}>{statusLabel}</span>
           {data.services
             .filter((s) => s.status === 'ok')
             .map((s) => (
-              <span key={s.name} className={styles.serviceOk}>
+              <span key={s.name} className={styles.connectionBannerServiceStatusOk}>
                 {s.name}
               </span>
             ))}
           {data.services
             .filter((s) => s.status !== 'ok')
             .map((s) => (
-              <span key={s.name} className={styles.serviceFail}>
+              <span key={s.name} className={styles.connectionBannerServiceStatusNotOk}>
                 {s.name}: {s.message || s.status}
               </span>
             ))}
@@ -114,7 +119,7 @@ export const ConnectionBanner: React.FC = () => {
       </div>
       <button
         type="button"
-        className={styles.closeButton}
+        className={styles.connectionBannerDismissButtonByUser}
         onClick={handleDismiss}
         aria-label="Dismiss"
       >

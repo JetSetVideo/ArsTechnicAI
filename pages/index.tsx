@@ -25,7 +25,7 @@ const ProjectLoader = dynamic(
         }
 
         // Load canvas state for the requested project
-        const { loadCanvasState } = require('@/hooks/useProjectSync');
+        const { loadProjectWorkspaceState } = require('@/hooks/useProjectSync');
         const { useProjectsStore } = require('@/stores/projectsStore');
         const { useUserStore } = require('@/stores/userStore');
         const { useFileStore } = require('@/stores/fileStore');
@@ -46,10 +46,8 @@ const ProjectLoader = dynamic(
             });
 
             // Switch file tree to this project while preserving shared folders.
-            useFileStore.getState().switchToProject(dashProject.name);
-
-            // Load saved canvas
-            loadCanvasState(projectId);
+            useFileStore.getState().switchToProject(dashProject.name, dashProject.id);
+            void loadProjectWorkspaceState(projectId, dashProject.name);
           }
         }
       }, [projectId, router]);

@@ -561,6 +561,102 @@ Each mode defines:
 
 ---
 
+## Naming convention system (mandatory)
+
+This section defines a single naming system for **classes**, **ids**, and code symbols across the repository.
+
+### Core naming order
+
+Names must be written in this order:
+
+1. **Goal** (what it does)
+2. **Location** (where it lives in parent/child layout)
+3. **Timing or state** (when it is used, if relevant)
+
+Formula:
+
+`<goal><location><timingOrState>`
+
+Examples:
+
+- `connectionBannerStatusRootAtStartup`
+- `dashboardLayoutHeaderPrimaryAtTop`
+- `appShellResizeHandleTimelineIdle`
+
+### General rules (all languages)
+
+- Use full words; avoid random letters/numbers (`x1`, `tmp2`, `abc`, `foo`).
+- Avoid unclear abbreviations unless industry-standard (`api`, `url`, `id`, `sql`).
+- Keep one concept per name; avoid overloaded names.
+- Add state only when needed (`Active`, `Idle`, `Loading`, `OnSubmit`, `AtStartup`).
+- Prefer deterministic semantic ids for DOM elements.
+
+### TypeScript / TSX
+
+- **Components**: `PascalCase` nouns, scoped by domain.
+  - `DashboardLayout`, `ConnectionBanner`, `GenerationForm`.
+- **Types / Interfaces / Enums**: `PascalCase`, include role.
+  - `HealthResponse`, `WorkspaceLayout`, `GenerationRequest`.
+- **Functions / handlers**: `camelCase` with action-first verbs.
+  - `handleOpenProjectFromDashboard`, `checkBackendHealth`.
+- **Booleans**: `is/has/can/should` prefix.
+  - `isResizingTimeline`, `hasRequiredRole`.
+- **Constants**: `SCREAMING_SNAKE_CASE` for global constants.
+  - `EPHEMERAL_DELAY_MS`, `MIN_PANEL_WIDTH`.
+- **React state names**: goal-oriented nouns.
+  - `settingsOpen`, `timelineHeight`, `searchQuery`.
+
+### CSS Modules (`*.module.css`)
+
+- Use `camelCase` class names with explicit goal + location + optional state.
+- Avoid generic names like `container`, `header`, `row`, `item` in new code.
+- State/variant classes should include explicit status:
+  - `...VariantOk`, `...VariantError`, `...Idle`, `...Active`.
+- Keep selectors component-scoped by prefix:
+  - `connectionBanner...`, `dashboardLayout...`, `appShell...`.
+
+### HTML ids in TSX
+
+- Use kebab-case semantic ids.
+- Pattern:
+  - `<feature>-<goal>-<location>-<stateOrTiming>`
+- Examples:
+  - `connection-banner-status-at-startup`
+  - `dashboard-layout-main-content-region`
+  - `app-shell-layout-root`
+- Never use random suffixes in static UI ids.
+
+### API / backend naming (TS + Prisma + SQL)
+
+- Route files and handlers must reflect resource + scope:
+  - `pages/api/projects/index.ts`, `pages/api/projects/[projectId].ts`.
+- Prisma model names: `PascalCase` singular nouns (`User`, `Project`, `GenerationJob`).
+- SQL/database columns: `snake_case` when manually created; keep Prisma mapping explicit if mixed.
+- ID fields:
+  - DB primary ids may remain generated (`uuid`/`cuid`) for uniqueness.
+  - UI-visible ids, test ids, and DOM ids must be semantic and readable.
+
+### Tests
+
+- Test file names:
+  - `<feature>.test.ts` for unit/integration.
+- Test case names must describe:
+  - **goal**, **context**, **expected result**.
+- Example:
+  - `creates project in dashboard context when user is authenticated`.
+
+### Migration policy for existing code
+
+- For touched files, rename symbols/classes to this standard in the same PR.
+- Prioritize:
+  1. Layout and shell classes/ids
+  2. Shared UI primitives
+  3. API handlers and service methods
+  4. Store/action names
+- Do not introduce mixed naming styles within a single file.
+
+---
+
 ## Current Implementation Status (February 2026)
 
 ### Implemented Design Tokens

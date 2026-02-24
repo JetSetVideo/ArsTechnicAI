@@ -13,7 +13,7 @@ import { Button } from '../ui';
 import { ConnectionBanner } from '../ui/ConnectionBanner';
 import { SettingsModal } from './SettingsModal';
 import { HelpModal } from './HelpModal';
-import { useProjectSync, saveCanvasState } from '../../hooks/useProjectSync';
+import { useProjectSync, saveProjectWorkspaceState } from '../../hooks/useProjectSync';
 import { useUserStore } from '../../stores/userStore';
 import { ProjectsGrid } from '../dashboard/ProjectsGrid';
 
@@ -28,36 +28,36 @@ export function DashboardLayout() {
 
   const handleOpenProject = useCallback(
     (projectId: string) => {
-      saveCanvasState(currentProject.id);
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
       openProjectFromDashboard(projectId);
       router.push(`/?project=${projectId}`);
     },
-    [router, currentProject.id, openProjectFromDashboard]
+    [router, currentProject.id, currentProject.name, openProjectFromDashboard]
   );
 
   return (
-    <div className={styles.dashboard}>
+    <div id="dashboard-layout-root-page-region" className={styles.dashboardLayoutRootPageRegion}>
       <ConnectionBanner />
-      <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <Link href="/home" className={styles.appName} title="Dashboard Home">
-            <span className={styles.logoArs}>Ars</span>
-            <span className={styles.logoTechnic}>Technic</span>
-            <span className={styles.logoAI}>AI</span>
+      <header id="dashboard-layout-header-primary-top" className={styles.dashboardLayoutHeaderPrimaryAtTop}>
+        <div className={styles.dashboardLayoutHeaderPrimaryContentRow}>
+          <Link href="/home" className={styles.dashboardLayoutHeaderBrandLinkHome} title="Dashboard Home">
+            <span className={styles.dashboardLayoutHeaderBrandLogoArs}>Ars</span>
+            <span className={styles.dashboardLayoutHeaderBrandLogoTechnic}>Technic</span>
+            <span className={styles.dashboardLayoutHeaderBrandLogoAi}>AI</span>
           </Link>
 
-          <div className={styles.searchBar}>
-            <Search size={18} className={styles.searchIcon} />
+          <div className={styles.dashboardLayoutHeaderSearchContainer}>
+            <Search size={18} className={styles.dashboardLayoutHeaderSearchIcon} />
             <input
               type="text"
               placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={styles.searchInput}
+              className={styles.dashboardLayoutHeaderSearchInputField}
             />
           </div>
 
-          <div className={styles.headerActions}>
+          <div className={styles.dashboardLayoutHeaderPrimaryActionsRight}>
             <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)} title="Settings">
               <Settings size={18} />
             </Button>
@@ -71,8 +71,8 @@ export function DashboardLayout() {
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
 
-      <main className={styles.main}>
-        <div className={styles.tabContent}>
+      <main id="dashboard-layout-main-content-region" className={styles.dashboardLayoutMainContentRegion}>
+        <div className={styles.dashboardLayoutMainProjectsContentRegion}>
           <ProjectsGrid onOpenProject={handleOpenProject} searchQuery={searchQuery} />
         </div>
       </main>

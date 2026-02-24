@@ -1,4 +1,4 @@
-.shell {
+.appShellLayoutRoot {
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -6,14 +6,14 @@
   background: var(--bg-primary);
 }
 
-.workspace {
+.appShellWorkspaceRegion {
   display: flex;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-.mainArea {
+.appShellWorkspaceMainCanvasRegion {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -24,7 +24,7 @@
 }
 
 /* Vertical resize handle (for side panels) */
-.resizeHandle {
+.appShellResizeHandleSidePanelsIdle {
   width: 4px;
   cursor: col-resize;
   background: transparent;
@@ -34,7 +34,7 @@
   z-index: 10;
 }
 
-.resizeHandle::before {
+.appShellResizeHandleSidePanelsIdle::before {
   content: '';
   position: absolute;
   top: 0;
@@ -43,16 +43,16 @@
   right: -2px;
 }
 
-.resizeHandle:hover {
+.appShellResizeHandleSidePanelsIdle:hover {
   background: var(--accent-primary);
 }
 
-.resizeHandle:active {
+.appShellResizeHandleSidePanelsIdle:active {
   background: var(--accent-primary);
 }
 
 /* Horizontal resize handle (for timeline) */
-.resizeHandleHorizontal {
+.appShellResizeHandleTimelineIdle {
   height: 4px;
   cursor: row-resize;
   background: transparent;
@@ -62,7 +62,7 @@
   z-index: 10;
 }
 
-.resizeHandleHorizontal::before {
+.appShellResizeHandleTimelineIdle::before {
   content: '';
   position: absolute;
   left: 0;
@@ -71,10 +71,10 @@
   bottom: -2px;
 }
 
-.resizeHandleHorizontal:hover {
+.appShellResizeHandleTimelineIdle:hover {
   background: var(--accent-primary);
 }
 
-.resizeHandleHorizontal:active {
+.appShellResizeHandleTimelineIdle:active {
   background: var(--accent-primary);
 }
