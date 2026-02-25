@@ -760,11 +760,11 @@ Users can adjust in Settings > Appearance:
 |-----------|------|----------------|-------|
 | Button | ✅ | ✅ | All variants, sizes |
 | Input | ✅ | ✅ | With icons, validation |
-| SearchBar | ✅ | ✅ | Scope chips, shortcuts |
+| SearchBar | ✅ | ✅ | Scope chips, shortcuts, regex/grep support |
 | Toast | ✅ | ✅ | Error codes, progress |
-| TopBar | ✅ | ✅ | Mode switcher, menu |
-| ConnectionBanner | ✅ | ✅ | Green/orange/red, X dismiss, ephemeral when ok |
-| Settings > About | ✅ | ✅ | Client signature, telemetry toggle |
+| TopBar | ✅ | ✅ | Mode switcher, menu, dynamic connection status icon |
+| ConnectionBanner | ✅ | ✅ | Fixed top overlay, green/orange/red, X dismiss, ephemeral when ok |
+| SettingsModal | ✅ | ✅ | Unified Account, API Keys, Appearance, Shortcuts, Help, About |
 | Explorer | ✅ | ✅ | Tree, drag-drop |
 | Canvas | ✅ | ✅ | Pan/zoom, selection |
 | Inspector | ✅ | ✅ | Forms, properties |
@@ -801,7 +801,7 @@ Based on the critical analysis in `ARCHITECTURE.md`:
 ### High Priority
 
 1. **Add skeleton loaders** for async content
-2. **Improve empty states** with clear call-to-actions
+2. ~~**Improve empty states** with clear call-to-actions~~ (✅ Implemented)
 3. **Add contextual tooltips** for complex controls
 4. **Implement keyboard shortcut hints** in menus
 

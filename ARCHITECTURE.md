@@ -166,17 +166,17 @@ MEDIUM RISK:
 
 #### UX Improvements Needed
 ```
-1. Add skeleton loaders for:
+1. [ ] Add skeleton loaders for:
    - Explorer tree loading
    - Image generation progress
    - Timeline track loading
 
-2. Improve empty states:
+2. [x] Improve empty states:
    - Explorer: "Drag files here or click Import"
    - Canvas: "Start by generating an image or importing assets"
    - Timeline: "Drop clips here to begin editing"
 
-3. Add contextual help:
+3. [ ] Add contextual help:
    - Tooltips on complex controls
    - Keyboard shortcut hints
    - First-run tutorial overlay
@@ -417,7 +417,7 @@ const apiKey = process.env.GOOGLE_AI_API_KEY; // Server-side only
 
 ### 5.2 Security Checklist
 
-- [ ] Move API keys to server environment variables
+- [x] Move API keys to server environment variables (supports fallback to client key for local usage)
 - [ ] Add CSRF protection to API routes
 - [ ] Implement request rate limiting
 - [ ] Add Content Security Policy headers
@@ -432,10 +432,10 @@ const apiKey = process.env.GOOGLE_AI_API_KEY; // Server-side only
 
 ### 6.1 Quick Wins (< 1 week)
 
-1. Add `React.memo()` to list items
-2. Implement `useDeferredValue` for search
-3. Add image lazy loading with Intersection Observer
-4. Debounce expensive operations (resize, search)
+1. [x] Add `React.memo()` to list items (Explorer tree)
+2. [x] Implement `useDeferredValue` for search (Explorer and Dashboard)
+3. [ ] Add image lazy loading with Intersection Observer
+4. [ ] Debounce expensive operations (resize, search)
 
 ### 6.2 Medium Effort (1-2 weeks)
 

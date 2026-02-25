@@ -71,12 +71,13 @@ For detailed component specs and CSS terms, see `Design.md`.
 | Inspector | ✅ Complete | Generation form, properties |
 | Timeline | ⚠️ UI Only | Visual only, no playback |
 | AI Generation | ✅ Complete | Google Imagen integration |
-| Settings | ✅ Complete | API keys, appearance, shortcuts |
+| Settings | ✅ Complete | Unified modal for account, API keys, appearance, shortcuts, help |
 | Action Log | ✅ Complete | Activity tracking |
 | Toast Notifications | ✅ Complete | Error handling with codes |
 | User Profiling | ✅ Complete | Anonymous device/session info |
 | Home Page Landing | ✅ Complete | Redirects `/` → `/home` at startup |
-| Connection Banner | ✅ Complete | Green/orange/red status for home server |
+| Connection Banner | ✅ Complete | Fixed overlay, green/orange/red status for home server |
+| Dashboard Search | ✅ Complete | Regex/grep support for project filtering |
 | Health Check API | ✅ Complete | Probes BACKEND_URL and PostgreSQL |
 | Telemetry Pipeline | ✅ Complete | Gather, digest, store, sync at startup |
 | Client Signature | ✅ Complete | Offline-unique code (Settings > About) |
@@ -151,11 +152,11 @@ ARSTECHNICAI_SENTRY_DSN=
 
 ### Startup connection to home server
 
-At startup, the app tries to connect to your **home server** (configured via `BACKEND_URL`, e.g. your desktop hosting PostgreSQL). A **connection banner** appears at the top:
+At startup, the app tries to connect to your **home server** (configured via `BACKEND_URL`, e.g. your desktop hosting PostgreSQL). If `BACKEND_URL` is not configured, it will try to connect directly to the local PostgreSQL database using Prisma. A **connection banner** appears at the top:
 
 - **Green**: All services connected (Backend API, PostgreSQL). Ephemeral—auto-dismisses after a few seconds.
 - **Orange**: Degraded (partial connectivity).
-- **Red**: Cannot reach the home server. Use the X button to dismiss.
+- **Red**: Cannot reach the home server or local database. Use the X button to dismiss.
 
 Configure `BACKEND_URL` in `.env.local` to point to your home server (e.g. `http://192.168.1.100:8000` or `http://your-desktop.local:8000`).
 

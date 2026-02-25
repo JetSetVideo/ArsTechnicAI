@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useDeferredValue } from 'react';
 import {
   Folder,
   FolderOpen,
@@ -64,7 +64,7 @@ interface FileTreeItemProps {
   isExpanded: boolean;
 }
 
-const FileTreeItem: React.FC<FileTreeItemProps> = ({
+const FileTreeItem = React.memo<FileTreeItemProps>(({
   node,
   depth,
   onSelect,
@@ -177,10 +177,10 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
       )}
     </div>
   );
-};
+});
 
 // Wrapper to connect to store
-const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({
+const FileTreeItemWrapper = React.memo<{ node: FileNode; depth: number }>(({
   node,
   depth,
 }) => {
@@ -288,7 +288,7 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({
       isExpanded={expandedPaths.has(node.path)}
     />
   );
-};
+});
 
 export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
   const {
@@ -392,7 +392,8 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
       .filter((n): n is FileNode => n !== null);
   }, []);
 
-  const filteredNodes = filterTree(rootNodes, filter);
+  const deferredFilter = useDeferredValue(filter);
+  const filteredNodes = filterTree(rootNodes, deferredFilter);
 
   return (
     <aside className={styles.explorer} style={{ width }} data-density="compact">
@@ -423,10 +424,10 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
 
         {filteredNodes.length === 0 && (
           <div className={styles.empty}>
-            <p>No files yet</p>
+            <p>Drag files here or click Import</p>
             <Button variant="secondary" size="sm" onClick={handleImportClick}>
               <Upload size={14} />
-              Import Images
+              Import Files
             </Button>
           </div>
         )}

@@ -5,7 +5,6 @@ import { InspectorPanel } from './InspectorPanel';
 import { Canvas } from './Canvas';
 import { Timeline } from './Timeline';
 import { SettingsModal } from './SettingsModal';
-import { HelpModal } from './HelpModal';
 import { ActionLog } from './ActionLog';
 import { useLogStore, useUserStore, useFileStore } from '@/stores';
 import { useProjectSync, saveProjectWorkspaceState, loadProjectWorkspaceState } from '@/hooks/useProjectSync';
@@ -285,7 +284,11 @@ export const AppShell: React.FC = () => {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
-      <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+      <SettingsModal 
+        isOpen={helpOpen} 
+        onClose={() => setHelpOpen(false)} 
+        defaultTab="help" 
+      />
     </div>
   );
 };

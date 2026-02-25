@@ -166,7 +166,7 @@ export const Timeline: React.FC<TimelineProps> = ({ height }) => {
           </div>
           <div className={styles.trackContent}>
             <div className={styles.emptyTrack}>
-              <span>Drop audio files here</span>
+              <span>Drop clips here to begin editing</span>
             </div>
           </div>
         </div>

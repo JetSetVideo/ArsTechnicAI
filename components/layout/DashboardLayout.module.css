@@ -128,75 +128,14 @@
   margin: 0 auto;
 }
 
-.dashboardLayoutAccountModalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: var(--space-4);
+.dashboardLayoutHeaderIconConnected {
+  color: var(--success);
+  filter: drop-shadow(0 0 4px var(--success));
 }
 
-.dashboardLayoutAccountModalCard {
-  width: 100%;
-  max-width: 460px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-}
-
-.dashboardLayoutAccountModalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.dashboardLayoutAccountModalHeader h3 {
-  margin: 0;
-  font-size: var(--font-sm);
-}
-
-.dashboardLayoutAccountModalCloseButton {
-  border: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-xs);
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-}
-
-.dashboardLayoutAccountModalCloseButton:hover {
-  color: var(--text-primary);
-}
-
-.dashboardLayoutAccountModalBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  color: var(--text-secondary);
-  font-size: var(--font-xs);
-}
-
-.dashboardLayoutAccountConnectionStatus {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
-}
-
-.dashboardLayoutAccountServiceRow {
-  margin: 0;
+.dashboardLayoutHeaderIconDisconnected {
+  color: var(--error);
+  filter: drop-shadow(0 0 4px var(--error));
 }
 
 /* ============================================

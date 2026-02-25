@@ -709,7 +709,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         {items.length === 0 && (
           <div className={styles.emptyState}>
             <Layers size={48} />
-            <h3>Drop images here</h3>
+            <h3>Start by generating an image or importing assets</h3>
             <p>
               Drag images from the Explorer panel or your computer, or generate
               new images using the Inspector panel.

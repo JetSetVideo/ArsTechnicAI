@@ -4,7 +4,7 @@
  * Grid display of user projects with thumbnails, search, and filters.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import { 
   Plus, 
   Star, 
@@ -233,19 +233,33 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
   }, [libraryAssets.length, refreshCloudSyncStatus]);
   
   const sortedProjects = getSortedProjects();
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const projects = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = deferredSearchQuery.trim();
     const filteredBySearch = !query
       ? sortedProjects
-      : sortedProjects.filter((project) =>
-          project.name.toLowerCase().includes(query) ||
-          project.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-          (project.description || '').toLowerCase().includes(query)
-        );
+      : sortedProjects.filter((project) => {
+          try {
+            const regex = new RegExp(query, 'i');
+            return (
+              regex.test(project.name) ||
+              project.tags.some((tag) => regex.test(tag)) ||
+              regex.test(project.description || '')
+            );
+          } catch (e) {
+            // Fallback to simple string match if regex is invalid
+            const lowerQuery = query.toLowerCase();
+            return (
+              project.name.toLowerCase().includes(lowerQuery) ||
+              project.tags.some((tag) => tag.toLowerCase().includes(lowerQuery)) ||
+              (project.description || '').toLowerCase().includes(lowerQuery)
+            );
+          }
+        });
     return filteredBySearch.filter((project) =>
       project.assetCount >= minimumAssets
     );
-  }, [sortedProjects, searchQuery, minimumAssets]);
+  }, [sortedProjects, deferredSearchQuery, minimumAssets]);
   const allTags = getAllTags();
 
   const handleNewProject = () => {
@@ -368,13 +382,13 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
         <div className={styles.librarySummaryMain}>
           <span className={styles.libraryTitle}>Shared Library</span>
           <span className={styles.libraryMeta}>
-            {libraryAssets.length} asset{libraryAssets.length !== 1 ? 's' : ''} reusable across projects
+            <span className={styles.libraryMetaValueBold}>{libraryAssets.length}</span> <span className={styles.libraryMetaLabelNormal}>asset{libraryAssets.length !== 1 ? 's' : ''} reusable across projects</span>
           </span>
           <span className={styles.libraryMeta}>
-            <HardDrive size={13} /> Local path: <code>{WORKSPACE_ROOT_PATHS.library}</code>
+            <HardDrive size={13} /> <span className={styles.libraryMetaLabelBold}>Local path:</span> <code className={styles.libraryMetaValueNormal}>{WORKSPACE_ROOT_PATHS.library}</code>
           </span>
           <span className={styles.libraryMeta}>
-            Last local update: {latestLibraryUpdateAt ? formatDate(latestLibraryUpdateAt) : 'No assets yet'}
+            <span className={styles.libraryMetaLabelBold}>Last local update:</span> <span className={styles.libraryMetaValueNormal}>{latestLibraryUpdateAt ? formatDate(latestLibraryUpdateAt) : 'No assets yet'}</span>
           </span>
         </div>
         <div className={styles.librarySummaryActions}>

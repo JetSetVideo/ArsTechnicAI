@@ -222,20 +222,23 @@ export default async function handler(
     }
 
     // Validate API key (required for direct provider mode)
-    if (!apiKey || typeof apiKey !== 'string') {
+    const envApiKey = process.env.ARSTECHNICAI_NANOBANANA_API_KEY?.trim() || process.env.GOOGLE_AI_API_KEY?.trim();
+    const effectiveApiKey = envApiKey || apiKey;
+
+    if (!effectiveApiKey || typeof effectiveApiKey !== 'string') {
       return createError(
         res,
         400,
-        'API key is required. Please add your Google Nano Banana API key in Settings.',
+        'API key is required. Please set ARSTECHNICAI_NANOBANANA_API_KEY in .env or add it in Settings.',
         'MISSING_API_KEY'
       );
     }
 
-    if (apiKey.trim().length < 10) {
+    if (effectiveApiKey.trim().length < 10) {
       return createError(
         res,
         400,
-        'API key appears to be invalid. Please check your settings.',
+        'API key appears to be invalid. Please check your settings or environment variables.',
         'INVALID_API_KEY'
       );
     }
@@ -377,7 +380,7 @@ export default async function handler(
         headers: {
           'Content-Type': 'application/json',
           // Gemini API key auth
-          'x-goog-api-key': apiKey.trim(),
+          'x-goog-api-key': effectiveApiKey.trim(),
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,

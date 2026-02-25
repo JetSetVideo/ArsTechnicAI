@@ -23,14 +23,14 @@ The repository is a **Next.js 14 Pages Router** app executed via **Deno 2** task
 │   │   ├── InspectorPanel.tsx# Right panel - properties
 │   │   ├── Timeline.tsx     # Bottom panel - video timeline
 │   │   ├── ActionLog.tsx    # Floating activity log
-│   │   └── SettingsModal.tsx# Settings dialog
+│   │   └── SettingsModal.tsx# Unified preferences, account, settings, and help dialog
 │   ├── contexts/
 │   │   └── TelemetryProvider.tsx # Gather → digest → store → sync at startup
 │   └── ui/                  # Reusable primitives
 │       ├── Button.tsx
-│       ├── ConnectionBanner.tsx  # Startup connection status (green/orange/red)
+│       ├── ConnectionBanner.tsx  # Startup connection status fixed overlay
 │       ├── Input.tsx
-│       ├── SearchBar.tsx
+│       ├── SearchBar.tsx         # Search with regex/grep support
 │       └── Toast.tsx        # Notification system
 ├── stores/                  # Zustand state management
 │   ├── canvasStore.ts       # Canvas items, viewport, selection

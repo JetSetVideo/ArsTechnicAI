@@ -1,24 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy } from 'lucide-react';
+import { X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { useSettingsStore, useLogStore, useTelemetryStore } from '@/stores';
+import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
 import { RECOMMENDED_GENERATION_MODELS, getRecommendedModelFallbacks } from '@/stores/settingsStore';
 import { computeClientSignature, APP_VERSION } from '@/utils/clientSignature';
 import { deriveDeviceTier, deriveConnectivityTier } from '@/utils/clientSignature';
 import { useUserStore } from '@/stores/userStore';
+import type { HealthResponse } from '@/pages/api/health';
 import styles from './SettingsModal.module.css';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultTab?: SettingsTab;
 }
 
-type SettingsTab = 'api' | 'appearance' | 'shortcuts' | 'about';
+type SettingsTab = 'account' | 'api' | 'appearance' | 'shortcuts' | 'help' | 'about';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
+  defaultTab = 'account'
 }) => {
   const { settings, updateSettings, updateAIProvider, updateAppearance, resetSettings } =
     useSettingsStore();
@@ -28,7 +31,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const setTelemetryEnabled = useTelemetryStore((s) => s.setTelemetryEnabled);
   const latestSnapshot = useTelemetryStore((s) => s.getLatestSnapshot());
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('api');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
+  
+  useEffect(() => {
+    if (isOpen && defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [isOpen, defaultTab]);
+
+  const [accountHealth, setAccountHealth] = useState<HealthResponse | null>(null);
+  const [accountHealthError, setAccountHealthError] = useState<string>('');
+  const session = useUserStore((s) => s.session);
+  const currentProject = useUserStore((s) => s.currentProject);
+  const projectCount = useProjectsStore((s) => s.projects.length);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'account') return;
+    let mounted = true;
+
+    const loadConnectionStatus = async () => {
+      setAccountHealthError('');
+      try {
+        const response = await fetch('/api/health');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const json = (await response.json()) as HealthResponse;
+        if (mounted) setAccountHealth(json);
+      } catch (error) {
+        if (!mounted) return;
+        setAccountHealthError(error instanceof Error ? error.message : 'Cannot reach health endpoint');
+      }
+    };
+
+    void loadConnectionStatus();
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, activeTab]);
+
   const [localApiKey, setLocalApiKey] = useState(settings.aiProvider.apiKey);
   const [localEndpoint, setLocalEndpoint] = useState(
     settings.aiProvider.endpoint || ''
@@ -75,9 +114,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'account', label: 'Account', icon: <UserRound size={16} /> },
     { id: 'api', label: 'API Keys', icon: <Key size={16} /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
     { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={16} /> },
+    { id: 'help', label: 'Help', icon: <HelpCircle size={16} /> },
     { id: 'about', label: 'About', icon: <Info size={16} /> },
   ];
   const suggestedFallbacks = getRecommendedModelFallbacks(localModel);
@@ -110,6 +151,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </nav>
 
           <div className={styles.content}>
+            {activeTab === 'account' && (
+              <div className={styles.section}>
+                <h3>Account Details</h3>
+                <div className={styles.accountRow}>
+                  <span className={styles.accountLabelBold}>Session:</span>
+                  <span className={styles.accountValueNormal}>{session.sessionId.slice(0, 8)}...</span>
+                </div>
+                {typeof window !== 'undefined' && localStorage.getItem('token') && (
+                  <div className={styles.accountRow}>
+                    <span className={styles.accountLabelBold}>User:</span>
+                    <span className={styles.accountValueNormal}>Connected User</span>
+                  </div>
+                )}
+                <div className={styles.accountRow}>
+                  <span className={styles.accountLabelBold}>Projects:</span>
+                  <span className={styles.accountValueNormal}>{projectCount}</span>
+                </div>
+                <div className={styles.accountRow}>
+                  <span className={styles.accountLabelBold}>Account age:</span>
+                  <span className={styles.accountValueNormal}>{Math.floor((Date.now() - session.startedAt) / (1000 * 60 * 60 * 24))} days</span>
+                </div>
+                <div className={styles.accountRow}>
+                  <span className={styles.accountLabelBold}>Auth token:</span>
+                  <span className={styles.accountValueNormal}>{typeof window !== 'undefined' && localStorage.getItem('token') ? 'Available' : 'Not signed in'}</span>
+                </div>
+
+                <h3>Connection</h3>
+                <div className={styles.accountConnectionStatus}>
+                  <Wifi size={14} />
+                  {accountHealthError ? (
+                    <span className={styles.accountValueNormal}>Connection check failed: {accountHealthError}</span>
+                  ) : accountHealth ? (
+                    <span><span className={styles.accountLabelBold}>Status:</span> <span className={styles.accountValueNormal}>{accountHealth.status}</span></span>
+                  ) : (
+                    <span className={styles.accountValueNormal}>Checking connection...</span>
+                  )}
+                </div>
+                {accountHealth?.services?.map((service) => (
+                  <div key={service.name} className={styles.accountRow}>
+                    <span className={styles.accountLabelBold}>{service.name}:</span>
+                    <span className={styles.accountValueNormal}>{service.message || service.status}</span>
+                  </div>
+                ))}
+
+                <div className={styles.formGroup} style={{ marginTop: '1rem' }}>
+                  <Button 
+                    variant={accountHealth?.status === 'ok' ? 'danger' : 'primary'}
+                    onClick={() => {
+                      if (accountHealth?.status === 'ok') {
+                        console.log('Disconnecting...');
+                        if (typeof window !== 'undefined') localStorage.removeItem('token');
+                      } else {
+                        console.log('Connecting...');
+                      }
+                    }}
+                  >
+                    {accountHealth?.status === 'ok' ? 'Disconnect' : 'Connect'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'api' && (
               <div className={styles.section}>
                 <h3>NanoBanana / Google AI API</h3>
@@ -388,6 +491,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <kbd>0</kbd>
                   </div>
                 </div>
+              </div>
+            )}
+            {activeTab === 'help' && (
+              <div className={styles.section}>
+                <h3>Creative process</h3>
+                <p className={styles.description}>
+                  Ars Technic AI is built around four modes that match how you work:
+                </p>
+                <ul className={styles.list}>
+                  <li>
+                    <strong>Create</strong> — Generate new images from prompts. Add assets to the canvas and iterate.
+                  </li>
+                  <li>
+                    <strong>Rework</strong> — Edit or vary existing images. Select an asset and refine with new prompts.
+                  </li>
+                  <li>
+                    <strong>Composite</strong> — Arrange and layer assets on the canvas. Resize, reorder, and combine.
+                  </li>
+                  <li>
+                    <strong>Timeline</strong> — Work with sequences and motion. Plan shots and export sequences.
+                  </li>
+                </ul>
+
+                <h3>Know-how</h3>
+                <ul className={styles.list}>
+                  <li>Use the <strong>Explorer</strong> to manage files and generated assets. Drag items onto the canvas.</li>
+                  <li>Use the <strong>Inspector</strong> to edit prompts, run variations, and adjust properties of the selected asset.</li>
+                  <li>Projects are saved locally. Use <strong>Save Project</strong> from the project menu to export a <code>.arstechnic</code> file.</li>
+                  <li>Configure your API key in <strong>Settings</strong> (gear icon or ⌘ ,) to enable image generation.</li>
+                </ul>
               </div>
             )}
           </div>

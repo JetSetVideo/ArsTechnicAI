@@ -71,9 +71,23 @@ async function checkBackendHealth(): Promise<ServiceStatus> {
 }
 
 async function checkPostgreSQL(): Promise<ServiceStatus> {
-  // PostgreSQL is typically accessed via the backend. If backend has a /health
-  // that checks DB, we rely on that. Otherwise we infer from backend status.
-  return { name: 'PostgreSQL', status: 'ok', message: 'Via backend' };
+  const configuredBackend = process.env.BACKEND_URL?.trim();
+
+  // If using external backend, we assume backend checks DB or we don't know.
+  if (configuredBackend) {
+    return { name: 'PostgreSQL', status: 'ok', message: 'Via backend' };
+  }
+
+  // Local Next.js API route mode: check Prisma directly.
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$disconnect();
+    return { name: 'PostgreSQL', status: 'ok', message: 'Connected to local DB' };
+  } catch (error) {
+    return { name: 'PostgreSQL', status: 'error', message: 'Database unreachable' };
+  }
 }
 
 export default async function handler(

@@ -138,9 +138,10 @@ export const ConnectionBanner: React.FC = () => {
           {data.services
             .filter((s) => s.status !== 'ok')
             .map((s) => (
-              <span key={s.name} className={styles.connectionBannerServiceStatusNotOk}>
-                {s.name}: {s.message || s.status}
-              </span>
+              <div key={s.name} className={styles.connectionBannerServiceStatusNotOk}>
+                <span className={styles.connectionBannerServiceStatusBold}>{s.name}:</span>{' '}
+                <span className={styles.connectionBannerServiceStatusNormal}>{s.message || s.status}</span>
+              </div>
             ))}
         </div>
       </div>

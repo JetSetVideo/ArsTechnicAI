@@ -53,6 +53,24 @@
   font-size: var(--font-xs);
 }
 
+.libraryMetaLabelBold {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.libraryMetaValueNormal {
+  font-weight: 400;
+}
+
+.libraryMetaValueBold {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.libraryMetaLabelNormal {
+  font-weight: 400;
+}
+
 .librarySyncStatus {
   display: inline-flex;
   align-items: center;
