@@ -81,6 +81,7 @@ model Project {
   creatorId   String
   creator     User     @relation(fields: [creatorId], references: [id])
   workspaceState ProjectWorkspaceState?
+  assets         ProjectAsset[]
   
   generationJobs GenerationJob[]
   
@@ -95,6 +96,24 @@ model ProjectWorkspaceState {
   state     Json
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+model ProjectAsset {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assetId        String
+  name           String
+  path           String
+  mimeType       String?
+  width          Int?
+  height         Int?
+  payloadDataUrl String?  @db.Text
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([projectId, assetId])
 }
 
 // Generation Job Model for tracking AI content generation

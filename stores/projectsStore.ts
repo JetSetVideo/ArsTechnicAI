@@ -31,6 +31,7 @@ interface ProjectsActions {
   updateProject: (id: string, updates: Partial<DashboardProject>) => void;
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => DashboardProject | null;
+  deduplicateProjects: () => number;
   
   // Project selection
   setCurrentProject: (id: string | null) => void;
@@ -130,6 +131,58 @@ export const useProjectsStore = create<ProjectsStore>()(
         }));
         
         return duplicate;
+      },
+
+      deduplicateProjects: () => {
+        const projects = get().projects;
+        if (projects.length <= 1) return 0;
+
+        const byName = new Map<string, DashboardProject>();
+        let removedCount = 0;
+
+        for (const project of projects) {
+          const key = project.name.trim().toLowerCase();
+          const existing = byName.get(key);
+          if (!existing) {
+            byName.set(key, project);
+            continue;
+          }
+
+          const existingScore = existing.assetCount * 1000 + existing.modifiedAt;
+          const incomingScore = project.assetCount * 1000 + project.modifiedAt;
+          const keepIncoming = incomingScore > existingScore;
+
+          if (keepIncoming) {
+            byName.set(key, {
+              ...project,
+              tags: Array.from(new Set([...(existing.tags || []), ...(project.tags || [])])),
+              isFavorite: Boolean(existing.isFavorite || project.isFavorite),
+              thumbnail: project.thumbnail || existing.thumbnail,
+            });
+          } else {
+            byName.set(key, {
+              ...existing,
+              tags: Array.from(new Set([...(existing.tags || []), ...(project.tags || [])])),
+              isFavorite: Boolean(existing.isFavorite || project.isFavorite),
+              thumbnail: existing.thumbnail || project.thumbnail,
+            });
+          }
+          removedCount += 1;
+        }
+
+        if (removedCount > 0) {
+          const deduped = Array.from(byName.values());
+          const dedupedIds = new Set(deduped.map((p) => p.id));
+          set((state) => ({
+            projects: deduped,
+            recentProjectIds: state.recentProjectIds.filter((id) => dedupedIds.has(id)),
+            currentProjectId: state.currentProjectId && dedupedIds.has(state.currentProjectId)
+              ? state.currentProjectId
+              : null,
+          }));
+        }
+
+        return removedCount;
       },
 
       // Project selection

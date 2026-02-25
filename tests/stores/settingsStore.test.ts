@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Import the store
-import { useSettingsStore } from '../../stores/settingsStore';
+import { useSettingsStore, getRecommendedModelFallbacks } from '../../stores/settingsStore';
 
 describe('SettingsStore', () => {
   beforeEach(() => {
@@ -102,6 +102,18 @@ describe('SettingsStore', () => {
       const state = useSettingsStore.getState();
       expect(state.settings.aiProvider.apiKey).toBe('initial-key');
       expect(state.settings.aiProvider.model).toBe('new-model');
+    });
+
+    it('should return fallback models excluding the current model', () => {
+      const fallbacks = getRecommendedModelFallbacks('imagen-3.0-generate-002');
+      expect(fallbacks).not.toContain('imagen-3.0-generate-002');
+      expect(fallbacks[0]).toBe('imagen-4.0-fast-generate-001');
+    });
+
+    it('should return default fallback list for unknown model', () => {
+      const fallbacks = getRecommendedModelFallbacks('custom-model');
+      expect(fallbacks[0]).toBe('imagen-3.0-generate-002');
+      expect(fallbacks.length).toBeGreaterThan(1);
     });
   });
 

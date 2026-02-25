@@ -113,6 +113,10 @@ export const ERROR_CODES = {
     title: 'Invalid API Key',
     message: 'Your API key appears to be invalid. Please check your settings.',
   },
+  MODEL_ACCESS_RESTRICTED: {
+    title: 'Model Access Restricted',
+    message: 'This model is not available for your current account tier. Choose another model or enable billing.',
+  },
   
   // Prompt errors
   EMPTY_PROMPT: {
@@ -181,6 +185,12 @@ export type ErrorCode = keyof typeof ERROR_CODES;
 
 // Helper to parse API errors into error codes
 export function parseAPIError(status: number, errorBody?: any): ErrorCode {
+  // Prefer explicit server-provided error code when available.
+  const explicitCode = errorBody?.errorCode;
+  if (explicitCode && explicitCode in ERROR_CODES) {
+    return explicitCode as ErrorCode;
+  }
+
   // Check for specific error messages first
   const errorMessage = errorBody?.error?.message?.toLowerCase() || errorBody?.message?.toLowerCase() || '';
   
@@ -190,6 +200,18 @@ export function parseAPIError(status: number, errorBody?: any): ErrorCode {
   
   if (errorMessage.includes('rate') || errorMessage.includes('limit') || errorMessage.includes('quota')) {
     return status === 429 ? 'RATE_LIMITED' : 'QUOTA_EXCEEDED';
+  }
+
+  if (
+    errorMessage.includes('paying user') ||
+    errorMessage.includes('paid user') ||
+    errorMessage.includes('free tier') ||
+    errorMessage.includes('upgrade') ||
+    errorMessage.includes('not available to free') ||
+    errorMessage.includes('subscription') ||
+    errorMessage.includes('model is not available for this account')
+  ) {
+    return 'MODEL_ACCESS_RESTRICTED';
   }
   
   if (errorMessage.includes('content') || errorMessage.includes('filter') || errorMessage.includes('policy')) {

@@ -34,6 +34,7 @@ interface BackendGenerationAttempt {
 type APIErrorCode = 
   | 'MISSING_API_KEY'
   | 'INVALID_API_KEY'
+  | 'MODEL_ACCESS_RESTRICTED'
   | 'EMPTY_PROMPT'
   | 'PROMPT_TOO_LONG'
   | 'INVALID_DIMENSIONS'
@@ -496,6 +497,23 @@ export default async function handler(
           );
 
         case 403:
+          if (
+            lowerMessage.includes('paying user') ||
+            lowerMessage.includes('paid user') ||
+            lowerMessage.includes('free tier') ||
+            lowerMessage.includes('upgrade') ||
+            lowerMessage.includes('not available to free') ||
+            lowerMessage.includes('subscription') ||
+            lowerMessage.includes('billing account required') ||
+            lowerMessage.includes('model is not available for this account')
+          ) {
+            return createError(
+              res,
+              403,
+              'This model is restricted to paid/billing-enabled accounts. Choose another model (for example imagen-3.0-generate-002) or enable billing for your API project.',
+              'MODEL_ACCESS_RESTRICTED'
+            );
+          }
           if (lowerMessage.includes('quota') || lowerMessage.includes('billing')) {
             return createError(
               res,

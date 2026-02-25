@@ -293,6 +293,18 @@ export function mapStatusToErrorCode(status: number, message?: string): ErrorCod
     return status === 429 ? 'RATE_LIMITED' : 'QUOTA_EXCEEDED';
   }
 
+  if (
+    lowerMessage.includes('paying user') ||
+    lowerMessage.includes('paid user') ||
+    lowerMessage.includes('free tier') ||
+    lowerMessage.includes('upgrade') ||
+    lowerMessage.includes('not available to free') ||
+    lowerMessage.includes('subscription') ||
+    lowerMessage.includes('model is not available for this account')
+  ) {
+    return 'MODEL_ACCESS_RESTRICTED';
+  }
+
   if (lowerMessage.includes('content') || lowerMessage.includes('filter') || lowerMessage.includes('policy')) {
     return 'CONTENT_FILTERED';
   }

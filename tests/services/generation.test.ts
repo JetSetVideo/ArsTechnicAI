@@ -273,6 +273,12 @@ describe('GenerationService', () => {
       expect(mapStatusToErrorCode(429)).toBe('RATE_LIMITED');
     });
 
+    it('should map paid-tier model restrictions to MODEL_ACCESS_RESTRICTED', () => {
+      expect(
+        mapStatusToErrorCode(403, 'This model is only available to paying users')
+      ).toBe('MODEL_ACCESS_RESTRICTED');
+    });
+
     it('should map 500 to SERVER_ERROR', () => {
       expect(mapStatusToErrorCode(500)).toBe('SERVER_ERROR');
     });

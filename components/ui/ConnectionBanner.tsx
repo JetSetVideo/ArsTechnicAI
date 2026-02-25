@@ -14,6 +14,8 @@ import type { HealthResponse } from '@/pages/api/health';
 import styles from './ConnectionBanner.module.css';
 
 const EPHEMERAL_DELAY_MS = 3000; // Green banner auto-dismisses after 3s
+const HEALTH_REQUEST_TIMEOUT_MS = 6000;
+const HEALTH_RETRY_DELAY_MS = 1200;
 
 export const ConnectionBanner: React.FC = () => {
   const [data, setData] = useState<HealthResponse | null>(null);
@@ -22,9 +24,32 @@ export const ConnectionBanner: React.FC = () => {
 
   const checkHealth = useCallback(async () => {
     setLoading(true);
+    let lastErrorMessage = 'Request failed';
+
+    const runHealthRequest = async (): Promise<HealthResponse> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), HEALTH_REQUEST_TIMEOUT_MS);
+      try {
+        const res = await fetch('/api/health', { signal: controller.signal });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return (await res.json()) as HealthResponse;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
     try {
-      const res = await fetch('/api/health');
-      const json: HealthResponse = await res.json();
+      let json: HealthResponse | null = null;
+      try {
+        json = await runHealthRequest();
+      } catch (firstError) {
+        lastErrorMessage =
+          firstError instanceof Error ? firstError.message : 'Request failed';
+        await new Promise((resolve) => setTimeout(resolve, HEALTH_RETRY_DELAY_MS));
+        json = await runHealthRequest();
+      }
       setData(json);
       const { useTelemetryStore } = await import('@/stores/telemetryStore');
       useTelemetryStore.getState().setHealth({
@@ -32,18 +57,20 @@ export const ConnectionBanner: React.FC = () => {
         services: json.services ?? [],
         checkedAt: json.timestamp ?? Date.now(),
       });
-    } catch {
+    } catch (error) {
+      lastErrorMessage =
+        error instanceof Error ? error.message : lastErrorMessage;
       setData({
-        status: 'error',
+        status: 'degraded',
         services: [
-          { name: 'Health check', status: 'error', message: 'Request failed' },
+          { name: 'Health check', status: 'degraded', message: `Health endpoint unavailable: ${lastErrorMessage}` },
         ],
         timestamp: Date.now(),
       });
       const { useTelemetryStore } = await import('@/stores/telemetryStore');
       useTelemetryStore.getState().setHealth({
-        status: 'error',
-        services: [{ name: 'Health check', status: 'error', message: 'Request failed' }],
+        status: 'degraded',
+        services: [{ name: 'Health check', status: 'degraded', message: `Health endpoint unavailable: ${lastErrorMessage}` }],
         checkedAt: Date.now(),
       });
     } finally {

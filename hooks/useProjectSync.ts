@@ -15,6 +15,31 @@ import { useUserStore } from '@/stores/userStore';
 import { projectPathFromName } from '@/utils/project';
 import { STORAGE_KEYS, WORKSPACE_DATA_KEYS_TO_CLEAR, WORKSPACE_DEFAULTS } from '@/constants/workspace';
 
+const CLOUD_SYNC_META_KEY = 'ars-technicai-cloud-sync-meta';
+
+interface CloudSyncMeta {
+  lastWorkspaceSyncAt?: number;
+  lastAssetSyncAt?: number;
+  lastSyncedProjectId?: string;
+  lastSyncError?: string;
+}
+
+function loadCloudSyncMeta(): CloudSyncMeta {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(CLOUD_SYNC_META_KEY);
+    return raw ? (JSON.parse(raw) as CloudSyncMeta) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCloudSyncMeta(update: Partial<CloudSyncMeta>) {
+  if (typeof window === 'undefined') return;
+  const current = loadCloudSyncMeta();
+  localStorage.setItem(CLOUD_SYNC_META_KEY, JSON.stringify({ ...current, ...update }));
+}
+
 /**
  * Syncs editor projects into projectsStore on mount and when currentProject changes.
  * Call this in AppShell (editor) and DashboardLayout (dashboard).
@@ -205,6 +230,17 @@ interface SavedCanvasState {
   savedAt: number;
 }
 
+interface CloudProjectAssetPayload {
+  assetId: string;
+  name: string;
+  path: string;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  payloadDataUrl?: string;
+  metadata?: Record<string, unknown>;
+}
+
 function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('token');
@@ -215,7 +251,7 @@ async function syncWorkspaceStateToCloud(projectId: string, payload: SavedWorksp
   if (!token) return;
 
   try {
-    await fetch(`/api/projects/${projectId}/state`, {
+    const response = await fetch(`/api/projects/${projectId}/state`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -223,8 +259,116 @@ async function syncWorkspaceStateToCloud(projectId: string, payload: SavedWorksp
       },
       body: JSON.stringify({ state: payload }),
     });
+    if (response.ok) {
+      saveCloudSyncMeta({
+        lastWorkspaceSyncAt: Date.now(),
+        lastSyncedProjectId: projectId,
+        lastSyncError: undefined,
+      });
+    } else {
+      saveCloudSyncMeta({
+        lastSyncError: `Workspace sync failed (${response.status})`,
+      });
+    }
   } catch {
     // Local-first by design: cloud sync is best effort.
+    saveCloudSyncMeta({
+      lastSyncError: 'Workspace sync failed (network error)',
+    });
+  }
+}
+
+function collectCloudAssets(filesSnapshot: SavedWorkspaceState['files']): CloudProjectAssetPayload[] {
+  return (filesSnapshot.projectAssets || [])
+    .map(([, asset]) => {
+      const dataUrlCandidate =
+        (typeof (asset as any)?.dataUrl === 'string' && (asset as any).dataUrl) ||
+        (typeof asset.thumbnail === 'string' && asset.thumbnail.startsWith('data:') ? asset.thumbnail : undefined);
+      return {
+        assetId: asset.id,
+        name: asset.name,
+        path: asset.path,
+        mimeType: asset.metadata?.mimeType,
+        width: asset.metadata?.width,
+        height: asset.metadata?.height,
+        payloadDataUrl: dataUrlCandidate,
+        metadata: asset.metadata || undefined,
+      };
+    })
+    .filter((asset) => Boolean(asset.assetId));
+}
+
+function stripBinaryFromFileSnapshot(filesSnapshot: SavedWorkspaceState['files']): SavedWorkspaceState['files'] {
+  return {
+    ...filesSnapshot,
+    projectAssets: (filesSnapshot.projectAssets || []).map(([assetId, asset]) => [
+      assetId,
+      {
+        ...asset,
+        thumbnail: typeof asset.thumbnail === 'string' && asset.thumbnail.startsWith('data:')
+          ? undefined
+          : asset.thumbnail,
+      },
+    ]),
+  };
+}
+
+async function syncProjectAssetsToCloud(projectId: string, assets: CloudProjectAssetPayload[]) {
+  const token = getAuthToken();
+  if (!token || assets.length === 0) return;
+
+  try {
+    const response = await fetch(`/api/projects/${projectId}/assets`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ assets }),
+    });
+    if (response.ok) {
+      saveCloudSyncMeta({
+        lastAssetSyncAt: Date.now(),
+        lastSyncedProjectId: projectId,
+        lastSyncError: undefined,
+      });
+    } else {
+      saveCloudSyncMeta({
+        lastSyncError: `Asset sync failed (${response.status})`,
+      });
+    }
+  } catch {
+    // Local-first fallback.
+    saveCloudSyncMeta({
+      lastSyncError: 'Asset sync failed (network error)',
+    });
+  }
+}
+
+async function loadProjectAssetsFromCloud(projectId: string): Promise<CloudProjectAssetPayload[]> {
+  const token = getAuthToken();
+  if (!token) return [];
+
+  try {
+    const response = await fetch(`/api/projects/${projectId}/assets`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { assets?: Array<any> };
+    return (body.assets || []).map((row) => ({
+      assetId: row.assetId,
+      name: row.name,
+      path: row.path,
+      mimeType: row.mimeType || undefined,
+      width: row.width ?? undefined,
+      height: row.height ?? undefined,
+      payloadDataUrl: row.payloadDataUrl || undefined,
+      metadata: (row.metadata || undefined) as Record<string, unknown> | undefined,
+    }));
+  } catch {
+    return [];
   }
 }
 
@@ -256,13 +400,14 @@ export async function saveProjectWorkspaceState(projectId: string, projectName: 
   const savedCanvas = canvasStates[projectId];
   if (!savedCanvas) return;
 
+  const filesSnapshot = useFileStore.getState().exportProjectFileState(projectName);
   const payload: SavedWorkspaceState = {
     version: 1,
     savedAt: Date.now(),
     canvas: savedCanvas,
-    files: useFileStore.getState().exportProjectFileState(projectName),
+    files: stripBinaryFromFileSnapshot(filesSnapshot),
   };
-
+  await syncProjectAssetsToCloud(projectId, collectCloudAssets(filesSnapshot));
   await syncWorkspaceStateToCloud(projectId, payload);
 }
 
@@ -278,13 +423,36 @@ export async function loadProjectWorkspaceState(projectId: string, projectName: 
   const cloudState = await loadWorkspaceStateFromCloud(projectId);
   if (!cloudState) return false;
 
+  const cloudAssets = await loadProjectAssetsFromCloud(projectId);
+  const cloudAssetMap = new Map(cloudAssets.map((asset) => [asset.assetId, asset]));
+  const patchedFiles = {
+    ...cloudState.files,
+    projectAssets: (cloudState.files.projectAssets || []).map(([assetId, asset]) => {
+      const cloud = cloudAssetMap.get(asset.id || assetId);
+      return [
+        assetId,
+        {
+          ...asset,
+          thumbnail: cloud?.payloadDataUrl || asset.thumbnail,
+          metadata: {
+            ...(asset.metadata || {}),
+            ...(cloud?.metadata || {}),
+            mimeType: cloud?.mimeType || asset.metadata?.mimeType,
+            width: cloud?.width ?? asset.metadata?.width,
+            height: cloud?.height ?? asset.metadata?.height,
+          },
+        },
+      ] as [string, typeof asset];
+    }),
+  };
+
   useCanvasStore.setState({
     items: cloudState.canvas?.items || [],
     viewport: cloudState.canvas?.viewport || { x: 0, y: 0, zoom: 1 },
     selectedIds: [],
     clipboard: [],
   });
-  useFileStore.getState().applyProjectFileState(projectName, cloudState.files);
+  useFileStore.getState().applyProjectFileState(projectName, patchedFiles);
 
   const canvasStates = loadCanvasStates();
   canvasStates[projectId] = {

@@ -546,6 +546,47 @@ Each mode defines:
 
 ---
 
+## Project storage architecture (local + cloud)
+
+Professional creative tools use a **local-first workspace snapshot** plus **cloud asset manifests**.
+
+### Required storage layers
+
+1. **Project metadata**
+   - Name, ownership, timestamps, tags, sharing fields.
+2. **Workspace state snapshot**
+   - Explorer tree state, selected paths, expanded folders.
+   - Canvas items, viewport, selection.
+3. **Asset registry**
+   - Stable `assetId`, logical `path`, mime/size/dimensions, lineage/version metadata.
+4. **Asset payload layer**
+   - Local binary/data cache for instant reopen.
+   - Cloud payload/pointer for cross-device restore.
+
+### Local-first behavior
+
+- Save workspace and project asset state locally on:
+  - periodic autosave
+  - project switch
+  - navigation/unmount
+- Reopen from local state first (low latency).
+- If local snapshot is missing, load cloud workspace state + cloud assets.
+
+### Cloud sync behavior
+
+- Workspace state sync is best-effort and non-blocking.
+- Asset payload sync is separate from metadata sync to avoid giant workspace blobs.
+- On cloud restore:
+  - apply workspace snapshot
+  - hydrate missing asset thumbnails/data payloads from cloud asset records.
+
+### Conflict strategy
+
+- Default: last-write-wins by `updatedAt` for workspace snapshots.
+- Asset-level updates are upserted by `(projectId, assetId)` to keep stable identity.
+
+---
+
 ## Coding standards (Next.js + TypeScript)
 
 - Strict TS. No `any` in app code.

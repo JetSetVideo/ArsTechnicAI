@@ -166,6 +166,7 @@ describe('ERROR_CODES', () => {
     const requiredCodes = [
       'MISSING_API_KEY',
       'INVALID_API_KEY',
+      'MODEL_ACCESS_RESTRICTED',
       'EMPTY_PROMPT',
       'PROMPT_TOO_LONG',
       'INVALID_DIMENSIONS',
@@ -200,6 +201,21 @@ describe('parseAPIError', () => {
   it('should parse 403 as INVALID_API_KEY', () => {
     const result = parseAPIError(403, 'Forbidden');
     expect(result).toBe('INVALID_API_KEY');
+  });
+
+  it('should parse paid-tier model restrictions correctly', () => {
+    const result = parseAPIError(403, {
+      message: 'This model is only available to paying users on a billing-enabled project.',
+    });
+    expect(result).toBe('MODEL_ACCESS_RESTRICTED');
+  });
+
+  it('should prefer explicit backend errorCode when provided', () => {
+    const result = parseAPIError(403, {
+      errorCode: 'MODEL_ACCESS_RESTRICTED',
+      error: 'Provider tier restriction',
+    });
+    expect(result).toBe('MODEL_ACCESS_RESTRICTED');
   });
 
   it('should parse 429 as RATE_LIMITED', () => {

@@ -70,7 +70,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     jobs,
     selectedItem,
     handleGenerate,
-  } = useGeneration(onOpenSettings);
+  } = useGeneration(onOpenSettings, onOpenSettings);
 
   const { updateItem } = useCanvasStore();
   const { updateAsset } = useFileStore();

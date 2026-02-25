@@ -3,6 +3,7 @@ import { X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy } from 'lucide-r
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useSettingsStore, useLogStore, useTelemetryStore } from '@/stores';
+import { RECOMMENDED_GENERATION_MODELS, getRecommendedModelFallbacks } from '@/stores/settingsStore';
 import { computeClientSignature, APP_VERSION } from '@/utils/clientSignature';
 import { deriveDeviceTier, deriveConnectivityTier } from '@/utils/clientSignature';
 import { useUserStore } from '@/stores/userStore';
@@ -79,6 +80,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={16} /> },
     { id: 'about', label: 'About', icon: <Info size={16} /> },
   ];
+  const suggestedFallbacks = getRecommendedModelFallbacks(localModel);
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -151,6 +153,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     placeholder="imagen-3.0-generate-002"
                   />
                 </div>
+
+                <h3>Recommended models</h3>
+                <p className={styles.description}>
+                  If your current model is restricted by account tier/billing, pick one of these validated options.
+                </p>
+                <div className={styles.themeOptions}>
+                  {RECOMMENDED_GENERATION_MODELS.map((modelName) => (
+                    <button
+                      key={modelName}
+                      type="button"
+                      className={`${styles.themeOption} ${localModel === modelName ? styles.active : ''}`}
+                      onClick={() => setLocalModel(modelName)}
+                    >
+                      {modelName}
+                    </button>
+                  ))}
+                </div>
+                {suggestedFallbacks.length > 0 && (
+                  <p className={styles.description}>
+                    Suggested fallback: <strong>{suggestedFallbacks[0]}</strong>
+                  </p>
+                )}
 
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>

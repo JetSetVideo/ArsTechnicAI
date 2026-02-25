@@ -4,7 +4,7 @@
  * Grid display of user projects with thumbnails, search, and filters.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Plus, 
   Star, 
@@ -14,12 +14,17 @@ import {
   Copy, 
   FolderOpen,
   Calendar,
-  Layers
+  Layers,
+  ArrowUpDown,
+  Cloud,
+  HardDrive,
+  RefreshCcw
 } from 'lucide-react';
 import { useProjectsStore } from '../../stores';
 import { useUserStore } from '../../stores/userStore';
 import { useFileStore } from '../../stores/fileStore';
 import { slugifyProjectName } from '../../utils/project';
+import { WORKSPACE_ROOT_PATHS } from '../../constants/workspace';
 import { Button } from '../ui';
 import styles from './ProjectsGrid.module.css';
 import type { FileNode } from '../../types';
@@ -53,6 +58,11 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
     setFilterTags,
     showFavoritesOnly,
     toggleShowFavoritesOnly,
+    sortBy,
+    sortOrder,
+    setSortBy,
+    setSortOrder,
+    deduplicateProjects,
   } = useProjectsStore();
 
   const rootNodes = useFileStore((s) => s.rootNodes);
@@ -148,21 +158,94 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectTags, setNewProjectTags] = useState('');
+  const [minimumAssets, setMinimumAssets] = useState<number>(0);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<{
+    state: 'checking' | 'synced' | 'unauthenticated' | 'offline';
+    detail: string;
+  }>({
+    state: 'checking',
+    detail: 'Checking backend sync status...',
+  });
   const libraryAssets = useMemo(
-    () => Array.from(assets.values()).filter((asset) => asset.path.startsWith('/library/')),
+    () => Array.from(assets.values()).filter((asset) => asset.path.startsWith(`${WORKSPACE_ROOT_PATHS.library}/`)),
     [assets]
   );
+  const latestLibraryUpdateAt = useMemo(
+    () => (libraryAssets.length > 0 ? Math.max(...libraryAssets.map((asset) => asset.modifiedAt)) : null),
+    [libraryAssets]
+  );
+
+  const refreshCloudSyncStatus = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    const token = localStorage.getItem('token');
+    let syncMeta: {
+      lastWorkspaceSyncAt?: number;
+      lastAssetSyncAt?: number;
+      lastSyncError?: string;
+    } = {};
+    try {
+      const syncMetaRaw = localStorage.getItem('ars-technicai-cloud-sync-meta');
+      syncMeta = syncMetaRaw ? (JSON.parse(syncMetaRaw) as typeof syncMeta) : {};
+    } catch {
+      syncMeta = {};
+    }
+
+    if (!token) {
+      setCloudSyncStatus({
+        state: 'unauthenticated',
+        detail: 'Not signed in. Local storage is active.',
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/projects?limit=1', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        setCloudSyncStatus({
+          state: 'offline',
+          detail: syncMeta.lastSyncError || `Backend check failed (${response.status})`,
+        });
+        return;
+      }
+      const lastSyncAt = Math.max(syncMeta.lastWorkspaceSyncAt || 0, syncMeta.lastAssetSyncAt || 0);
+      setCloudSyncStatus({
+        state: 'synced',
+        detail: lastSyncAt > 0
+          ? `Connected. Last sync ${new Date(lastSyncAt).toLocaleString()}.`
+          : 'Connected. Waiting for first sync.',
+      });
+    } catch {
+      setCloudSyncStatus({
+        state: 'offline',
+        detail: syncMeta.lastSyncError || 'Cannot reach backend API.',
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    deduplicateProjects();
+  }, [deduplicateProjects, currentProject?.id, recentProjects.length]);
+
+  useEffect(() => {
+    void refreshCloudSyncStatus();
+  }, [libraryAssets.length, refreshCloudSyncStatus]);
   
   const sortedProjects = getSortedProjects();
   const projects = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return sortedProjects;
-    return sortedProjects.filter((project) =>
-      project.name.toLowerCase().includes(query) ||
-      project.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-      (project.description || '').toLowerCase().includes(query)
+    const filteredBySearch = !query
+      ? sortedProjects
+      : sortedProjects.filter((project) =>
+          project.name.toLowerCase().includes(query) ||
+          project.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+          (project.description || '').toLowerCase().includes(query)
+        );
+    return filteredBySearch.filter((project) =>
+      project.assetCount >= minimumAssets
     );
-  }, [sortedProjects, searchQuery]);
+  }, [sortedProjects, searchQuery, minimumAssets]);
   const allTags = getAllTags();
 
   const handleNewProject = () => {
@@ -211,6 +294,13 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
     return date.toLocaleDateString();
   };
 
+  const librarySyncBadgeClass =
+    cloudSyncStatus.state === 'synced'
+      ? styles.librarySyncStatusConnected
+      : cloudSyncStatus.state === 'offline'
+        ? styles.librarySyncStatusOffline
+        : styles.librarySyncStatusIdle;
+
   return (
     <div className={styles.container}>
       {/* Filters */}
@@ -238,14 +328,75 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
             {tag}
           </button>
         ))}
+        <label className={styles.filterSelectLabel}>
+          <ArrowUpDown size={14} />
+          Sort
+          <select
+            className={styles.filterSelect}
+            value={`${sortBy}:${sortOrder}`}
+            onChange={(event) => {
+              const [nextSortBy, nextSortOrder] = event.target.value.split(':') as [
+                'name' | 'modifiedAt' | 'createdAt',
+                'asc' | 'desc',
+              ];
+              setSortBy(nextSortBy);
+              setSortOrder(nextSortOrder);
+            }}
+          >
+            <option value="modifiedAt:desc">Last modified (newest)</option>
+            <option value="modifiedAt:asc">Last modified (oldest)</option>
+            <option value="createdAt:desc">Created (newest)</option>
+            <option value="createdAt:asc">Created (oldest)</option>
+            <option value="name:asc">Name (A-Z)</option>
+            <option value="name:desc">Name (Z-A)</option>
+          </select>
+        </label>
+        <label className={styles.filterSelectLabel}>
+          Min assets
+          <input
+            type="number"
+            className={styles.filterNumberInput}
+            min={0}
+            value={minimumAssets}
+            onChange={(event) => setMinimumAssets(Math.max(0, Number(event.target.value) || 0))}
+          />
+        </label>
       </div>
 
       {/* Shared library summary */}
       <div className={styles.librarySummary}>
-        <span className={styles.libraryTitle}>Shared Library</span>
-        <span className={styles.libraryMeta}>
-          {libraryAssets.length} asset{libraryAssets.length !== 1 ? 's' : ''} reusable across projects
-        </span>
+        <div className={styles.librarySummaryMain}>
+          <span className={styles.libraryTitle}>Shared Library</span>
+          <span className={styles.libraryMeta}>
+            {libraryAssets.length} asset{libraryAssets.length !== 1 ? 's' : ''} reusable across projects
+          </span>
+          <span className={styles.libraryMeta}>
+            <HardDrive size={13} /> Local path: <code>{WORKSPACE_ROOT_PATHS.library}</code>
+          </span>
+          <span className={styles.libraryMeta}>
+            Last local update: {latestLibraryUpdateAt ? formatDate(latestLibraryUpdateAt) : 'No assets yet'}
+          </span>
+        </div>
+        <div className={styles.librarySummaryActions}>
+          <span className={`${styles.librarySyncStatus} ${librarySyncBadgeClass}`}>
+            <Cloud size={13} />
+            {cloudSyncStatus.detail}
+          </span>
+          <button
+            type="button"
+            className={styles.filterButton}
+            onClick={() => {
+              setCloudSyncStatus({
+                state: 'checking',
+                detail: 'Re-checking backend sync status...',
+              });
+              void refreshCloudSyncStatus();
+            }}
+          >
+            <RefreshCcw size={14} />
+            Refresh status
+          </button>
+        </div>
       </div>
 
       {/* Projects Grid */}

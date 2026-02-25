@@ -3,6 +3,19 @@ import { persist } from 'zustand/middleware';
 import type { AppSettings, AIProviderSettings, AppearanceSettings } from '@/types';
 import { STORAGE_KEYS } from '@/constants/workspace';
 
+export const RECOMMENDED_GENERATION_MODELS = [
+  'imagen-3.0-generate-002',
+  'imagen-4.0-fast-generate-001',
+  'imagen-4.0-generate-001',
+  'imagen-4.0-ultra-generate-001',
+] as const;
+
+export function getRecommendedModelFallbacks(currentModel: string): string[] {
+  const normalized = (currentModel || '').trim();
+  const ordered = RECOMMENDED_GENERATION_MODELS.filter((model) => model !== normalized);
+  return [...ordered];
+}
+
 interface SettingsState {
   settings: AppSettings;
   updateSettings: (partial: Partial<AppSettings>) => void;

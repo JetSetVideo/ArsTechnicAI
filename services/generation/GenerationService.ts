@@ -20,7 +20,7 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useLogStore } from '@/stores/logStore';
 import { useToastStore, ERROR_CODES, parseAPIError } from '@/stores/toastStore';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { useSettingsStore, getRecommendedModelFallbacks } from '@/stores/settingsStore';
 import { useUserStore } from '@/stores/userStore';
 import { useProjectsStore } from '@/stores/projectsStore';
 import { useProductionStore } from '@/stores/productionStore';
@@ -33,6 +33,7 @@ export interface GenerateImageInput {
   height: number;
   selectedItemAssetId?: string;
   onMissingApiKey?: () => void;
+  onModelAccessRestricted?: () => void;
 }
 
 export interface GenerateImageOutput {
@@ -126,8 +127,31 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
       const errorCode = parseAPIError(response.status, errorBody);
       const errorInfo = ERROR_CODES[errorCode];
       const errorMessage = errorBody.error || errorBody.message || errorInfo.message;
+      const fallbackModels = getRecommendedModelFallbacks(settings.aiProvider.model);
 
-      toast.error(errorInfo.title, errorMessage);
+      if (errorCode === 'MODEL_ACCESS_RESTRICTED') {
+        toast.addToast({
+          type: 'warning',
+          title: errorInfo.title,
+          message: `${errorMessage}${fallbackModels.length > 0 ? ` Try: ${fallbackModels.slice(0, 2).join(' or ')}.` : ''}`,
+          duration: 12000,
+          action: input.onModelAccessRestricted
+            ? { label: 'Open Settings', onClick: input.onModelAccessRestricted }
+            : fallbackModels[0]
+              ? {
+                  label: `Use ${fallbackModels[0]}`,
+                  onClick: () => {
+                    useSettingsStore.getState().updateAIProvider({ model: fallbackModels[0] });
+                    useToastStore
+                      .getState()
+                      .info('Model Updated', `Switched model to ${fallbackModels[0]}. Try generating again.`);
+                  },
+                }
+              : undefined,
+        });
+      } else {
+        toast.error(errorInfo.title, errorMessage);
+      }
       failJob(job.id, errorMessage);
       log('generation_fail', `Generation failed: ${errorMessage}`, { error: errorMessage, status: response.status, errorCode });
       recordRun(currentProject, prompt, negativePrompt, settings, job.id, 'failed', width, height, undefined, undefined, errorMessage);

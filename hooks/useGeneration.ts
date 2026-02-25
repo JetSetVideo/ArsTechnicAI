@@ -11,7 +11,10 @@ import { useGenerationStore } from '@/stores/generationStore';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { generateImage, type GenerateImageOutput } from '@/services/generation/GenerationService';
 
-export function useGeneration(onMissingApiKey?: () => void) {
+export function useGeneration(
+  onMissingApiKey?: () => void,
+  onModelAccessRestricted?: () => void,
+) {
   const {
     prompt,
     setPrompt,
@@ -35,8 +38,9 @@ export function useGeneration(onMissingApiKey?: () => void) {
       height,
       selectedItemAssetId: selectedItem?.assetId,
       onMissingApiKey,
+      onModelAccessRestricted,
     });
-  }, [prompt, negativePrompt, width, height, selectedItem?.assetId, onMissingApiKey]);
+  }, [prompt, negativePrompt, width, height, selectedItem?.assetId, onMissingApiKey, onModelAccessRestricted]);
 
   return {
     prompt,

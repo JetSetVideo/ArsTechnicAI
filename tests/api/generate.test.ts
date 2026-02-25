@@ -169,6 +169,7 @@ describe('Generate API Validation', () => {
       'INVALID_PROMPT',
       'MISSING_API_KEY',
       'INVALID_API_KEY',
+      'MODEL_ACCESS_RESTRICTED',
       'INVALID_DIMENSIONS',
       'GENERATION_FAILED',
       'CONTENT_FILTERED',
