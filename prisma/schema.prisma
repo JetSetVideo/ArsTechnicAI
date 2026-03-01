@@ -20,8 +20,11 @@ model User {
   // OAuth Integration
   googleId      String?   @unique
   githubId      String?   @unique
-  
+
   // Profile Information
+  firstName     String?
+  lastName      String?
+  pseudonym     String?   @unique   // Display name chosen by user
   profileImage  String?
   bio           String?
   

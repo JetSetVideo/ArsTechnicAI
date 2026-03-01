@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi } from 'lucide-react';
+import { X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi, CheckCircle, XCircle, Pencil, Check } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
@@ -7,6 +7,8 @@ import { RECOMMENDED_GENERATION_MODELS, getRecommendedModelFallbacks } from '@/s
 import { computeClientSignature, APP_VERSION } from '@/utils/clientSignature';
 import { deriveDeviceTier, deriveConnectivityTier } from '@/utils/clientSignature';
 import { useUserStore } from '@/stores/userStore';
+import { useAuthStore } from '@/stores/authStore';
+import { AuthModal } from '@/components/auth/AuthModal';
 import type { HealthResponse } from '@/pages/api/health';
 import styles from './SettingsModal.module.css';
 
@@ -32,12 +34,61 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const latestSnapshot = useTelemetryStore((s) => s.getLatestSnapshot());
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
-  
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
   useEffect(() => {
     if (isOpen && defaultTab) {
       setActiveTab(defaultTab);
     }
   }, [isOpen, defaultTab]);
+
+  // Auth state
+  const authUser = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+  const updateAuthUser = useAuthStore((s) => s.updateUser);
+  const getAuthHeader = useAuthStore((s) => s.getAuthHeader);
+
+  // Pseudonym editing
+  const [editingPseudonym, setEditingPseudonym] = useState(false);
+  const [pseudonymDraft, setPseudonymDraft] = useState('');
+  const [pseudonymError, setPseudonymError] = useState('');
+  const [pseudonymSaving, setPseudonymSaving] = useState(false);
+
+  const startEditPseudonym = () => {
+    setPseudonymDraft(authUser?.pseudonym || '');
+    setPseudonymError('');
+    setEditingPseudonym(true);
+  };
+
+  const savePseudonym = async () => {
+    if (!pseudonymDraft.trim() || pseudonymDraft.trim() === authUser?.pseudonym) {
+      setEditingPseudonym(false);
+      return;
+    }
+    setPseudonymSaving(true);
+    setPseudonymError('');
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ pseudonym: pseudonymDraft.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to save pseudonym');
+      updateAuthUser({ pseudonym: data.pseudonym });
+      setEditingPseudonym(false);
+    } catch (err) {
+      setPseudonymError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setPseudonymSaving(false);
+    }
+  };
+
+  const handleDisconnect = () => {
+    clearAuth();
+    log('settings_change', 'User disconnected');
+  };
 
   const [accountHealth, setAccountHealth] = useState<HealthResponse | null>(null);
   const [accountHealthError, setAccountHealthError] = useState<string>('');
@@ -124,6 +175,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const suggestedFallbacks = getRecommendedModelFallbacks(localModel);
 
   return (
+    <>
+    {authModalOpen && (
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+    )}
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
@@ -153,62 +208,141 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className={styles.content}>
             {activeTab === 'account' && (
               <div className={styles.section}>
-                <h3>Account Details</h3>
-                <div className={styles.accountRow}>
-                  <span className={styles.accountLabelBold}>Session:</span>
-                  <span className={styles.accountValueNormal}>{session.sessionId.slice(0, 8)}...</span>
+
+                {/* ── Connection status ─────────────────────────────── */}
+                <h3>Connection</h3>
+                <div className={styles.accountConnectionStatus} style={{
+                  borderColor: isAuthenticated ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+                  background: isAuthenticated ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                }}>
+                  {isAuthenticated ? (
+                    <CheckCircle size={14} color="var(--success)" />
+                  ) : (
+                    <XCircle size={14} color="var(--error)" />
+                  )}
+                  <span style={{ fontWeight: 600, color: isAuthenticated ? 'var(--success)' : 'var(--error)' }}>
+                    {isAuthenticated ? 'Connected' : 'Not connected'}
+                  </span>
+                  {isAuthenticated && authUser && (
+                    <span className={styles.accountValueNormal} style={{ marginLeft: '0.25rem' }}>
+                      — {authUser.pseudonym || authUser.email}
+                    </span>
+                  )}
                 </div>
-                {typeof window !== 'undefined' && localStorage.getItem('token') && (
-                  <div className={styles.accountRow}>
-                    <span className={styles.accountLabelBold}>User:</span>
-                    <span className={styles.accountValueNormal}>Connected User</span>
+
+                {/* API/backend health */}
+                {accountHealth && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <Wifi size={13} color={accountHealth.status === 'ok' ? 'var(--success)' : 'var(--error)'} />
+                    <span className={styles.accountValueNormal} style={{ fontSize: '0.75rem' }}>
+                      Server: {accountHealth.status}
+                    </span>
                   </div>
                 )}
+
+                {/* Connect / Disconnect button */}
+                <div className={styles.formGroup}>
+                  {isAuthenticated ? (
+                    <Button variant="danger" onClick={handleDisconnect}>
+                      Disconnect
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      onClick={() => setAuthModalOpen(true)}
+                      style={{ background: 'var(--success)', color: '#000', border: 'none' } as React.CSSProperties}
+                    >
+                      Connect
+                    </Button>
+                  )}
+                </div>
+
+                {/* ── User profile (only when authenticated) ────────── */}
+                {isAuthenticated && authUser && (
+                  <>
+                    <h3>Profile</h3>
+
+                    {/* Pseudonym */}
+                    <div className={styles.accountRow} style={{ alignItems: 'flex-start', flexDirection: 'column', gap: '0.375rem' }}>
+                      <span className={styles.accountLabelBold} style={{ textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.05em' }}>
+                        Pseudonym
+                      </span>
+                      {editingPseudonym ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                          <input
+                            type="text"
+                            value={pseudonymDraft}
+                            onChange={(e) => setPseudonymDraft(e.target.value)}
+                            autoFocus
+                            maxLength={30}
+                            style={{
+                              flex: 1, padding: '0.375rem 0.5rem',
+                              background: 'var(--bg-tertiary)', border: '1px solid var(--accent-primary)',
+                              borderRadius: '6px', color: 'var(--text-primary)',
+                              fontFamily: 'var(--font-ui)', fontSize: '0.875rem', outline: 'none',
+                            }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') savePseudonym(); if (e.key === 'Escape') setEditingPseudonym(false); }}
+                          />
+                          <button
+                            onClick={savePseudonym}
+                            disabled={pseudonymSaving}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--success)', display: 'flex' }}
+                            title="Save"
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button
+                            onClick={() => setEditingPseudonym(false)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
+                            title="Cancel"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                            {authUser.pseudonym || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Not set</span>}
+                          </span>
+                          <button
+                            onClick={startEditPseudonym}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px' }}
+                            title="Edit pseudonym"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        </div>
+                      )}
+                      {pseudonymError && (
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--error)' }}>{pseudonymError}</p>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div className={styles.accountRow}>
+                      <span className={styles.accountLabelBold}>Name:</span>
+                      <span className={styles.accountValueNormal}>
+                        {[authUser.firstName, authUser.lastName].filter(Boolean).join(' ') || '—'}
+                      </span>
+                    </div>
+
+                    {/* Email */}
+                    <div className={styles.accountRow}>
+                      <span className={styles.accountLabelBold}>Email:</span>
+                      <span className={styles.accountValueNormal}>{authUser.email}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Session info ───────────────────────────────────── */}
+                <h3>Session</h3>
+                <div className={styles.accountRow}>
+                  <span className={styles.accountLabelBold}>Session ID:</span>
+                  <span className={styles.accountValueNormal}>{session.sessionId.slice(0, 8)}…</span>
+                </div>
                 <div className={styles.accountRow}>
                   <span className={styles.accountLabelBold}>Projects:</span>
                   <span className={styles.accountValueNormal}>{projectCount}</span>
-                </div>
-                <div className={styles.accountRow}>
-                  <span className={styles.accountLabelBold}>Account age:</span>
-                  <span className={styles.accountValueNormal}>{Math.floor((Date.now() - session.startedAt) / (1000 * 60 * 60 * 24))} days</span>
-                </div>
-                <div className={styles.accountRow}>
-                  <span className={styles.accountLabelBold}>Auth token:</span>
-                  <span className={styles.accountValueNormal}>{typeof window !== 'undefined' && localStorage.getItem('token') ? 'Available' : 'Not signed in'}</span>
-                </div>
-
-                <h3>Connection</h3>
-                <div className={styles.accountConnectionStatus}>
-                  <Wifi size={14} />
-                  {accountHealthError ? (
-                    <span className={styles.accountValueNormal}>Connection check failed: {accountHealthError}</span>
-                  ) : accountHealth ? (
-                    <span><span className={styles.accountLabelBold}>Status:</span> <span className={styles.accountValueNormal}>{accountHealth.status}</span></span>
-                  ) : (
-                    <span className={styles.accountValueNormal}>Checking connection...</span>
-                  )}
-                </div>
-                {accountHealth?.services?.map((service) => (
-                  <div key={service.name} className={styles.accountRow}>
-                    <span className={styles.accountLabelBold}>{service.name}:</span>
-                    <span className={styles.accountValueNormal}>{service.message || service.status}</span>
-                  </div>
-                ))}
-
-                <div className={styles.formGroup} style={{ marginTop: '1rem' }}>
-                  <Button 
-                    variant={accountHealth?.status === 'ok' ? 'danger' : 'primary'}
-                    onClick={() => {
-                      if (accountHealth?.status === 'ok') {
-                        console.log('Disconnecting...');
-                        if (typeof window !== 'undefined') localStorage.removeItem('token');
-                      } else {
-                        console.log('Connecting...');
-                      }
-                    }}
-                  >
-                    {accountHealth?.status === 'ok' ? 'Disconnect' : 'Connect'}
-                  </Button>
                 </div>
               </div>
             )}
@@ -546,5 +680,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };

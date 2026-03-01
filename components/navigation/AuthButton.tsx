@@ -1,56 +1,58 @@
 import React, { useState } from 'react';
-import AuthModal from '../auth/AuthModal';
-import { FaUser } from 'react-icons/fa';
+import { AuthModal } from '../auth/AuthModal';
+import { useAuthStore } from '@/stores/authStore';
+import { UserRound } from 'lucide-react';
 
-interface AuthButtonProps {
-  onLogin?: (user: any) => void;
-}
+const AuthButton: React.FC = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
 
-const AuthButton: React.FC<AuthButtonProps> = ({ onLogin }) => {
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
-
-  const handleAuthSuccess = (userData: any) => {
-    setUser(userData);
-    onLogin?.(userData);
-    setIsAuthModalOpen(false);
-  };
-
-  const handleLogout = () => {
-    // Implement logout logic
-    setUser(null);
-  };
+  if (isAuthenticated && user) {
+    return (
+      <button
+        onClick={clearAuth}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          background: 'var(--accent-primary-alpha)', border: '1px solid var(--accent-primary)',
+          borderRadius: '6px', padding: '0.375rem 0.75rem',
+          color: 'var(--accent-primary)', fontFamily: 'var(--font-ui)',
+          fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer',
+        }}
+        title="Click to disconnect"
+      >
+        <UserRound size={14} />
+        {user.pseudonym || user.email}
+      </button>
+    );
+  }
 
   return (
     <>
-      {user ? (
-        <div className="relative group">
-          <button 
-            onClick={handleLogout}
-            className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
-          >
-            <FaUser />
-            <span>{user.username}</span>
-            <span className="text-xs opacity-0 group-hover:opacity-100 transition ml-2">
-              Logout
-            </span>
-          </button>
-        </div>
-      ) : (
-        <button 
-          onClick={() => setIsAuthModalOpen(true)}
-          className="flex items-center space-x-2 bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 transition"
-        >
-          <FaUser />
-          <span>Sign In</span>
-        </button>
-      )}
-
-      <AuthModal 
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthSuccess={handleAuthSuccess}
-      />
+      <button
+        onClick={() => setIsOpen(true)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          background: 'transparent', border: '1px solid var(--border-color)',
+          borderRadius: '6px', padding: '0.375rem 0.75rem',
+          color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)',
+          fontSize: '0.8125rem', cursor: 'pointer',
+          transition: 'border-color 0.15s ease, color 0.15s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = 'var(--border-strong)';
+          e.currentTarget.style.color = 'var(--text-primary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = 'var(--border-color)';
+          e.currentTarget.style.color = 'var(--text-secondary)';
+        }}
+      >
+        <UserRound size={14} />
+        Sign In
+      </button>
+      <AuthModal isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </>
   );
 };

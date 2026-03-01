@@ -1,50 +1,84 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { google } from 'googleapis';
-import UserService from '../../../../services/user/userService';
+import AuthService from '../../../../services/auth/authService';
 
-// Configure OAuth2 client
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  `${process.env.NEXTAUTH_URL}/api/auth/google/callback`
-);
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  try {
-    const { code } = req.query;
+  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
-    if (!code || typeof code !== 'string') {
-      return res.status(400).json({ message: 'Invalid or missing authorization code' });
+  try {
+    const { code, error: oauthError } = req.query;
+
+    if (oauthError) {
+      return res.redirect(`${appUrl}/home?auth_error=${encodeURIComponent(String(oauthError))}`);
     }
 
-    // Exchange authorization code for tokens
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
+    if (!code || typeof code !== 'string') {
+      return res.redirect(`${appUrl}/home?auth_error=missing_code`);
+    }
 
-    // Fetch user information
-    const oauth2 = google.oauth2({ auth: oauth2Client, version: 'v2' });
-    const { data } = await oauth2.userinfo.get();
-
-    // Create or update user in our system
-    const userProfile = await UserService.registerOrUpdateGoogleUser({
-      googleId: data.id!,
-      email: data.email!,
-      username: data.name || data.email!.split('@')[0],
-      profileImage: data.picture
+    // Exchange authorization code for tokens using native fetch
+    const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: `${appUrl}/api/auth/google/callback`,
+        grant_type: 'authorization_code',
+      }).toString(),
     });
 
-    // Redirect to frontend with user token
-    const frontendRedirectUrl = new URL(`${process.env.NEXTAUTH_URL}/dashboard`);
-    frontendRedirectUrl.searchParams.append('token', userProfile.id);
+    if (!tokenRes.ok) {
+      throw new Error('Failed to exchange authorization code');
+    }
 
-    return res.redirect(frontendRedirectUrl.toString());
+    const tokens = await tokenRes.json() as { access_token: string };
 
+    // Fetch user profile from Google
+    const userRes = await fetch(GOOGLE_USERINFO_URL, {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    if (!userRes.ok) {
+      throw new Error('Failed to fetch Google user info');
+    }
+
+    const data = await userRes.json() as {
+      id: string;
+      email: string;
+      given_name?: string;
+      family_name?: string;
+      name?: string;
+      picture?: string;
+    };
+
+    if (!data.id || !data.email) {
+      return res.redirect(`${appUrl}/home?auth_error=incomplete_profile`);
+    }
+
+    const authResult = await AuthService.googleAuth({
+      googleId: data.id,
+      email: data.email,
+      firstName: data.given_name || data.name?.split(' ')[0] || '',
+      lastName: data.family_name || data.name?.split(' ').slice(1).join(' ') || '',
+      profileImage: data.picture,
+    });
+
+    const redirectUrl = new URL(`${appUrl}/home`);
+    redirectUrl.searchParams.set('auth_token', authResult.token);
+    redirectUrl.searchParams.set('auth_expires_in', String(authResult.expiresIn));
+
+    return res.redirect(redirectUrl.toString());
   } catch (error) {
     console.error('Google OAuth Callback Error:', error);
-    return res.status(500).json({ message: 'Authentication failed' });
+    const message = error instanceof Error ? error.message : 'Authentication failed';
+    return res.redirect(`${appUrl}/home?auth_error=${encodeURIComponent(message)}`);
   }
 }

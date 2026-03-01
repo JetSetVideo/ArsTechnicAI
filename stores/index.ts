@@ -1,3 +1,7 @@
+// Auth store
+export { useAuthStore } from './authStore';
+export type { AuthUser } from './authStore';
+
 // Core stores
 export { useSettingsStore } from './settingsStore';
 export { useLogStore } from './logStore';

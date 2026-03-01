@@ -377,19 +377,15 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
   const filterTree = useCallback((nodes: FileNode[], query: string): FileNode[] => {
     if (!query.trim()) return nodes;
     const q = query.toLowerCase();
-    return nodes
-      .map((node) => {
-        const childMatches = node.children ? filterTree(node.children, query) : [];
-        const selfMatches = node.name.toLowerCase().includes(q);
-        if (selfMatches || childMatches.length > 0) {
-          return {
-            ...node,
-            children: node.children ? childMatches : node.children,
-          };
-        }
-        return null;
-      })
-      .filter((n): n is FileNode => n !== null);
+    const results: FileNode[] = [];
+    for (const node of nodes) {
+      const childMatches = node.children ? filterTree(node.children, query) : [];
+      const selfMatches = node.name.toLowerCase().includes(q);
+      if (selfMatches || childMatches.length > 0) {
+        results.push({ ...node, children: node.children ? childMatches : node.children });
+      }
+    }
+    return results;
   }, []);
 
   const deferredFilter = useDeferredValue(filter);

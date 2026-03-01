@@ -4,7 +4,7 @@ import React, {
   useState, 
   useCallback 
 } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 
 // Types for project management
 interface Project {
@@ -54,7 +54,7 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { token } = useAuth();
+  const token = useAuthStore((s) => s.token);
   const [projects, setProjects] = useState<Project[]>([]);
   const [totalProjects, setTotalProjects] = useState(0);
   const [isLoading, setIsLoading] = useState(false);

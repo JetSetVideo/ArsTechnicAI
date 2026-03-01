@@ -4,7 +4,7 @@ import React, {
   useState, 
   useCallback 
 } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 
 // Types for generation
 interface GenerationRequest {
@@ -33,7 +33,7 @@ interface GenerationContextType {
 const GenerationContext = createContext<GenerationContextType | undefined>(undefined);
 
 export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { token } = useAuth();
+  const token = useAuthStore((s) => s.token);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationHistory, setGenerationHistory] = useState<GenerationResult[]>([]);
 
