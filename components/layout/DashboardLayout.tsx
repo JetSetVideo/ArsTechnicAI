@@ -36,10 +36,10 @@ export function DashboardLayout() {
     [router, currentProject.id, currentProject.name, openProjectFromDashboard]
   );
 
-  const iconClass = health?.status === 'ok' 
-    ? styles.dashboardLayoutHeaderIconConnected 
+  const profilePictureClass = health?.status === 'ok' 
+    ? styles.dashboardLayoutProfilePictureConnected 
     : health?.status === 'error' || health?.status === 'degraded'
-      ? styles.dashboardLayoutHeaderIconDisconnected 
+      ? styles.dashboardLayoutProfilePictureDisconnected 
       : '';
 
   return (
@@ -73,8 +73,11 @@ export function DashboardLayout() {
                 setSettingsOpen(true);
               }} 
               title="Account and Preferences"
+              style={{ padding: '4px' }}
             >
-              <UserRound size={18} className={iconClass} />
+              <div className={`${styles.dashboardLayoutProfilePicture} ${profilePictureClass}`}>
+                <UserRound size={14} />
+              </div>
             </Button>
           </div>
         </div>

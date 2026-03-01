@@ -128,14 +128,27 @@
   margin: 0 auto;
 }
 
-.dashboardLayoutHeaderIconConnected {
-  color: var(--success);
-  filter: drop-shadow(0 0 4px var(--success));
+.dashboardLayoutProfilePicture {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  overflow: hidden;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
-.dashboardLayoutHeaderIconDisconnected {
-  color: var(--error);
-  filter: drop-shadow(0 0 4px var(--error));
+.dashboardLayoutProfilePictureConnected {
+  box-shadow: 0 0 8px 1px var(--success);
+  border: 1px solid var(--success);
+}
+
+.dashboardLayoutProfilePictureDisconnected {
+  box-shadow: 0 0 8px 1px var(--error);
+  border: 1px solid var(--error);
 }
 
 /* ============================================
