@@ -24,9 +24,15 @@
   gap: 0.25rem;
 }
 
-.toolbarGroup + .toolbarGroup {
-  padding-left: 0.5rem;
-  border-left: 1px solid var(--border-color);
+.toolbarDivider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+  flex-shrink: 0;
+}
+
+.toolbarSpacer {
+  flex: 1;
 }
 
 .zoomLevel {
@@ -119,40 +125,26 @@
   font-size: 0.75rem;
 }
 
-/* Selection handles */
+/* Selection & resize handles */
 .handle {
   position: absolute;
-  width: 8px;
-  height: 8px;
   background: var(--accent-primary);
-  border: 1px solid var(--bg-primary);
+  border: 1.5px solid var(--bg-primary);
   border-radius: 2px;
-  cursor: nwse-resize;
+  z-index: 10;
 }
 
-.handleNW {
-  top: -4px;
-  left: -4px;
-  cursor: nwse-resize;
-}
+/* Corner handles — 8×8 */
+.handleNW { width: 8px; height: 8px; top: -4px; left: -4px; cursor: nw-resize; }
+.handleNE { width: 8px; height: 8px; top: -4px; right: -4px; cursor: ne-resize; }
+.handleSE { width: 8px; height: 8px; bottom: -4px; right: -4px; cursor: se-resize; }
+.handleSW { width: 8px; height: 8px; bottom: -4px; left: -4px; cursor: sw-resize; }
 
-.handleNE {
-  top: -4px;
-  right: -4px;
-  cursor: nesw-resize;
-}
-
-.handleSW {
-  bottom: -4px;
-  left: -4px;
-  cursor: nesw-resize;
-}
-
-.handleSE {
-  bottom: -4px;
-  right: -4px;
-  cursor: nwse-resize;
-}
+/* Edge handles — 6×6, centered on edges */
+.handleN { width: 6px; height: 6px; top: -3px; left: calc(50% - 3px); cursor: n-resize; }
+.handleS { width: 6px; height: 6px; bottom: -3px; left: calc(50% - 3px); cursor: s-resize; }
+.handleE { width: 6px; height: 6px; right: -3px; top: calc(50% - 3px); cursor: e-resize; }
+.handleW { width: 6px; height: 6px; left: -3px; top: calc(50% - 3px); cursor: w-resize; }
 
 /* Lock indicator */
 .lockIndicator {

@@ -3,10 +3,12 @@ import { TopBar } from './TopBar';
 import { ExplorerPanel } from './ExplorerPanel';
 import { InspectorPanel } from './InspectorPanel';
 import { Canvas } from './Canvas';
+import { NodeGraph } from './NodeGraph';
 import { Timeline } from './Timeline';
 import { SettingsModal } from './SettingsModal';
 import { ActionLog } from './ActionLog';
 import { useLogStore } from '@/stores';
+import { useSettingsSync } from '@/hooks/useSettingsSync';
 import styles from './AppShell.module.css';
 import type { WorkspaceMode, WorkspaceLayout } from '@/types';
 
@@ -21,6 +23,9 @@ const MAX_PANEL_WIDTH = 500;
 const MIN_TIMELINE_HEIGHT = 100;
 const MAX_TIMELINE_HEIGHT = 400;
 
+// Modes that use the node graph instead of canvas
+const NODE_GRAPH_MODES: WorkspaceMode[] = ['rework'];
+
 export const AppShell: React.FC = () => {
   const [mode, setMode] = useState<WorkspaceMode>('create');
   const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT);
@@ -29,7 +34,9 @@ export const AppShell: React.FC = () => {
   const [timelineHeight, setTimelineHeight] = useState(160);
   const log = useLogStore((s) => s.log);
 
-  // Refs for resize handling
+  // Sync settings with DB
+  useSettingsSync();
+
   const isResizingExplorer = useRef(false);
   const isResizingInspector = useRef(false);
   const isResizingTimeline = useRef(false);
@@ -38,14 +45,13 @@ export const AppShell: React.FC = () => {
   const startWidth = useRef(0);
   const startHeight = useRef(0);
 
+  const showNodeGraph = NODE_GRAPH_MODES.includes(mode);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      // Cmd/Ctrl + number to toggle panels
       if (e.metaKey || e.ctrlKey) {
         switch (e.key) {
           case '1':
@@ -72,35 +78,20 @@ export const AppShell: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Global mouse move and mouse up handlers for resizing
+  // Global resize handlers
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isResizingExplorer.current) {
         const delta = e.clientX - startX.current;
-        const newWidth = Math.min(
-          MAX_PANEL_WIDTH,
-          Math.max(MIN_PANEL_WIDTH, startWidth.current + delta)
-        );
-        setLayout((prev) => ({
-          ...prev,
-          explorer: { ...prev.explorer, width: newWidth },
-        }));
+        const newWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, startWidth.current + delta));
+        setLayout((prev) => ({ ...prev, explorer: { ...prev.explorer, width: newWidth } }));
       } else if (isResizingInspector.current) {
         const delta = startX.current - e.clientX;
-        const newWidth = Math.min(
-          MAX_PANEL_WIDTH,
-          Math.max(MIN_PANEL_WIDTH, startWidth.current + delta)
-        );
-        setLayout((prev) => ({
-          ...prev,
-          inspector: { ...prev.inspector, width: newWidth },
-        }));
+        const newWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, startWidth.current + delta));
+        setLayout((prev) => ({ ...prev, inspector: { ...prev.inspector, width: newWidth } }));
       } else if (isResizingTimeline.current) {
         const delta = startY.current - e.clientY;
-        const newHeight = Math.min(
-          MAX_TIMELINE_HEIGHT,
-          Math.max(MIN_TIMELINE_HEIGHT, startHeight.current + delta)
-        );
+        const newHeight = Math.min(MAX_TIMELINE_HEIGHT, Math.max(MIN_TIMELINE_HEIGHT, startHeight.current + delta));
         setTimelineHeight(newHeight);
       }
     };
@@ -115,71 +106,55 @@ export const AppShell: React.FC = () => {
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, []);
 
-  const handleExplorerResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isResizingExplorer.current = true;
-      startX.current = e.clientX;
-      startWidth.current = layout.explorer.width;
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    },
-    [layout.explorer.width]
-  );
+  const handleExplorerResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingExplorer.current = true;
+    startX.current = e.clientX;
+    startWidth.current = layout.explorer.width;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [layout.explorer.width]);
 
-  const handleInspectorResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isResizingInspector.current = true;
-      startX.current = e.clientX;
-      startWidth.current = layout.inspector.width;
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    },
-    [layout.inspector.width]
-  );
+  const handleInspectorResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingInspector.current = true;
+    startX.current = e.clientX;
+    startWidth.current = layout.inspector.width;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [layout.inspector.width]);
 
-  const handleTimelineResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isResizingTimeline.current = true;
-      startY.current = e.clientY;
-      startHeight.current = timelineHeight;
-      document.body.style.cursor = 'row-resize';
-      document.body.style.userSelect = 'none';
-    },
-    [timelineHeight]
-  );
+  const handleTimelineResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingTimeline.current = true;
+    startY.current = e.clientY;
+    startHeight.current = timelineHeight;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, [timelineHeight]);
 
   const togglePanel = useCallback((panel: keyof WorkspaceLayout) => {
-    setLayout((prev) => ({
-      ...prev,
-      [panel]: { ...prev[panel], visible: !prev[panel].visible },
-    }));
+    setLayout((prev) => ({ ...prev, [panel]: { ...prev[panel], visible: !prev[panel].visible } }));
   }, []);
 
-  const handleModeChange = useCallback(
-    (newMode: WorkspaceMode) => {
-      setMode(newMode);
-      log('settings_change', `Switched to ${newMode} mode`, { mode: newMode });
+  const handleModeChange = useCallback((newMode: WorkspaceMode) => {
+    setMode(newMode);
+    log('settings_change', `Switched to ${newMode} mode`, { mode: newMode });
 
-      // Show timeline in timeline mode
-      if (newMode === 'timeline') {
-        setLayout((prev) => ({
-          ...prev,
-          timeline: { ...prev.timeline, visible: true },
-        }));
-      }
-    },
-    [log]
-  );
+    if (newMode === 'timeline') {
+      setLayout((prev) => ({ ...prev, timeline: { ...prev.timeline, visible: true } }));
+    }
+    // Hide inspector in rework (node graph) mode to maximise graph space
+    if (newMode === 'rework') {
+      setLayout((prev) => ({ ...prev, timeline: { ...prev.timeline, visible: false } }));
+    }
+  }, [log]);
 
   return (
     <div className={styles.shell}>
@@ -201,33 +176,29 @@ export const AppShell: React.FC = () => {
         {layout.explorer.visible && (
           <>
             <ExplorerPanel width={layout.explorer.width} />
-            <div
-              className={styles.resizeHandle}
-              onMouseDown={handleExplorerResizeStart}
-            />
+            <div className={styles.resizeHandle} onMouseDown={handleExplorerResizeStart} />
           </>
         )}
 
         <div className={styles.mainArea}>
-          <Canvas showTimeline={layout.timeline.visible} />
-
-          {layout.timeline.visible && (
+          {showNodeGraph ? (
+            <NodeGraph />
+          ) : (
             <>
-              <div
-                className={styles.resizeHandleHorizontal}
-                onMouseDown={handleTimelineResizeStart}
-              />
-              <Timeline height={timelineHeight} />
+              <Canvas showTimeline={layout.timeline.visible} />
+              {layout.timeline.visible && (
+                <>
+                  <div className={styles.resizeHandleHorizontal} onMouseDown={handleTimelineResizeStart} />
+                  <Timeline height={timelineHeight} />
+                </>
+              )}
             </>
           )}
         </div>
 
-        {layout.inspector.visible && (
+        {layout.inspector.visible && !showNodeGraph && (
           <>
-            <div
-              className={styles.resizeHandle}
-              onMouseDown={handleInspectorResizeStart}
-            />
+            <div className={styles.resizeHandle} onMouseDown={handleInspectorResizeStart} />
             <InspectorPanel
               width={layout.inspector.width}
               onOpenSettings={() => setSettingsOpen(true)}
@@ -238,10 +209,7 @@ export const AppShell: React.FC = () => {
 
       <ActionLog />
 
-      <SettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 };

@@ -2,9 +2,13 @@
   "nodeModulesDir": "auto",
   "tasks": {
     "install": "deno install --allow-scripts",
-    "dev": "deno run -A npm:next@14.2.15 dev",
+    "dev": "deno run -A npm:next@14.2.15 dev -p 3002",
     "build": "deno run -A npm:next@14.2.15 build",
-    "start": "deno run -A npm:next@14.2.15 start",
-    "lint": "deno run -A npm:next@14.2.15 lint"
+    "start": "deno run -A npm:next@14.2.15 start -p 3002",
+    "lint": "deno run -A npm:next@14.2.15 lint",
+    "prisma:generate": "deno run -A npm:prisma generate",
+    "prisma:migrate": "deno run -A npm:prisma migrate dev",
+    "prisma:push": "deno run -A npm:prisma db push",
+    "prisma:seed": "./node_modules/.bin/tsx prisma/seed.ts"
   }
 }

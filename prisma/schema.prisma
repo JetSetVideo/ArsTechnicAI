@@ -1,0 +1,802 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector, pgcrypto]
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  CREATOR
+  USER
+  VIEWER
+}
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  AUDIO
+  TEXT
+  PROMPT
+  FOLDER
+  VOCABULARY
+  PRESET
+  CHARACTER
+  SCENE
+  LUT
+  SUBTITLE
+}
+
+enum MediaStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+  ARCHIVED
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum JobType {
+  IMAGE_GENERATION
+  VIDEO_GENERATION
+  AUDIO_GENERATION
+  UPSCALE
+  INPAINT
+  OUTPAINT
+  STYLE_TRANSFER
+  TRANSCODING
+  THUMBNAIL
+  EMBEDDING
+}
+
+enum AIProvider {
+  GOOGLE_IMAGEN
+  OPENAI_DALLE
+  STABILITY
+  MIDJOURNEY
+  REPLICATE
+  CUSTOM
+}
+
+enum CanvasItemType {
+  IMAGE
+  GENERATED
+  PLACEHOLDER
+  PROMPT_NODE
+  REFERENCE_SET
+  PROVIDER_CALL
+  EDIT_NODE
+  UPSCALE_NODE
+  MERGE_NODE
+  EXPORT_NODE
+  COMMENT
+  FRAME
+}
+
+enum TimelineTrackType {
+  VIDEO
+  AUDIO
+  SUBTITLE
+  FX
+  DATA
+}
+
+enum PublishPlatform {
+  YOUTUBE
+  TIKTOK
+  INSTAGRAM
+  TWITTER
+  CUSTOM
+}
+
+enum PublishStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+enum ActionType {
+  FILE_IMPORT
+  FILE_EXPORT
+  CANVAS_ADD
+  CANVAS_REMOVE
+  CANVAS_MOVE
+  CANVAS_RESIZE
+  GENERATION_START
+  GENERATION_COMPLETE
+  GENERATION_FAIL
+  PROMPT_SAVE
+  SETTINGS_CHANGE
+  SEARCH
+  FOLDER_CREATE
+  FOLDER_OPEN
+  PROJECT_CREATE
+  PROJECT_OPEN
+  PROJECT_SAVE
+  USER_LOGIN
+  USER_LOGOUT
+  ROLE_CHANGE
+  PUBLISH_START
+  PUBLISH_COMPLETE
+  VERSION_CREATE
+  VERSION_RESTORE
+  DEVICE_REVOKE
+}
+
+enum WorkspaceMode {
+  CREATE
+  REWORK
+  COMPOSITE
+  TIMELINE
+  COMIC
+  SCENE_3D
+}
+
+// ============================================================
+// NextAuth Models
+// ============================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================================
+// User Models
+// ============================================================
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  hashedPassword String?
+  role           Role      @default(USER)
+  isActive       Boolean   @default(true)
+  displayName    String?
+  bio            String?
+  avatarUrl      String?
+  timezone             String?
+  locale               String?
+  totalLogins          Int       @default(0)
+  lastLoginAt          DateTime?
+  lastLoginIp          String?
+  totalMinutesOnline   Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  projects       Project[]
+  assets         Asset[]
+  generationJobs GenerationJob[]
+  actionLogs     ActionLog[]
+  apiKeys        UserApiKey[]
+  settings       UserSettings?
+  publishAccounts PublishAccount[]
+  memberships    ProjectMember[]
+  devices        UserDevice[]
+  userSessions   UserSession[]
+
+  @@map("users")
+}
+
+model UserSettings {
+  id                   String     @id @default(cuid())
+  userId               String     @unique
+  theme                String     @default("dark")
+  autoSavePrompts      Boolean    @default(true)
+  showGrid             Boolean    @default(true)
+  snapToGrid           Boolean    @default(false)
+  gridSize             Int        @default(20)
+  defaultWidth         Int        @default(1024)
+  defaultHeight        Int        @default(1024)
+  defaultSteps         Int        @default(50)
+  defaultGuidanceScale Float      @default(7.5)
+  defaultProvider      AIProvider @default(GOOGLE_IMAGEN)
+  defaultModel         String     @default("imagen-3.0-generate-001")
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model UserApiKey {
+  id           String     @id @default(cuid())
+  userId       String
+  provider     AIProvider
+  encryptedKey String     @db.Text
+  label        String?
+  isActive     Boolean    @default(true)
+  lastUsedAt   DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_api_keys")
+}
+
+// ============================================================
+// Project Models
+// ============================================================
+
+model Project {
+  id            String        @id @default(cuid())
+  name          String
+  description   String?
+  slug          String        @unique
+  ownerId       String
+  isPublic      Boolean       @default(false)
+  isArchived    Boolean       @default(false)
+  version       Int           @default(1)
+  thumbnailUrl  String?
+  currentMode   WorkspaceMode @default(CREATE)
+  layoutState   Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members        ProjectMember[]
+  assets         Asset[]
+  canvasStates   CanvasState[]
+  timelineStates TimelineState[]
+  generationJobs GenerationJob[]
+  actionLogs     ActionLog[]
+  tags           ProjectTag[]
+  publishJobs    PublishJob[]
+  vocabLibraries VocabLibrary[]
+  fileNodes      FileNode[]
+  versions       ProjectVersion[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      Role     @default(USER)
+  joinedAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+// ============================================================
+// Asset Models
+// ============================================================
+
+model Asset {
+  id               String      @id @default(cuid())
+  name             String
+  type             AssetType
+  status           MediaStatus @default(READY)
+  path             String?
+  originalFilename String?
+  mimeType         String?
+  size             Int?
+  width            Int?
+  height           Int?
+  duration         Float?
+  thumbnailPath    String?
+  previewPath      String?
+  checksum         String?
+  prompt           String?     @db.Text
+  negativePrompt   String?     @db.Text
+  model            String?
+  provider         AIProvider?
+  seed             Int?
+  steps            Int?
+  guidanceScale    Float?
+  parentAssetId    String?
+  embedding        Unsupported("vector(1536)")?
+  userId           String
+  projectId        String?
+  metadata         Json?
+  colorPalette     Json?
+  exifData         Json?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentAsset    Asset?          @relation("AssetVariants", fields: [parentAssetId], references: [id], onDelete: SetNull)
+  variants       Asset[]         @relation("AssetVariants")
+  tags           AssetTag[]
+  canvasItems    CanvasItem[]
+  timelineClips  TimelineClip[]
+  resultOfJob    GenerationJob?  @relation("JobResult")
+  referencedByJobs GenerationJob[] @relation("JobReferences")
+  fileNodes      FileNode[]
+
+  @@map("assets")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  assets   AssetTag[]
+  projects ProjectTag[]
+
+  @@map("tags")
+}
+
+model AssetTag {
+  assetId String
+  tagId   String
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, tagId])
+  @@map("asset_tags")
+}
+
+model ProjectTag {
+  projectId String
+  tagId     String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, tagId])
+  @@map("project_tags")
+}
+
+// ============================================================
+// File Tree
+// ============================================================
+
+model FileNode {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // 'file' | 'folder'
+  path      String
+  parentId  String?
+  assetId   String?
+  projectId String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   FileNode?  @relation("FileTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children FileNode[] @relation("FileTree")
+  asset    Asset?     @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("file_nodes")
+}
+
+// ============================================================
+// Canvas Models
+// ============================================================
+
+model CanvasState {
+  id        String  @id @default(cuid())
+  projectId String
+  name      String  @default("Default")
+  isDefault Boolean @default(true)
+  viewportX Float   @default(0)
+  viewportY Float   @default(0)
+  viewportZoom Float @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   CanvasItem[]
+  edges   CanvasEdge[]
+
+  @@map("canvas_states")
+}
+
+model CanvasItem {
+  id            String         @id @default(cuid())
+  canvasStateId String
+  assetId       String?
+  type          CanvasItemType
+  x             Float          @default(0)
+  y             Float          @default(0)
+  width         Float          @default(200)
+  height        Float          @default(200)
+  rotation      Float          @default(0)
+  scale         Float          @default(1)
+  zIndex        Int            @default(0)
+  locked        Boolean        @default(false)
+  visible       Boolean        @default(true)
+  name          String?
+  prompt        String?        @db.Text
+  nodeData      Json?
+  dataUrl       String?        @db.Text
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  canvasState CanvasState  @relation(fields: [canvasStateId], references: [id], onDelete: Cascade)
+  asset       Asset?       @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  outEdges    CanvasEdge[] @relation("EdgeSource")
+  inEdges     CanvasEdge[] @relation("EdgeTarget")
+
+  @@map("canvas_items")
+}
+
+model CanvasEdge {
+  id            String  @id @default(cuid())
+  canvasStateId String
+  sourceItemId  String
+  targetItemId  String
+  sourcePort    String?
+  targetPort    String?
+  dataType      String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  canvasState CanvasState @relation(fields: [canvasStateId], references: [id], onDelete: Cascade)
+  sourceItem  CanvasItem  @relation("EdgeSource", fields: [sourceItemId], references: [id], onDelete: Cascade)
+  targetItem  CanvasItem  @relation("EdgeTarget", fields: [targetItemId], references: [id], onDelete: Cascade)
+
+  @@map("canvas_edges")
+}
+
+// ============================================================
+// Timeline Models
+// ============================================================
+
+model TimelineState {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String   @default("Default")
+  duration  Float    @default(0)
+  fps       Int      @default(24)
+  width     Int      @default(1920)
+  height    Int      @default(1080)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tracks  TimelineTrack[]
+  markers TimelineMarker[]
+
+  @@map("timeline_states")
+}
+
+model TimelineTrack {
+  id              String            @id @default(cuid())
+  timelineStateId String
+  name            String
+  type            TimelineTrackType
+  sortOrder       Int               @default(0)
+  isMuted         Boolean           @default(false)
+  isLocked        Boolean           @default(false)
+  volume          Float             @default(1)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  timelineState TimelineState  @relation(fields: [timelineStateId], references: [id], onDelete: Cascade)
+  clips         TimelineClip[]
+
+  @@map("timeline_tracks")
+}
+
+model TimelineClip {
+  id          String  @id @default(cuid())
+  trackId     String
+  assetId     String?
+  name        String?
+  startTime   Float   @default(0)
+  endTime     Float   @default(0)
+  inPoint     Float   @default(0)
+  outPoint    Float   @default(0)
+  opacity     Float   @default(1)
+  volume      Float   @default(1)
+  speed       Float   @default(1)
+  x           Float?
+  y           Float?
+  scaleX      Float   @default(1)
+  scaleY      Float   @default(1)
+  rotation    Float   @default(0)
+  textContent String? @db.Text
+  textStyle   Json?
+  effects     Json?
+  transitions Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  track TimelineTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  asset Asset?        @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@map("timeline_clips")
+}
+
+model TimelineMarker {
+  id              String @id @default(cuid())
+  timelineStateId String
+  time            Float
+  name            String?
+  type            String  @default("marker")
+  color           String  @default("#f59e0b")
+  description     String?
+  createdAt       DateTime @default(now())
+
+  timelineState TimelineState @relation(fields: [timelineStateId], references: [id], onDelete: Cascade)
+
+  @@map("timeline_markers")
+}
+
+// ============================================================
+// Generation & Job Queue
+// ============================================================
+
+model GenerationJob {
+  id              String     @id @default(cuid())
+  userId          String
+  projectId       String?
+  type            JobType
+  status          JobStatus  @default(QUEUED)
+  provider        AIProvider
+  model           String?
+  priority        Int        @default(0)
+  prompt          String?    @db.Text
+  negativePrompt  String?    @db.Text
+  width           Int?
+  height          Int?
+  seed            Int?
+  steps           Int?
+  guidanceScale   Float?
+  requestParams   Json?
+  resultAssetId   String?    @unique
+  resultData      Json?
+  progress        Float      @default(0)
+  progressMessage String?
+  error           String?    @db.Text
+  retryCount      Int        @default(0)
+  maxRetries      Int        @default(3)
+  estimatedCost   Float?
+  actualCost      Float?
+  tokensUsed      Int?
+  externalJobId   String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  completedAt     DateTime?
+
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  resultAsset   Asset?   @relation("JobResult", fields: [resultAssetId], references: [id], onDelete: SetNull)
+  referenceAssets Asset[] @relation("JobReferences")
+
+  @@index([status, priority, createdAt])
+  @@map("generation_jobs")
+}
+
+// ============================================================
+// Action Log
+// ============================================================
+
+model ActionLog {
+  id          String     @id @default(cuid())
+  type        ActionType
+  description String
+  data        Json?
+  undoable    Boolean    @default(false)
+  userId      String?
+  projectId   String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime   @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@map("action_logs")
+}
+
+// ============================================================
+// Prompts & Vocabulary
+// ============================================================
+
+model VocabLibrary {
+  id          String  @id @default(cuid())
+  name        String
+  category    String
+  description String?
+  entries     Json
+  projectId   String?
+  isGlobal    Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("vocab_libraries")
+}
+
+model PromptTemplate {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  template    String  @db.Text
+  variables   Json?
+  category    String?
+  isGlobal    Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("prompt_templates")
+}
+
+// ============================================================
+// Social Publishing
+// ============================================================
+
+model PublishAccount {
+  id           String          @id @default(cuid())
+  userId       String
+  platform     PublishPlatform
+  accountName  String
+  accessToken  String          @db.Text
+  refreshToken String?         @db.Text
+  tokenExpiry  DateTime?
+  profileUrl   String?
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs PublishJob[]
+
+  @@map("publish_accounts")
+}
+
+model PublishJob {
+  id               String          @id @default(cuid())
+  projectId        String
+  publishAccountId String
+  status           PublishStatus   @default(DRAFT)
+  platform         PublishPlatform
+  title            String
+  description      String?         @db.Text
+  hashtags         String[]
+  thumbnailPath    String?
+  mediaPath        String?
+  platformSettings Json?
+  publishedUrl     String?
+  publishedId      String?
+  error            String?         @db.Text
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publishAccount PublishAccount @relation(fields: [publishAccountId], references: [id], onDelete: Cascade)
+
+  @@map("publish_jobs")
+}
+
+// ============================================================
+// Device & Session Tracking
+// ============================================================
+
+model UserDevice {
+  id          String   @id @default(cuid())
+  userId      String
+  fingerprint String
+  name        String?
+  browser     String?
+  os          String?
+  deviceType  String?
+  ip          String?
+  city        String?
+  country     String?
+  countryCode String?
+  timezone    String?
+  loginCount  Int      @default(1)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  isTrusted   Boolean  @default(false)
+  isRevoked   Boolean  @default(false)
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions UserSession[]
+
+  @@unique([userId, fingerprint])
+  @@map("user_devices")
+}
+
+model UserSession {
+  id         String    @id @default(cuid())
+  userId     String
+  deviceId   String?
+  ip         String?
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+  durationMs Int?
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device UserDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+// ============================================================
+// Project Versioning
+// ============================================================
+
+model ProjectVersion {
+  id        String   @id @default(cuid())
+  projectId String
+  version   Int
+  label     String?
+  trigger   String
+  snapshot  Json
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, version])
+  @@map("project_versions")
+}

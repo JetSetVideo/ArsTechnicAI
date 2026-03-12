@@ -1,128 +1,160 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth/options';
+import { generateSchema } from '@/lib/validation/schemas';
+import { prisma } from '@/lib/prisma';
+import { getProvider } from '@/lib/ai/registry';
+import { saveFile } from '@/lib/storage/local';
+import type { AIProvider } from '@prisma/client';
 
-interface GenerateRequest {
-  prompt: string;
-  negativePrompt?: string;
-  width: number;
-  height: number;
-  apiKey: string;
-}
-
-interface GenerateResponse {
-  imageUrl?: string;
-  dataUrl?: string;
-  seed?: number;
-  error?: string;
-}
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<GenerateResponse>
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, negativePrompt, width, height, apiKey } =
-    req.body as GenerateRequest;
+  const session = await getServerSession(req, res, authOptions);
 
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required' });
+  const parsed = generateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
   }
 
+  const {
+    prompt,
+    negativePrompt,
+    width,
+    height,
+    provider,
+    model,
+    seed,
+    steps,
+    guidanceScale,
+    projectId,
+    apiKey,
+  } = parsed.data;
+
+  const resolvedProvider: AIProvider = (provider as AIProvider) || 'GOOGLE_IMAGEN';
+
+  // Require API key (from body) for all generation requests
   if (!apiKey) {
-    return res.status(400).json({ error: 'API key is required' });
+    return res.status(400).json({ error: 'API key required' });
+  }
+
+  const providerInstance = getProvider(resolvedProvider);
+  if (!providerInstance) {
+    return res.status(400).json({ error: `Provider ${resolvedProvider} not available` });
+  }
+
+  // Create a pending job record for authenticated users (for tracking)
+  let jobId: string | undefined;
+  if (session?.user?.id) {
+    const job = await prisma.generationJob.create({
+      data: {
+        userId: session.user.id,
+        projectId: projectId ?? null,
+        type: 'IMAGE_GENERATION',
+        provider: resolvedProvider,
+        model,
+        prompt,
+        negativePrompt,
+        width,
+        height,
+        seed,
+        steps,
+        guidanceScale,
+        status: 'PROCESSING',
+      },
+    });
+    jobId = job.id;
   }
 
   try {
-    // Google Imagen API endpoint (NanoBanana refers to Google's API)
-    // Using the Gemini API with image generation capabilities
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`;
-
-    const requestBody = {
-      instances: [
-        {
-          prompt: prompt,
-        },
-      ],
-      parameters: {
-        sampleCount: 1,
-        aspectRatio: width === height ? '1:1' : width > height ? '16:9' : '9:16',
-        negativePrompt: negativePrompt || undefined,
-      },
-    };
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
+    const result = await providerInstance.generate({
+      prompt,
+      negativePrompt,
+      width,
+      height,
+      model,
+      seed,
+      steps,
+      guidanceScale,
+      apiKey,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      
-      // If Imagen API fails, try with Gemini's image generation
-      // Fall back to a placeholder for demo purposes
-      if (response.status === 404 || response.status === 400) {
-        // Generate a placeholder image for demo
-        // In production, you'd want to use the actual API
-        const placeholderUrl = `https://placehold.co/${width}x${height}/1a1a24/00d4aa?text=${encodeURIComponent(prompt.slice(0, 20))}`;
-        
-        // Fetch the placeholder and convert to data URL
-        const placeholderResponse = await fetch(placeholderUrl);
-        if (placeholderResponse.ok) {
-          const buffer = await placeholderResponse.arrayBuffer();
-          const base64 = Buffer.from(buffer).toString('base64');
-          const dataUrl = `data:image/png;base64,${base64}`;
-          
-          return res.status(200).json({
-            imageUrl: placeholderUrl,
-            dataUrl,
-            seed: Math.floor(Math.random() * 1000000),
-          });
+    // Save asset to DB for authenticated users
+    let assetId: string | undefined;
+    if (session?.user?.id) {
+      // Decode base64 dataUrl and persist to disk
+      let filePath: string | undefined;
+      try {
+        if (result.dataUrl) {
+          const base64Data = result.dataUrl.replace(/^data:image\/\w+;base64,/, '');
+          const buffer = Buffer.from(base64Data, 'base64');
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const promptSlug = (prompt || 'generated')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .slice(0, 30);
+          const filename = `gen_${promptSlug}_${timestamp}.png`;
+          filePath = await saveFile(buffer, filename, 'upload');
         }
+      } catch {
+        // Storage failure is non-fatal; asset record will have no path
       }
 
-      console.error('API Error:', errorData);
-      return res.status(response.status).json({
-        error: errorData.error?.message || 'Failed to generate image',
+      const asset = await prisma.asset.create({
+        data: {
+          name: `Generated image — ${prompt?.slice(0, 50) ?? 'untitled'}`,
+          type: 'IMAGE',
+          status: 'READY',
+          path: filePath ?? null,
+          mimeType: 'image/png',
+          width: width ?? null,
+          height: height ?? null,
+          prompt: prompt ?? null,
+          negativePrompt: negativePrompt ?? null,
+          model: model ?? null,
+          provider: resolvedProvider,
+          seed: result.seed ?? null,
+          steps: steps ?? null,
+          guidanceScale: guidanceScale ?? null,
+          userId: session.user.id,
+          projectId: projectId ?? null,
+        },
       });
+      assetId = asset.id;
+
+      // Update the job as completed and link to asset
+      if (jobId) {
+        await prisma.generationJob.update({
+          where: { id: jobId },
+          data: {
+            status: 'COMPLETED',
+            resultAssetId: assetId,
+            completedAt: new Date(),
+          },
+        });
+      }
     }
 
-    const data = await response.json();
-
-    // Extract the generated image
-    if (data.predictions && data.predictions[0]) {
-      const prediction = data.predictions[0];
-      const imageData = prediction.bytesBase64Encoded;
-      const dataUrl = `data:image/png;base64,${imageData}`;
-
-      return res.status(200).json({
-        dataUrl,
-        seed: Math.floor(Math.random() * 1000000),
-      });
-    }
-
-    // Fallback: generate placeholder for demo
-    const placeholderUrl = `https://placehold.co/${width}x${height}/1a1a24/00d4aa?text=${encodeURIComponent(prompt.slice(0, 20))}`;
-    const placeholderResponse = await fetch(placeholderUrl);
-    
-    if (placeholderResponse.ok) {
-      const buffer = await placeholderResponse.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString('base64');
-      const dataUrl = `data:image/png;base64,${base64}`;
-      
-      return res.status(200).json({
-        imageUrl: placeholderUrl,
-        dataUrl,
-        seed: Math.floor(Math.random() * 1000000),
-      });
-    }
-
-    return res.status(500).json({ error: 'No image generated' });
+    return res.status(200).json({
+      dataUrl: result.dataUrl,
+      seed: result.seed,
+      assetId,
+      jobId,
+    });
   } catch (error) {
+    // Mark job as failed
+    if (jobId) {
+      await prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          status: 'FAILED',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      }).catch(() => {});
+    }
+
     console.error('Generation error:', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Internal server error',
@@ -131,9 +163,5 @@ export default async function handler(
 }
 
 export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
+  api: { bodyParser: { sizeLimit: '10mb' } },
 };

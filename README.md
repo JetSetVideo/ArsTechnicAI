@@ -1,65 +1,100 @@
 # Ars TechnicAI
 
-A **desktop-grade, browser-delivered creative production suite** for authoring **prompts, images, videos, comics, and AI-assisted pipelines**—with a **file-manager-class asset explorer**, an **infinite node canvas**, and a **multi‑track timeline**.
-
-This repository is the foundation UI: **Next.js 14** running on **Deno 2** (Deno executes `npm:next`), written in **TypeScript** with **CSS Variables + CSS Modules**.
-
-> **Provider note**: Ars TechnicAI is designed to integrate multiple third‑party AI providers (e.g. Midjourney, Higgsfield, “Nano banana”, etc.). Provider names are typically trademarks of their owners and are used here descriptively. Ars TechnicAI is **not affiliated** with them. You must comply with each provider’s Terms of Service and content policies.
+A **desktop-grade, browser-delivered creative production suite** for authoring **prompts, images, videos, comics, and AI-assisted pipelines** — with a file-manager-class **Explorer**, a **ComfyUI-style node graph**, an **infinite free-form canvas**, and a **multi-track timeline**.
 
 ---
 
 ## What Ars TechnicAI is
 
-Ars TechnicAI is an **AI production IDE** that treats media creation as a **graph + timeline problem**:
+An **AI production IDE** that treats media creation as a **graph + timeline problem**:
 
-- **Explorer (left)**: your local and project assets (files, prompts, presets, characters, scenes), with pro‑grade UX (search, tags, filters, rename, batch ops, drag‑drop).
-- **Infinite Canvas (center)**: a **node/blueprint canvas** where assets are arranged as a **pipeline** (prompt → references → generation jobs → edits → versions → exports).
-- **Inspector (right)**: contextual properties, parameters, metadata, and generation settings for the current selection.
-- **Timeline (bottom, inside main workspace)**: multi‑track sequencing (video/audio/text/fx), scrubbing with a **red playhead**, markers, and clip-level parameters.
-- **Top Bar (global)**: mode switcher (Image Create / Image Rework / Video / Comic / 3D Scene), command palette, project controls, user/account, settings.
-
----
-
-## Core concepts
-
-- **Project**: the top-level container for assets, graph state, timeline edits, and exports.
-- **Asset**: any managed entity (file, prompt template, generated image/video, LUT, preset, character profile, sound, etc.).
-- **Node**: a canvas block representing an operation or asset (Prompt, Reference Set, Provider Call, Edit, Upscale, Color Grade, Merge, Export…).
-- **Edge**: typed connections between nodes (e.g., prompt text → provider call; image → inpaint; video → stabilize).
-- **Job / Run**: an execution instance of a node or subgraph; supports queuing, cancellation, retries, and provenance.
-- **Version / Variant**: branches of assets and edits; supports “variations” and comparison.
-- **Provider**: a pluggable integration (REST/WebSocket/SDK) with unified job tracking and cost/latency reporting.
+- **Explorer (left)**: Local file tree + Cloud asset library (generated images synced to your account). Search/filter across both tabs. Drag assets directly onto the canvas.
+- **Canvas (center)**: Infinite pan/zoom 2D canvas with free-form image placement, 8-handle resize, rotation, undo/redo (50 steps), snap-to-grid, and PNG export.
+- **Node Graph (Rework mode)**: ComfyUI-inspired workflow editor — Prompt, Negative, Generator, Image-In, Transform, Blend, and Output nodes connected with bezier edges. Executes the graph and adds results to the canvas.
+- **Inspector (right)**: Prompt authoring, API key, Selected Item properties, Version History (restore any snapshot), Prompt Templates library, Recent Generations.
+- **Timeline (bottom)**: Multi-track sequencing (toggleable).
+- **Top Bar**: Mode switcher (Create / Rework / Video / Comic / 3D), project controls (New / Open / Save / Recent), user account.
 
 ---
 
-## UI architecture (target)
+## Implemented features
 
-```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ TOP BAR: Mode switch • Command palette • Project • User • Settings             │
-├───────────────┬───────────────────────────────────────────────┬───────────────┤
-│ LEFT PANEL    │ MAIN WORKSPACE (infinite canvas + overlay UI) │ RIGHT PANEL   │
-│ Explorer      │  - Canvas graph / blueprint                    │ Inspector     │
-│ Search/Filter │  - Selection + snapping + minimap              │ Parameters    │
-│ Tree/Tags     │  - Drag assets in • connect • comment          │ Metadata      │
-├───────────────┴───────────────────────────────────────────────┴───────────────┤
-│ TIMELINE (inside workspace): tracks • clips • markers • red playhead • zoom    │
-└───────────────────────────────────────────────────────────────────────────────┘
-```
+### Account & auth
+- NextAuth 4 JWT: credentials (email + password) + Google/GitHub OAuth
+- In-app auth modal — Login and Register tabs, no page redirect
+- Account panel (avatar, stats, device list, session list, sign out)
+- Device fingerprinting (SHA-256 hash) + geo lookup (ip-api.com, server-side)
+- `UserDevice` + `UserSession` tracked per login
+- Session duration recorded on sign-out
 
-For detailed component specs and CSS terms, see `Design.md`.
+### Project & versioning
+- DB-backed projects (Prisma PostgreSQL)
+- Auto-save canvas state on dirty + every 30 s when logged in
+- Project versioning: snapshot on Generate, manual Save (Cmd+S), Delete, and Restore
+- Version list in Inspector with one-click restore
+
+### Canvas
+- Infinite pan + zoom (Ctrl+Wheel zooms to cursor)
+- Free-form image placement with drag-and-drop
+- 8 resize handles (NW/N/NE/E/SE/S/SW/W) — fully functional
+- Rotation (CCW / CW in 15° steps)
+- Undo/redo stack (Cmd+Z / Cmd+Shift+Z, 50 steps)
+- Export canvas to PNG (offscreen render)
+- Grid toggle, zoom controls
+
+### Node graph (Rework mode)
+- 7 node types: Prompt, Negative Prompt, Generator, Image Input, Transform, Blend, Output
+- Drag nodes, click ports to connect, click connections to remove
+- Bezier SVG connections
+- Viewport pan (alt+drag / middle-click) + zoom (Ctrl+wheel)
+- Execute workflow → topological sort → run nodes → add output to canvas
+- Save/Load workflow JSON
+
+### Explorer
+- **Local tab**: file tree, folder expand/collapse, drag assets to canvas
+- **Cloud tab**: 2-column asset grid pulled from DB, drag-to-canvas or double-click-to-add, thumbnail previews
+
+### Inspector
+- Image generation via Google Imagen (direct, no worker needed)
+- Authenticated users: assets saved to DB automatically
+- Version History section (loads from DB, restore button)
+- Prompt Templates section (loads from DB, "Use" populates prompt)
+- Recent Generations job list with thumbnails
+
+### Settings & sync
+- Settings DB sync: loads from DB on login, debounced PUT on change
+- Settings override: DB wins for display prefs, local wins for API key
+- Cross-device settings via UserSettings model
+
+### Connection status
+- 4 states: **pending** (orange), **connected** (green), **denied** (red — server error), **unauthenticated** (teal — server OK, not logged in)
+- Unauthenticated is NOT shown as an error
+
+### API
+- `GET/PATCH /api/users/me` — user profile + stats + devices + sessions
+- `GET/DELETE/PATCH /api/users/me/devices/[id]` — device management
+- `GET/POST /api/projects/[id]/versions` — version list + create snapshot
+- `POST /api/projects/[id]/versions/[id]/restore` — restore version
+- `GET /api/assets` — paginated asset library
+- `GET text/event-stream /api/jobs/[id]/stream` — SSE job status
+- `POST /api/generate` — direct generation (Google Imagen), saves Asset to DB if authenticated
 
 ---
 
-## Tech stack (current repo)
+## Tech stack
 
-- **Runtime**: Deno 2 (`deno task dev` runs `npm:next@14.2.15`)
-- **Framework**: Next.js 14 (Pages Router)
-- **Language**: TypeScript (strict)
-- **UI**: React 18
-- **Styling**: CSS Variables + CSS Modules
-
-> Planned (not necessarily implemented yet): Zustand for state, Framer Motion for micro-interactions, Three.js/WebGL for canvas shaders/transitions, WebAudio for waveforms, ffmpeg-based processing (server-side or native wrapper), provider SDK adapters.
+| Layer | Tech |
+|---|---|
+| Runtime | Deno 2 |
+| Framework | Next.js 14 (Pages Router) |
+| Language | TypeScript (strict) |
+| UI | React 18 + CSS Modules + CSS Variables |
+| State | Zustand (canvas, file, settings, generation, project, node stores) |
+| Database | PostgreSQL + pgvector + Prisma ORM |
+| Auth | NextAuth 4 (JWT, credentials + Google/GitHub) |
+| Cache/Queue | Redis (ioredis) — queue not yet used for generation |
+| AI | Google Imagen (via REST) |
+| Reverse proxy | Nginx → :3002 |
 
 ---
 
@@ -67,75 +102,99 @@ For detailed component specs and CSS terms, see `Design.md`.
 
 ### Prerequisites
 
-- Deno 2 installed (`deno -V`)
+- Deno 2 (`deno -V`)
+- PostgreSQL running
+- Redis running (optional for current generation path)
+- Google AI Studio API key for image generation
 
-### Install & run
+### Setup
 
 ```bash
+cp .env.example .env.local
+# Fill in DATABASE_URL, REDIS_URL, NEXTAUTH_SECRET, GOOGLE_GENERATIVE_AI_API_KEY
 deno task install
-deno task dev
+deno task prisma:push   # create/sync DB schema
+deno task prisma:seed   # optional: seed admin user + sample data
+deno task dev           # dev server on :3002
 ```
 
-### Production build
+### Production
 
 ```bash
 deno task build
 deno task start
+# Or use PM2:
+pm2 start ecosystem.config.cjs
 ```
 
 ---
 
-## Environment variables (planned integrations)
-
-Create `.env.local` (Next.js convention) for provider credentials. Example names (subject to change as adapters land):
+## Environment variables
 
 ```bash
-# Example provider keys (do not commit secrets)
-ARSTECHNICAI_MIDJOURNEY_API_KEY=
-ARSTECHNICAI_HIGGSFIELD_API_KEY=
-ARSTECHNICAI_NANOBANANA_API_KEY=
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/arstechnicai
 
-# Optional: telemetry / error reporting
-ARSTECHNICAI_SENTRY_DSN=
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# NextAuth
+NEXTAUTH_URL=https://yourdomain.com
+NEXTAUTH_SECRET=your-secret-here
+
+# OAuth (optional)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+
+# AI providers
+GOOGLE_GENERATIVE_AI_API_KEY=   # or pass per-request from client
 ```
 
 ---
 
-## Repository map
+## Keyboard shortcuts
 
-Current structure (early-stage):
-
-- `pages/`: Next.js routes
-- `styles/`: global CSS + CSS Modules
-- `deno.json`: Deno tasks (authoritative dev workflow)
-
-Target structure and module boundaries are documented in `Structure.md`.
-
----
-
-## Product roadmap (high level)
-
-- **Phase 0 (foundation UI)**: app shell, docking panels, resizers, command palette, theming, accessibility baseline.
-- **Phase 1 (assets + canvas)**: explorer CRUD, tagging, drag/drop, canvas nodes/edges, graph serialization, undo/redo.
-- **Phase 2 (timeline)**: tracks/clips, scrubbing, markers, basic transforms/effects, preview player.
-- **Phase 3 (providers)**: adapter interfaces, job orchestration, history, cost tracking, provider-specific capabilities.
-- **Phase 4 (workflow)**: characters/scenes/dialogues/voices, template libraries, batch generation, render/export pipeline.
+| Shortcut | Action |
+|---|---|
+| Cmd/Ctrl+Z | Undo |
+| Cmd/Ctrl+Shift+Z | Redo |
+| Cmd/Ctrl+S | Save project |
+| Cmd/Ctrl+1 | Toggle Explorer |
+| Cmd/Ctrl+2 | Toggle Timeline |
+| Cmd/Ctrl+3 | Toggle Inspector |
+| Cmd/Ctrl+, | Open Settings |
+| Delete / Backspace | Delete selected canvas items |
+| Escape | Deselect |
+| G | Toggle grid |
+| Scroll | Zoom (on canvas) |
+| Space+drag | Pan canvas |
 
 ---
 
-## Accessibility & input model
+## Roadmap
 
-Ars TechnicAI is designed to be **keyboard-first** with **mouse precision**:
-
-- Full focus management, roving tab index for lists/trees, ARIA roles for tree/grid/menus
-- Predictable shortcuts (Cmd/Ctrl+K, Cmd/Ctrl+P, Cmd/Ctrl+Z, Shift modifiers)
-- Hit target sizing, high contrast mode, reduced motion support
-
-See `Design.md` for the full interaction spec.
+- [x] App shell with resizable panels
+- [x] NextAuth with device tracking + geo
+- [x] Project + asset DB persistence
+- [x] Project versioning with restore
+- [x] Google Imagen generation (direct)
+- [x] Canvas undo/redo + resize handles + export PNG
+- [x] ComfyUI-style node graph (Rework mode)
+- [x] Cloud asset library in Explorer
+- [x] Version history + prompt templates in Inspector
+- [x] SSE job streaming endpoint
+- [x] Settings cross-device sync
+- [ ] Video timeline editing
+- [ ] Comic panel layout
+- [ ] More AI providers (Midjourney, Higgsfield, etc.)
+- [ ] Collaborative multi-user projects
+- [ ] Worker daemon for queued jobs
+- [ ] 3D scene mode
 
 ---
 
 ## License
 
 MIT — see `LICENSE`.
-

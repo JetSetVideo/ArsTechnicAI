@@ -2,11 +2,15 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { CanvasItem, CanvasViewport, Asset } from '@/types';
 
+const MAX_HISTORY = 50;
+
 interface CanvasState {
   items: CanvasItem[];
   selectedIds: string[];
   viewport: CanvasViewport;
   clipboard: CanvasItem[];
+  past: CanvasItem[][];
+  future: CanvasItem[][];
 
   // Item operations
   addItem: (item: Omit<CanvasItem, 'id' | 'createdAt' | 'zIndex'>) => CanvasItem;
@@ -38,6 +42,13 @@ interface CanvasState {
 
   // Clear
   clearCanvas: () => void;
+
+  // History
+  snapshot: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
@@ -45,8 +56,44 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   selectedIds: [],
   viewport: { x: 0, y: 0, zoom: 1 },
   clipboard: [],
+  past: [],
+  future: [],
+
+  snapshot: () => {
+    const { items, past } = get();
+    const newPast = [...past, [...items]].slice(-MAX_HISTORY);
+    set({ past: newPast, future: [] });
+  },
+
+  undo: () => {
+    const { past, items, future } = get();
+    if (past.length === 0) return;
+    const prev = past[past.length - 1];
+    set({
+      items: prev,
+      past: past.slice(0, -1),
+      future: [items, ...future].slice(0, MAX_HISTORY),
+      selectedIds: [],
+    });
+  },
+
+  redo: () => {
+    const { past, items, future } = get();
+    if (future.length === 0) return;
+    const next = future[0];
+    set({
+      items: next,
+      past: [...past, items].slice(-MAX_HISTORY),
+      future: future.slice(1),
+      selectedIds: [],
+    });
+  },
+
+  canUndo: () => get().past.length > 0,
+  canRedo: () => get().future.length > 0,
 
   addItem: (itemData) => {
+    get().snapshot();
     const maxZ = Math.max(0, ...get().items.map((i) => i.zIndex));
     const item: CanvasItem = {
       ...itemData,
@@ -80,6 +127,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   removeItem: (id) => {
+    get().snapshot();
     set((state) => ({
       items: state.items.filter((i) => i.id !== id),
       selectedIds: state.selectedIds.filter((sid) => sid !== id),
@@ -87,6 +135,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   removeSelected: () => {
+    get().snapshot();
     const { selectedIds } = get();
     set((state) => ({
       items: state.items.filter((i) => !selectedIds.includes(i.id)),
@@ -103,7 +152,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   duplicateItem: (id) => {
     const item = get().items.find((i) => i.id === id);
     if (!item) return undefined;
-
     return get().addItem({
       ...item,
       x: item.x + 20,
@@ -123,9 +171,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   selectAll: () => {
-    set((state) => ({
-      selectedIds: state.items.map((i) => i.id),
-    }));
+    set((state) => ({ selectedIds: state.items.map((i) => i.id) }));
   },
 
   clearSelection: () => {
@@ -138,9 +184,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   setViewport: (viewport) => {
-    set((state) => ({
-      viewport: { ...state.viewport, ...viewport },
-    }));
+    set((state) => ({ viewport: { ...state.viewport, ...viewport } }));
   },
 
   zoomIn: () => {
@@ -175,9 +219,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   paste: (offsetX = 20, offsetY = 20) => {
+    get().snapshot();
     const { clipboard, addItem } = get();
     const newIds: string[] = [];
-
     clipboard.forEach((item) => {
       const newItem = addItem({
         ...item,
@@ -187,11 +231,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       });
       newIds.push(newItem.id);
     });
-
     set({ selectedIds: newIds });
   },
 
   clearCanvas: () => {
+    get().snapshot();
     set({ items: [], selectedIds: [] });
   },
 }));
