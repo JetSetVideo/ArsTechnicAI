@@ -1,26 +1,124 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Palette, Keyboard, Save, RotateCcw } from 'lucide-react';
+import { X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi, CheckCircle, XCircle, Pencil, Check } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { useSettingsStore, useLogStore } from '@/stores';
+import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
+import { RECOMMENDED_GENERATION_MODELS, getRecommendedModelFallbacks } from '@/stores/settingsStore';
+import { computeClientSignature, APP_VERSION } from '@/utils/clientSignature';
+import { deriveDeviceTier, deriveConnectivityTier } from '@/utils/clientSignature';
+import { useUserStore } from '@/stores/userStore';
+import { useAuthStore } from '@/stores/authStore';
+import { AuthModal } from '@/components/auth/AuthModal';
+import type { HealthResponse } from '@/pages/api/health';
 import styles from './SettingsModal.module.css';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultTab?: SettingsTab;
 }
 
-type SettingsTab = 'api' | 'appearance' | 'shortcuts';
+type SettingsTab = 'account' | 'api' | 'appearance' | 'shortcuts' | 'help' | 'about';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
+  defaultTab = 'account'
 }) => {
-  const { settings, updateSettings, updateAIProvider, resetSettings } =
+  const { settings, updateSettings, updateAIProvider, updateAppearance, resetSettings } =
     useSettingsStore();
   const log = useLogStore((s) => s.log);
+  const deviceInfo = useUserStore((s) => s.deviceInfo);
+  const telemetryEnabled = useTelemetryStore((s) => s.telemetryEnabled);
+  const setTelemetryEnabled = useTelemetryStore((s) => s.setTelemetryEnabled);
+  const latestSnapshot = useTelemetryStore((s) => s.getLatestSnapshot());
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('api');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [isOpen, defaultTab]);
+
+  // Auth state
+  const authUser = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+  const updateAuthUser = useAuthStore((s) => s.updateUser);
+  const getAuthHeader = useAuthStore((s) => s.getAuthHeader);
+
+  // Pseudonym editing
+  const [editingPseudonym, setEditingPseudonym] = useState(false);
+  const [pseudonymDraft, setPseudonymDraft] = useState('');
+  const [pseudonymError, setPseudonymError] = useState('');
+  const [pseudonymSaving, setPseudonymSaving] = useState(false);
+
+  const startEditPseudonym = () => {
+    setPseudonymDraft(authUser?.pseudonym || '');
+    setPseudonymError('');
+    setEditingPseudonym(true);
+  };
+
+  const savePseudonym = async () => {
+    if (!pseudonymDraft.trim() || pseudonymDraft.trim() === authUser?.pseudonym) {
+      setEditingPseudonym(false);
+      return;
+    }
+    setPseudonymSaving(true);
+    setPseudonymError('');
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ pseudonym: pseudonymDraft.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to save pseudonym');
+      updateAuthUser({ pseudonym: data.pseudonym });
+      setEditingPseudonym(false);
+    } catch (err) {
+      setPseudonymError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setPseudonymSaving(false);
+    }
+  };
+
+  const handleDisconnect = () => {
+    clearAuth();
+    log('settings_change', 'User disconnected');
+  };
+
+  const [accountHealth, setAccountHealth] = useState<HealthResponse | null>(null);
+  const [accountHealthError, setAccountHealthError] = useState<string>('');
+  const session = useUserStore((s) => s.session);
+  const currentProject = useUserStore((s) => s.currentProject);
+  const projectCount = useProjectsStore((s) => s.projects.length);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'account') return;
+    let mounted = true;
+
+    const loadConnectionStatus = async () => {
+      setAccountHealthError('');
+      try {
+        const response = await fetch('/api/health');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const json = (await response.json()) as HealthResponse;
+        if (mounted) setAccountHealth(json);
+      } catch (error) {
+        if (!mounted) return;
+        setAccountHealthError(error instanceof Error ? error.message : 'Cannot reach health endpoint');
+      }
+    };
+
+    void loadConnectionStatus();
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, activeTab]);
+
   const [localApiKey, setLocalApiKey] = useState(settings.aiProvider.apiKey);
   const [localEndpoint, setLocalEndpoint] = useState(
     settings.aiProvider.endpoint || ''
@@ -52,18 +150,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const deviceTier = deviceInfo
+    ? deriveDeviceTier(deviceInfo.hardwareConcurrency, deviceInfo.deviceMemory)
+    : 'unknown';
+  const connectivityTier = deviceInfo
+    ? deriveConnectivityTier(deviceInfo.connectionEffectiveType)
+    : 'unknown';
+  const clientSignature =
+    latestSnapshot?.clientSignature ?? computeClientSignature(deviceTier, connectivityTier);
+
+  const handleCopySignature = () => {
+    navigator.clipboard?.writeText(clientSignature);
+    log('settings_change', 'Copied client signature to clipboard');
+  };
+
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'account', label: 'Account', icon: <UserRound size={16} /> },
     { id: 'api', label: 'API Keys', icon: <Key size={16} /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
     { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={16} /> },
+    { id: 'help', label: 'Help', icon: <HelpCircle size={16} /> },
+    { id: 'about', label: 'About', icon: <Info size={16} /> },
   ];
+  const suggestedFallbacks = getRecommendedModelFallbacks(localModel);
 
   return (
+    <>
+    {authModalOpen && (
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+    )}
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h2>Settings</h2>
-          <button className={styles.closeButton} onClick={onClose}>
+          <button type="button" className={styles.closeButton} onClick={onClose}>
             <X size={20} />
           </button>
         </div>
@@ -72,6 +192,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <nav className={styles.tabs}>
             {tabs.map((tab) => (
               <button
+                type="button"
                 key={tab.id}
                 className={`${styles.tab} ${
                   activeTab === tab.id ? styles.active : ''
@@ -85,6 +206,147 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </nav>
 
           <div className={styles.content}>
+            {activeTab === 'account' && (
+              <div className={styles.section}>
+
+                {/* ── Connection status ─────────────────────────────── */}
+                <h3>Connection</h3>
+                <div className={styles.accountConnectionStatus} style={{
+                  borderColor: isAuthenticated ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+                  background: isAuthenticated ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                }}>
+                  {isAuthenticated ? (
+                    <CheckCircle size={14} color="var(--success)" />
+                  ) : (
+                    <XCircle size={14} color="var(--error)" />
+                  )}
+                  <span style={{ fontWeight: 600, color: isAuthenticated ? 'var(--success)' : 'var(--error)' }}>
+                    {isAuthenticated ? 'Connected' : 'Not connected'}
+                  </span>
+                  {isAuthenticated && authUser && (
+                    <span className={styles.accountValueNormal} style={{ marginLeft: '0.25rem' }}>
+                      — {authUser.pseudonym || authUser.email}
+                    </span>
+                  )}
+                </div>
+
+                {/* API/backend health */}
+                {accountHealth && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <Wifi size={13} color={accountHealth.status === 'ok' ? 'var(--success)' : 'var(--error)'} />
+                    <span className={styles.accountValueNormal} style={{ fontSize: '0.75rem' }}>
+                      Server: {accountHealth.status}
+                    </span>
+                  </div>
+                )}
+
+                {/* Connect / Disconnect button */}
+                <div className={styles.formGroup}>
+                  {isAuthenticated ? (
+                    <Button variant="danger" onClick={handleDisconnect}>
+                      Disconnect
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      onClick={() => setAuthModalOpen(true)}
+                      style={{ background: 'var(--success)', color: '#000', border: 'none' } as React.CSSProperties}
+                    >
+                      Connect
+                    </Button>
+                  )}
+                </div>
+
+                {/* ── User profile (only when authenticated) ────────── */}
+                {isAuthenticated && authUser && (
+                  <>
+                    <h3>Profile</h3>
+
+                    {/* Pseudonym */}
+                    <div className={styles.accountRow} style={{ alignItems: 'flex-start', flexDirection: 'column', gap: '0.375rem' }}>
+                      <span className={styles.accountLabelBold} style={{ textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.05em' }}>
+                        Pseudonym
+                      </span>
+                      {editingPseudonym ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                          <input
+                            type="text"
+                            value={pseudonymDraft}
+                            onChange={(e) => setPseudonymDraft(e.target.value)}
+                            autoFocus
+                            maxLength={30}
+                            style={{
+                              flex: 1, padding: '0.375rem 0.5rem',
+                              background: 'var(--bg-tertiary)', border: '1px solid var(--accent-primary)',
+                              borderRadius: '6px', color: 'var(--text-primary)',
+                              fontFamily: 'var(--font-ui)', fontSize: '0.875rem', outline: 'none',
+                            }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') savePseudonym(); if (e.key === 'Escape') setEditingPseudonym(false); }}
+                          />
+                          <button
+                            onClick={savePseudonym}
+                            disabled={pseudonymSaving}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--success)', display: 'flex' }}
+                            title="Save"
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button
+                            onClick={() => setEditingPseudonym(false)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
+                            title="Cancel"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                            {authUser.pseudonym || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Not set</span>}
+                          </span>
+                          <button
+                            onClick={startEditPseudonym}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px' }}
+                            title="Edit pseudonym"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        </div>
+                      )}
+                      {pseudonymError && (
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--error)' }}>{pseudonymError}</p>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div className={styles.accountRow}>
+                      <span className={styles.accountLabelBold}>Name:</span>
+                      <span className={styles.accountValueNormal}>
+                        {[authUser.firstName, authUser.lastName].filter(Boolean).join(' ') || '—'}
+                      </span>
+                    </div>
+
+                    {/* Email */}
+                    <div className={styles.accountRow}>
+                      <span className={styles.accountLabelBold}>Email:</span>
+                      <span className={styles.accountValueNormal}>{authUser.email}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Session info ───────────────────────────────────── */}
+                <h3>Session</h3>
+                <div className={styles.accountRow}>
+                  <span className={styles.accountLabelBold}>Session ID:</span>
+                  <span className={styles.accountValueNormal}>{session.sessionId.slice(0, 8)}…</span>
+                </div>
+                <div className={styles.accountRow}>
+                  <span className={styles.accountLabelBold}>Projects:</span>
+                  <span className={styles.accountValueNormal}>{projectCount}</span>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'api' && (
               <div className={styles.section}>
                 <h3>NanoBanana / Google AI API</h3>
@@ -125,9 +387,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     label="Model"
                     value={localModel}
                     onChange={(e) => setLocalModel(e.target.value)}
-                    placeholder="imagen-3.0-generate-001"
+                    placeholder="imagen-3.0-generate-002"
                   />
                 </div>
+
+                <h3>Recommended models</h3>
+                <p className={styles.description}>
+                  If your current model is restricted by account tier/billing, pick one of these validated options.
+                </p>
+                <div className={styles.themeOptions}>
+                  {RECOMMENDED_GENERATION_MODELS.map((modelName) => (
+                    <button
+                      key={modelName}
+                      type="button"
+                      className={`${styles.themeOption} ${localModel === modelName ? styles.active : ''}`}
+                      onClick={() => setLocalModel(modelName)}
+                    >
+                      {modelName}
+                    </button>
+                  ))}
+                </div>
+                {suggestedFallbacks.length > 0 && (
+                  <p className={styles.description}>
+                    Suggested fallback: <strong>{suggestedFallbacks[0]}</strong>
+                  </p>
+                )}
 
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
@@ -169,6 +453,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {(['dark', 'light', 'system'] as const).map((theme) => (
                     <button
                       key={theme}
+                      type="button"
                       className={`${styles.themeOption} ${
                         settings.theme === theme ? styles.active : ''
                       }`}
@@ -178,6 +463,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   ))}
                 </div>
+
+                <h3>Font Size</h3>
+                <p className={styles.description}>
+                  Adjust the interface text size for better readability.
+                </p>
+                <div className={styles.fontSizeOptions}>
+                  {(['small', 'medium', 'large'] as const).map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      className={`${styles.fontSizeOption} ${
+                        settings.appearance?.fontSize === size ? styles.active : ''
+                      }`}
+                      onClick={() => updateAppearance({ fontSize: size })}
+                    >
+                      <span className={styles.fontSizeLabel}>{size.charAt(0).toUpperCase() + size.slice(1)}</span>
+                      <span className={styles.fontSizePreview} style={{ fontSize: size === 'small' ? '12px' : size === 'medium' ? '14px' : '16px' }}>Aa</span>
+                    </button>
+                  ))}
+                </div>
+
+                <h3>Display</h3>
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={settings.appearance?.compactMode || false}
+                    onChange={(e) =>
+                      updateAppearance({ compactMode: e.target.checked })
+                    }
+                  />
+                  <span>Compact mode (reduced spacing)</span>
+                </label>
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={settings.appearance?.showFilenames ?? true}
+                    onChange={(e) =>
+                      updateAppearance({ showFilenames: e.target.checked })
+                    }
+                  />
+                  <span>Show filenames on canvas items</span>
+                </label>
 
                 <h3>Canvas</h3>
                 <label className={styles.checkbox}>
@@ -212,6 +539,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   />
                   <span>Auto-save prompts with generated images</span>
                 </label>
+              </div>
+            )}
+
+            {activeTab === 'about' && (
+              <div className={styles.section}>
+                <h3>Client Signature</h3>
+                <p className={styles.description}>
+                  Unique code for your current app version and environment. Use it when reporting
+                  bugs so we can correlate issues with your setup.
+                </p>
+                <div className={styles.signatureRow}>
+                  <code className={styles.signatureCode}>{clientSignature}</code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopySignature}
+                    icon={<Copy size={14} />}
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <h3>Telemetry</h3>
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={telemetryEnabled}
+                    onChange={(e) => setTelemetryEnabled(e.target.checked)}
+                  />
+                  <span>Allow telemetry sync (device/usage stats to backend)</span>
+                </label>
+                <p className={styles.description} style={{ marginTop: 8, fontSize: '0.75rem' }}>
+                  When enabled, anonymous usage and error data is sent to help improve the app. No
+                  PII is collected. Data is stored locally first and synced when online.
+                </p>
               </div>
             )}
 
@@ -266,13 +627,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
             )}
+            {activeTab === 'help' && (
+              <div className={styles.section}>
+                <h3>Creative process</h3>
+                <p className={styles.description}>
+                  Ars Technic AI is built around four modes that match how you work:
+                </p>
+                <ul className={styles.list}>
+                  <li>
+                    <strong>Create</strong> — Generate new images from prompts. Add assets to the canvas and iterate.
+                  </li>
+                  <li>
+                    <strong>Rework</strong> — Edit or vary existing images. Select an asset and refine with new prompts.
+                  </li>
+                  <li>
+                    <strong>Composite</strong> — Arrange and layer assets on the canvas. Resize, reorder, and combine.
+                  </li>
+                  <li>
+                    <strong>Timeline</strong> — Work with sequences and motion. Plan shots and export sequences.
+                  </li>
+                </ul>
+
+                <h3>Know-how</h3>
+                <ul className={styles.list}>
+                  <li>Use the <strong>Explorer</strong> to manage files and generated assets. Drag items onto the canvas.</li>
+                  <li>Use the <strong>Inspector</strong> to edit prompts, run variations, and adjust properties of the selected asset.</li>
+                  <li>Projects are saved locally. Use <strong>Save Project</strong> from the project menu to export a <code>.arstechnic</code> file.</li>
+                  <li>Configure your API key in <strong>Settings</strong> (gear icon or ⌘ ,) to enable image generation.</li>
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
         <div className={styles.footer}>
-          <Button variant="ghost" onClick={handleReset} icon={<RotateCcw size={14} />}>
-            Reset to Defaults
-          </Button>
+          <div className={styles.footerLeft}>
+            <Button variant="ghost" onClick={handleReset} icon={<RotateCcw size={14} />}>
+              Reset to Defaults
+            </Button>
+            <span className={styles.versionLabel}>
+              Development version {APP_VERSION}
+            </span>
+          </div>
           <div className={styles.footerRight}>
             <Button variant="secondary" onClick={onClose}>
               Cancel
@@ -284,5 +680,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };

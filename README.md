@@ -127,6 +127,16 @@ deno task start
 pm2 start ecosystem.config.cjs
 ```
 
+### Database migration (optional)
+
+If you use PostgreSQL (DATABASE_URL set), run migrations to create telemetry tables:
+
+```bash
+npx prisma migrate dev --name add_telemetry
+```
+
+This creates `TelemetrySnapshot` and `TelemetryErrorEvent` tables for telemetry sync.
+
 ---
 
 ## Environment variables
@@ -150,6 +160,78 @@ GITHUB_CLIENT_SECRET=
 
 # AI providers
 GOOGLE_GENERATIVE_AI_API_KEY=   # or pass per-request from client
+```
+
+### Startup connection to home server
+
+At startup, the app tries to connect to your **home server** (configured via `BACKEND_URL`, e.g. your desktop hosting PostgreSQL). If `BACKEND_URL` is not configured, it will try to connect directly to the local PostgreSQL database using Prisma. A **connection banner** appears at the top:
+
+- **Green**: All services connected (Backend API, PostgreSQL). Ephemeral—auto-dismisses after a few seconds.
+- **Orange**: Degraded (partial connectivity).
+- **Red**: Cannot reach the home server or local database. Use the X button to dismiss.
+
+Configure `BACKEND_URL` in `.env.local` to point to your home server (e.g. `http://192.168.1.100:8000` or `http://your-desktop.local:8000`).
+
+The app runs locally and accesses **local assets** via the Explorer panel—you can import files from your machine and store project data in the browser. Backend/PostgreSQL connectivity is optional for generation and persistence on your home server.
+
+### Telemetry & Client Signature
+
+At startup, the app **gathers** device, session, usage, paths, logs, and settings data; **digests** it into derived metrics (device tier, connectivity tier); and **stores** snapshots locally. Errors are persisted in the error store. When telemetry sync is enabled (Settings > About), snapshots and error events are sent to the backend.
+
+A **client signature** (e.g. `v1.0.0-a3f2c1`) uniquely identifies your version + environment for bug/performance tracking. It is computed offline and shown in Settings > About. You can copy it when reporting bugs.
+
+### Plug frontend to local backend + PostgreSQL (Ubuntu)
+
+You can run the UI in this repo and delegate generation requests to your own backend (for example Python/FastAPI + PostgreSQL) on the same machine.
+
+1. Copy environment template:
+
+```bash
+cp .env.example .env.local
+```
+
+2. Enable backend delegation in `.env.local`:
+
+```bash
+BACKEND_GENERATION_ENABLED=true
+BACKEND_URL=http://localhost:8000
+BACKEND_GENERATION_PATH=/api/v1/generate
+```
+
+3. Start PostgreSQL locally (Docker example):
+
+```bash
+docker run --name arstechnicai-postgres \
+  -e POSTGRES_USER=ars \
+  -e POSTGRES_PASSWORD=ars_pass \
+  -e POSTGRES_DB=ars_technicai \
+  -p 5432:5432 -d postgres:16
+```
+
+4. Start your backend on Ubuntu (example URL `http://localhost:8000`) and point it to PostgreSQL:
+
+```bash
+export DATABASE_URL="postgresql://ars:ars_pass@localhost:5432/ars_technicai"
+# then run your backend server (uvicorn, gunicorn, etc.)
+```
+
+5. Run this frontend:
+
+```bash
+npm run dev
+```
+
+When enabled, `POST /api/generate` in this frontend will try your backend first and only fall back to direct provider calls if possible.
+
+Backend response contract (minimum):
+
+```json
+{
+  "dataUrl": "data:image/png;base64,...",
+  "imageUrl": "https://optional-hosted-image",
+  "seed": 12345,
+  "modelUsed": "optional-model-name"
+}
 ```
 
 ---

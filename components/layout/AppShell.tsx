@@ -30,9 +30,49 @@ export const AppShell: React.FC = () => {
   const [mode, setMode] = useState<WorkspaceMode>('create');
   const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [projectName, setProjectName] = useState('Untitled Project');
+  const [helpOpen, setHelpOpen] = useState(false);
   const [timelineHeight, setTimelineHeight] = useState(160);
   const log = useLogStore((s) => s.log);
+  
+  // User and project management
+  const { currentProject, updateProject, refreshDeviceInfo, deviceInfo } = useUserStore();
+  const { setCurrentProject } = useFileStore();
+  const projectName = currentProject.name;
+
+  // Sync editor projects ↔ dashboard projects
+  useProjectSync();
+
+  // Initialize user info and device capabilities on mount
+  useEffect(() => {
+    refreshDeviceInfo();
+    
+    // Log device info for debugging
+    console.log('[AppShell] Device info gathered:', deviceInfo);
+    
+    // Initialize file structure with current project and hydrate saved workspace.
+    setCurrentProject(currentProject.name, currentProject.id);
+    void loadProjectWorkspaceState(currentProject.id, currentProject.name);
+  }, [currentProject.id, currentProject.name, refreshDeviceInfo, setCurrentProject]);
+
+  // Auto-save canvas state periodically and on unmount
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
+    }, 15000); // Save every 15 seconds
+
+    return () => {
+      clearInterval(interval);
+      // Save on unmount (navigating away from editor)
+      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
+    };
+  }, [currentProject.id, currentProject.name]);
+
+  // Sync project name changes with both stores
+  const setProjectName = useCallback((name: string) => {
+    updateProject({ name });
+    setCurrentProject(name, currentProject.id);
+    log('settings_change', `Project renamed to: ${name}`, { projectName: name });
+  }, [updateProject, setCurrentProject, log, currentProject.id]);
 
   // Sync settings with DB
   useSettingsSync();
@@ -157,7 +197,7 @@ export const AppShell: React.FC = () => {
   }, [log]);
 
   return (
-    <div className={styles.shell}>
+    <div id="app-shell-layout-root" className={styles.appShellLayoutRoot}>
       <TopBar
         currentMode={mode}
         onModeChange={handleModeChange}
@@ -165,6 +205,7 @@ export const AppShell: React.FC = () => {
         onToggleInspector={() => togglePanel('inspector')}
         onToggleTimeline={() => togglePanel('timeline')}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenHelp={() => setHelpOpen(true)}
         explorerVisible={layout.explorer.visible}
         inspectorVisible={layout.inspector.visible}
         timelineVisible={layout.timeline.visible}
@@ -172,7 +213,7 @@ export const AppShell: React.FC = () => {
         onProjectNameChange={setProjectName}
       />
 
-      <div className={styles.workspace}>
+      <div id="app-shell-workspace-region" className={styles.appShellWorkspaceRegion}>
         {layout.explorer.visible && (
           <>
             <ExplorerPanel width={layout.explorer.width} />

@@ -11,30 +11,31 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 0.75rem;
+  padding: var(--space-2, 0.5rem) var(--panel-padding, 0.75rem);
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-color);
-  gap: 1rem;
+  gap: var(--space-3, 0.75rem);
+  flex-shrink: 0;
 }
 
 .transportControls {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--space-1, 0.25rem);
 }
 
 .transportControls button {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   padding: 0;
 }
 
 .timecode {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--space-1, 0.25rem);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--font-sm, 0.75rem);
 }
 
 .currentTime {

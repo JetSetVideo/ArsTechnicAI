@@ -201,7 +201,7 @@ This document describes how Ars TechnicAI's codebase and product modules are org
 
 ---
 
-## Naming conventions
+## Naming Conventions
 
 - **React components**: `PascalCase.tsx`
 - **Hooks**: `useThing.ts`

@@ -1,0 +1,123 @@
+/**
+ * ConnectionBanner styles
+ * Green (ok), Orange (degraded), Red (error)
+ */
+
+.connectionBannerStatusRootAtStartup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid;
+  animation: slideDown 0.2s ease;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.connectionBannerStatusVariantOk {
+  background: var(--success-bg);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.connectionBannerStatusVariantDegraded {
+  background: var(--warning-bg);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.connectionBannerStatusVariantError {
+  background: var(--error-bg);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.connectionBannerStatusContentRegion {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.connectionBannerStatusIconByState {
+  flex-shrink: 0;
+}
+
+.connectionBannerStatusVariantOk .connectionBannerStatusIconByState {
+  color: var(--success);
+}
+
+.connectionBannerStatusVariantDegraded .connectionBannerStatusIconByState {
+  color: var(--warning);
+}
+
+.connectionBannerStatusVariantError .connectionBannerStatusIconByState {
+  color: var(--error);
+}
+
+.connectionBannerStatusTextRegion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+}
+
+.connectionBannerStatusLabelPrimary {
+  font-weight: 600;
+  margin-inline-end: var(--space-2);
+}
+
+.connectionBannerServiceStatusOk {
+  color: var(--success);
+}
+
+.connectionBannerServiceStatusNotOk {
+  color: var(--text-secondary);
+}
+
+.connectionBannerStatusVariantError .connectionBannerServiceStatusNotOk {
+  color: var(--error);
+}
+
+.connectionBannerServiceStatusBold {
+  font-weight: 600;
+}
+
+.connectionBannerServiceStatusNormal {
+  font-weight: 400;
+}
+
+.connectionBannerDismissButtonByUser {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.connectionBannerDismissButtonByUser:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}

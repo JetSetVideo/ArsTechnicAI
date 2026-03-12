@@ -11,12 +11,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem;
+  padding: var(--panel-padding, 0.75rem);
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .title {
-  font-size: 0.6875rem;
+  font-size: var(--font-xs, 0.6875rem);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -25,6 +26,8 @@
 
 .content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -32,19 +35,40 @@
 /* Sections */
 .section {
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+/* When section is expanded, content should be visible */
+.section.expanded {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make expanded sections grow to take available space proportionally */
+.section.expanded.expandable {
+  flex: 1;
+  min-height: 0;
+}
+
+.section.expanded .sectionContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sectionHeader {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
   width: 100%;
-  padding: 0.75rem;
+  padding: var(--panel-padding, 0.75rem);
   border: none;
   background: transparent;
   color: var(--text-secondary);
   font-family: var(--font-ui);
-  font-size: 0.6875rem;
+  font-size: var(--font-xs, 0.6875rem);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -66,12 +90,12 @@
 }
 
 .sectionContent {
-  padding: 0 0.75rem 0.75rem;
+  padding: 0 var(--panel-padding, 0.75rem) var(--panel-padding, 0.75rem);
 }
 
 /* Form elements */
 .formGroup {
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3, 0.75rem);
 }
 
 .formGroup:last-child {
@@ -81,12 +105,12 @@
 .formRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
 }
 
 .hint {
-  margin-top: 0.375rem;
-  font-size: 0.6875rem;
+  margin-top: var(--space-1, 0.25rem);
+  font-size: var(--font-xs, 0.6875rem);
   color: var(--text-muted);
 }
 
@@ -101,31 +125,45 @@
 
 .generateButton {
   width: 100%;
-  margin-top: 0.5rem;
+  margin-top: var(--space-2, 0.5rem);
 }
 
 /* Property grid */
 .propertyGrid {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
+}
+
+.propertyGrid .formGroup {
+  margin-bottom: 0;
+}
+
+.propertyGrid .formRow {
+  margin-bottom: 0;
 }
 
 .property {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-1, 0.25rem) 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.property:last-child {
+  border-bottom: none;
 }
 
 .propertyLabel {
-  font-size: 0.75rem;
+  font-size: var(--font-sm, 0.75rem);
   color: var(--text-muted);
   flex-shrink: 0;
 }
 
 .propertyValue {
-  font-size: 0.75rem;
+  font-size: var(--font-sm, 0.75rem);
   color: var(--text-primary);
   text-align: right;
   word-break: break-word;
@@ -135,23 +173,23 @@
 .jobList {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
 }
 
 .jobItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.5rem;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem);
   background: var(--bg-tertiary);
-  border-radius: 6px;
+  border-radius: var(--radius-md, 6px);
 }
 
 .jobStatus {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
   flex: 1;
   min-width: 0;
 }
@@ -190,7 +228,7 @@
 }
 
 .jobPrompt {
-  font-size: 0.75rem;
+  font-size: var(--font-sm, 0.75rem);
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -198,9 +236,9 @@
 }
 
 .jobThumb {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm, 4px);
   object-fit: cover;
   flex-shrink: 0;
 }

@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import {
   ChevronDown,
   Settings,
@@ -40,6 +41,7 @@ interface TopBarProps {
   onToggleInspector: () => void;
   onToggleTimeline: () => void;
   onOpenSettings: () => void;
+  onOpenHelp?: () => void;
   explorerVisible: boolean;
   inspectorVisible: boolean;
   timelineVisible: boolean;
@@ -71,6 +73,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleInspector,
   onToggleTimeline,
   onOpenSettings,
+  onOpenHelp,
   explorerVisible,
   inspectorVisible,
   timelineVisible,
@@ -431,8 +434,20 @@ export const TopBar: React.FC<TopBarProps> = ({
             <PanelRight size={18} />
           </button>
         </div>
+      </div>
 
-        <div className={styles.divider} />
+      {/* Bottom row: Project menu + mode nav | Settings + Help */}
+      <div className={styles.row}>
+        <div className={styles.section}>
+          <div className={styles.projectSelector} ref={menuRef}>
+            <button
+              className={`${styles.projectButton} ${menuOpen ? styles.open : ''}`}
+              onClick={() => setMenuOpen(!menuOpen)}
+              title="Project Menu"
+            >
+              <span className={styles.projectName}>{projectName}</span>
+              <ChevronDown size={14} className={styles.chevron} />
+            </button>
 
         <div className={styles.actions}>
           <Button

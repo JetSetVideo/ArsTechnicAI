@@ -24,8 +24,9 @@ interface CanvasProps {
   showTimeline?: boolean;
 }
 
-export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
+export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = false }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const {
     items,
     selectedIds,
@@ -50,6 +51,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
     canRedo,
   } = useCanvasStore();
 
+  const { getAsset, getAssetsByLineage, getAssetsByParentId, updateAsset } = useFileStore();
   const { settings } = useSettingsStore();
   const log = useLogStore((s) => s.log);
 
@@ -58,6 +60,63 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(settings.showGrid);
+  const [promptOverlayItemId, setPromptOverlayItemId] = useState<string | null>(null);
+  const [versionOverlayItemId, setVersionOverlayItemId] = useState<string | null>(null);
+  
+  // Editable filename tag state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle double-click on filename tag to start editing
+  const handleTagDoubleClick = useCallback((e: React.MouseEvent, item: CanvasItem) => {
+    e.stopPropagation();
+    setEditingItemId(item.id);
+    setEditingName(item.name);
+  }, []);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingItemId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingItemId]);
+
+  // Handle saving the edited name
+  const handleSaveName = useCallback(() => {
+    if (editingItemId && editingName.trim()) {
+      updateItem(editingItemId, { name: editingName.trim() });
+      log('canvas_move', `Renamed item to: ${editingName.trim()}`);
+    }
+    setEditingItemId(null);
+    setEditingName('');
+  }, [editingItemId, editingName, updateItem, log]);
+
+  // Handle click outside to stop editing
+  useEffect(() => {
+    if (!editingItemId) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(`.${styles.filenameEditInput}`)) {
+        handleSaveName();
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [editingItemId, handleSaveName]);
+
+  // Handle keyboard events for editing
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveName();
+    } else if (e.key === 'Escape') {
+      setEditingItemId(null);
+      setEditingName('');
+    }
+  }, [handleSaveName]);
 
   // Resize state
   const [resizingHandle, setResizingHandle] = useState<ResizeHandle | null>(null);
@@ -141,6 +200,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
 
           const img = new Image();
           img.onload = () => {
+            // Scale dropped images to a reasonable size for the viewport
+            const maxDim = Math.min(320, Math.round(window.innerWidth * 0.2));
+            const scaleFactor = Math.min(1, maxDim / Math.max(img.width, img.height));
             addItem({
               type: 'image',
               x: x + index * 20,
@@ -148,7 +210,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
               width: img.width,
               height: img.height,
               rotation: 0,
-              scale: Math.min(1, 400 / Math.max(img.width, img.height)),
+              scale: scaleFactor,
               locked: false,
               visible: true,
               src: dataUrl,
@@ -176,6 +238,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
     (e: React.MouseEvent) => {
       if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains(styles.canvasContent)) {
         clearSelection();
+        setPromptOverlayItemId(null);
+        setVersionOverlayItemId(null);
       }
     },
     [clearSelection]
@@ -569,15 +633,42 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline = false }) => {
                 <div className={styles.lockIndicator}>
                   <span style={{ fontSize: '10px' }}>🔒</span>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Selection handles */}
+                {selectedIds.includes(item.id) && !item.locked && (
+                  <>
+                    <div className={`${styles.handle} ${styles.handleNW}`} />
+                    <div className={`${styles.handle} ${styles.handleNE}`} />
+                    <div className={`${styles.handle} ${styles.handleSW}`} />
+                    <div className={`${styles.handle} ${styles.handleSE}`} />
+                  </>
+                )}
+
+                {/* Lock indicator */}
+                {item.locked && (
+                  <div className={styles.lockIndicator}>
+                    <Lock size={12} />
+                  </div>
+                )}
+
+                {/* Link indicators */}
+                {hasParent && (
+                  <div className={`${styles.linkDot} ${styles.linkDotLeft}`} title="Linked to parent" />
+                )}
+                {hasChildren && (
+                  <div className={`${styles.linkDot} ${styles.linkDotRight}`} title={`${children.length} linked outputs`}>
+                    {children.length}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {items.length === 0 && (
           <div className={styles.emptyState}>
             <Layers size={48} />
-            <h3>Drop images here</h3>
+            <h3>Start by generating an image or importing assets</h3>
             <p>
               Drag images from the Explorer panel or your computer, or generate
               new images using the Inspector panel.

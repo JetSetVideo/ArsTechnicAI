@@ -2,6 +2,8 @@
 
 This document defines **UI/UX rules**, **interaction patterns**, and **CSS specifications** for Ars TechnicAI (Deno 2 + Next.js + TypeScript). It is written as a **desktop-grade product spec** for **Windows/macOS + browser**, optimized for **keyboard + mouse** input today.
 
+> **Implementation Status**: Most design specs are implemented. See `ARCHITECTURE.md` for UX analysis and recommendations.
+
 Also see: `Structure.md` (module boundaries, naming, file layout).
 
 ---
@@ -544,6 +546,47 @@ Each mode defines:
 
 ---
 
+## Project storage architecture (local + cloud)
+
+Professional creative tools use a **local-first workspace snapshot** plus **cloud asset manifests**.
+
+### Required storage layers
+
+1. **Project metadata**
+   - Name, ownership, timestamps, tags, sharing fields.
+2. **Workspace state snapshot**
+   - Explorer tree state, selected paths, expanded folders.
+   - Canvas items, viewport, selection.
+3. **Asset registry**
+   - Stable `assetId`, logical `path`, mime/size/dimensions, lineage/version metadata.
+4. **Asset payload layer**
+   - Local binary/data cache for instant reopen.
+   - Cloud payload/pointer for cross-device restore.
+
+### Local-first behavior
+
+- Save workspace and project asset state locally on:
+  - periodic autosave
+  - project switch
+  - navigation/unmount
+- Reopen from local state first (low latency).
+- If local snapshot is missing, load cloud workspace state + cloud assets.
+
+### Cloud sync behavior
+
+- Workspace state sync is best-effort and non-blocking.
+- Asset payload sync is separate from metadata sync to avoid giant workspace blobs.
+- On cloud restore:
+  - apply workspace snapshot
+  - hydrate missing asset thumbnails/data payloads from cloud asset records.
+
+### Conflict strategy
+
+- Default: last-write-wins by `updatedAt` for workspace snapshots.
+- Asset-level updates are upserted by `(projectId, assetId)` to keep stable identity.
+
+---
+
 ## Coding standards (Next.js + TypeScript)
 
 - Strict TS. No `any` in app code.
@@ -557,3 +600,229 @@ Each mode defines:
   - Unit: pure functions, parsers, adapters
   - Integration: explorer CRUD, canvas graph ops, timeline edits
 
+---
+
+## Naming convention system (mandatory)
+
+This section defines a single naming system for **classes**, **ids**, and code symbols across the repository.
+
+### Core naming order
+
+Names must be written in this order:
+
+1. **Goal** (what it does)
+2. **Location** (where it lives in parent/child layout)
+3. **Timing or state** (when it is used, if relevant)
+
+Formula:
+
+`<goal><location><timingOrState>`
+
+Examples:
+
+- `connectionBannerStatusRootAtStartup`
+- `dashboardLayoutHeaderPrimaryAtTop`
+- `appShellResizeHandleTimelineIdle`
+
+### General rules (all languages)
+
+- Use full words; avoid random letters/numbers (`x1`, `tmp2`, `abc`, `foo`).
+- Avoid unclear abbreviations unless industry-standard (`api`, `url`, `id`, `sql`).
+- Keep one concept per name; avoid overloaded names.
+- Add state only when needed (`Active`, `Idle`, `Loading`, `OnSubmit`, `AtStartup`).
+- Prefer deterministic semantic ids for DOM elements.
+
+### TypeScript / TSX
+
+- **Components**: `PascalCase` nouns, scoped by domain.
+  - `DashboardLayout`, `ConnectionBanner`, `GenerationForm`.
+- **Types / Interfaces / Enums**: `PascalCase`, include role.
+  - `HealthResponse`, `WorkspaceLayout`, `GenerationRequest`.
+- **Functions / handlers**: `camelCase` with action-first verbs.
+  - `handleOpenProjectFromDashboard`, `checkBackendHealth`.
+- **Booleans**: `is/has/can/should` prefix.
+  - `isResizingTimeline`, `hasRequiredRole`.
+- **Constants**: `SCREAMING_SNAKE_CASE` for global constants.
+  - `EPHEMERAL_DELAY_MS`, `MIN_PANEL_WIDTH`.
+- **React state names**: goal-oriented nouns.
+  - `settingsOpen`, `timelineHeight`, `searchQuery`.
+
+### CSS Modules (`*.module.css`)
+
+- Use `camelCase` class names with explicit goal + location + optional state.
+- Avoid generic names like `container`, `header`, `row`, `item` in new code.
+- State/variant classes should include explicit status:
+  - `...VariantOk`, `...VariantError`, `...Idle`, `...Active`.
+- Keep selectors component-scoped by prefix:
+  - `connectionBanner...`, `dashboardLayout...`, `appShell...`.
+
+### HTML ids in TSX
+
+- Use kebab-case semantic ids.
+- Pattern:
+  - `<feature>-<goal>-<location>-<stateOrTiming>`
+- Examples:
+  - `connection-banner-status-at-startup`
+  - `dashboard-layout-main-content-region`
+  - `app-shell-layout-root`
+- Never use random suffixes in static UI ids.
+
+### API / backend naming (TS + Prisma + SQL)
+
+- Route files and handlers must reflect resource + scope:
+  - `pages/api/projects/index.ts`, `pages/api/projects/[projectId].ts`.
+- Prisma model names: `PascalCase` singular nouns (`User`, `Project`, `GenerationJob`).
+- SQL/database columns: `snake_case` when manually created; keep Prisma mapping explicit if mixed.
+- ID fields:
+  - DB primary ids may remain generated (`uuid`/`cuid`) for uniqueness.
+  - UI-visible ids, test ids, and DOM ids must be semantic and readable.
+
+### Tests
+
+- Test file names:
+  - `<feature>.test.ts` for unit/integration.
+- Test case names must describe:
+  - **goal**, **context**, **expected result**.
+- Example:
+  - `creates project in dashboard context when user is authenticated`.
+
+### Migration policy for existing code
+
+- For touched files, rename symbols/classes to this standard in the same PR.
+- Prioritize:
+  1. Layout and shell classes/ids
+  2. Shared UI primitives
+  3. API handlers and service methods
+  4. Store/action names
+- Do not introduce mixed naming styles within a single file.
+
+---
+
+## Current Implementation Status (February 2026)
+
+### Implemented Design Tokens
+
+```css
+/* Typography Scale (user-configurable) */
+--font-scale: 1;                    /* 0.875 | 1 | 1.125 */
+--font-2xs: calc(0.625rem * var(--font-scale));
+--font-xs: calc(0.6875rem * var(--font-scale));
+--font-sm: calc(0.75rem * var(--font-scale));
+--font-base: calc(0.8125rem * var(--font-scale));
+--font-md: calc(0.875rem * var(--font-scale));
+--font-lg: calc(1rem * var(--font-scale));
+
+/* Spacing Scale */
+--space-1: 0.25rem;
+--space-2: 0.5rem;
+--space-3: 0.75rem;
+--space-4: 1rem;
+--space-5: 1.25rem;
+--space-6: 1.5rem;
+--space-8: 2rem;
+
+/* Component-specific spacing */
+--panel-padding: var(--space-3);
+--input-padding-x: var(--space-3);
+--input-padding-y: var(--space-2);
+--button-padding-x: var(--space-3);
+--button-padding-y: var(--space-2);
+
+/* Border Radius */
+--radius-sm: 4px;
+--radius-md: 6px;
+--radius-lg: 8px;
+--radius-xl: 12px;
+```
+
+### Responsive Breakpoints
+
+| Breakpoint | Width | Changes |
+|------------|-------|---------|
+| Large Desktop | > 1440px | Wider panels, generous spacing |
+| Desktop | 1024-1440px | Default settings |
+| Tablet Landscape | 768-1024px | Reduced sizes, 95% font |
+| Tablet Portrait | 640-768px | Compact layout, 90% font |
+| Mobile | < 640px | Full-width panels, 87.5% font |
+| Touch devices | (hover: none) | 44px minimum touch targets |
+
+### User-Configurable Appearance
+
+Users can adjust in Settings > Appearance:
+
+1. **Font Size**: Small (87.5%) / Medium (100%) / Large (112.5%)
+2. **Compact Mode**: Reduces all spacing by ~30%
+3. **Show Filenames**: Toggle filename tags on canvas items
+
+### Component Implementation Status
+
+| Component | Spec | Implementation | Notes |
+|-----------|------|----------------|-------|
+| Button | ✅ | ✅ | All variants, sizes |
+| Input | ✅ | ✅ | With icons, validation |
+| SearchBar | ✅ | ✅ | Scope chips, shortcuts, regex/grep support |
+| Toast | ✅ | ✅ | Error codes, progress |
+| TopBar | ✅ | ✅ | Mode switcher, menu, dynamic connection status icon |
+| ConnectionBanner | ✅ | ✅ | Fixed top overlay, green/orange/red, X dismiss, ephemeral when ok |
+| SettingsModal | ✅ | ✅ | Unified Account, API Keys, Appearance, Shortcuts, Help, About |
+| Explorer | ✅ | ✅ | Tree, drag-drop |
+| Canvas | ✅ | ✅ | Pan/zoom, selection |
+| Inspector | ✅ | ✅ | Forms, properties |
+| Timeline | ⚠️ | ✅ UI | No playback engine |
+| Modal | ✅ | ✅ | Focus trap, escape |
+| Tooltip | ❌ | ❌ | Not implemented |
+| Combobox | ❌ | ❌ | Using native select |
+
+### ArsTechnicAI Title Style
+
+The ArsTechnicAI logo is styled consistently across the canvas TopBar and home DashboardLayout:
+
+- **Ars**: `font-family: var(--font-serif)`, italic, primary text
+- **Technic**: `font-family: var(--font-mono)`, secondary text
+- **AI**: `background: var(--accent-gradient)`, gradient clip text, mono, bold
+
+### Accessibility Status
+
+| Requirement | Status |
+|-------------|--------|
+| Keyboard navigation | ✅ Implemented |
+| Focus management | ✅ Implemented |
+| ARIA roles | ⚠️ Partial |
+| Color contrast | ⚠️ Check needed |
+| Reduced motion | ❌ Not implemented |
+| Screen reader | ⚠️ Partial |
+
+---
+
+## UX Improvements Needed
+
+Based on the critical analysis in `ARCHITECTURE.md`:
+
+### High Priority
+
+1. **Add skeleton loaders** for async content
+2. ~~**Improve empty states** with clear call-to-actions~~ (✅ Implemented)
+3. **Add contextual tooltips** for complex controls
+4. **Implement keyboard shortcut hints** in menus
+
+### Medium Priority
+
+1. **Add first-run tutorial** overlay
+2. **Implement drag preview** improvements
+3. **Add progress indicators** for long operations
+4. **Improve error message** specificity
+
+### Low Priority
+
+1. **Add themes** beyond dark mode
+2. **Implement custom keyboard shortcuts**
+3. **Add animation preferences** (reduced motion)
+
+Generally speaking, buttons can have 4 modes: activated, neutral, pushed, disabled.
+Those states are typically represented by the following CSS style:
+- colored background, border, text color with outer shadow.
+- white text with black border and background, no shadow, feels flat.
+- A dark color of the activated style, with a dark inner shadow and light outter shadow to feel encasted.
+- No shadow at all and the text color is a dark grey color to feel disabled.
+
+The default state is the neutral style.

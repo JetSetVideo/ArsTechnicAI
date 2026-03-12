@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ChevronRight,
   History,
-  Sliders,
   Palette,
   Settings2,
   Cloud,
@@ -26,8 +25,6 @@ import {
   useProjectStore,
 } from '@/stores';
 import styles from './InspectorPanel.module.css';
-import type { CanvasItem, GenerationResult } from '@/types';
-import { v4 as uuidv4 } from 'uuid';
 
 interface InspectorPanelProps {
   width: number;
@@ -38,6 +35,7 @@ interface CollapsibleSectionProps {
   title: string;
   icon?: React.ReactNode;
   defaultOpen?: boolean;
+  expandable?: boolean;
   children: React.ReactNode;
   badge?: number;
 }
@@ -46,6 +44,13 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   title, icon, defaultOpen = true, children, badge,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
+  const sectionClasses = [
+    styles.section,
+    open ? styles.expanded : '',
+    expandable && open ? styles.expandable : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className={styles.section}>
@@ -217,9 +222,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     isGenerating, startGeneration, completeJob, failJob, jobs,
   } = useGenerationStore();
 
-  const { settings, updateAIProvider } = useSettingsStore();
-  const { addItem } = useCanvasStore();
-  const { addAsset } = useFileStore();
+  const { updateItem } = useCanvasStore();
+  const { updateAsset } = useFileStore();
   const log = useLogStore((s) => s.log);
   const selectedItems = useCanvasStore((s) => s.getSelectedItems());
   const selectedItem = selectedItems[0];
@@ -264,8 +268,16 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         const error = await response.json();
         throw new Error(error.error || error.message || 'Generation failed');
       }
+    },
+    [selectedItem, updateItem, updateAsset, log],
+  );
 
-      const result = await response.json();
+  const handleUpdatePosition = useCallback(
+    (axis: 'x' | 'y', value: number) => {
+      if (selectedItem) updateItem(selectedItem.id, { [axis]: value });
+    },
+    [selectedItem, updateItem],
+  );
 
       const generationResult: GenerationResult = {
         id: uuidv4(),
@@ -424,10 +436,34 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         {selectedItem && (
           <CollapsibleSection title="Selected Item" icon={<Palette size={14} />} defaultOpen>
             <div className={styles.propertyGrid}>
-              <div className={styles.property}>
-                <span className={styles.propertyLabel}>Name</span>
-                <span className={styles.propertyValue}>{selectedItem.name}</span>
+              <div className={styles.formGroup}>
+                <Input
+                  label="Name"
+                  value={selectedItem.name}
+                  onChange={(e) => handleRenameItem(e.target.value)}
+                  placeholder="Item name..."
+                />
               </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <Input
+                    label="X"
+                    type="number"
+                    value={Math.round(selectedItem.x)}
+                    onChange={(e) => handleUpdatePosition('x', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <Input
+                    label="Y"
+                    type="number"
+                    value={Math.round(selectedItem.y)}
+                    onChange={(e) => handleUpdatePosition('y', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+
               <div className={styles.property}>
                 <span className={styles.propertyLabel}>Position</span>
                 <span className={styles.propertyValue}>{Math.round(selectedItem.x)}, {Math.round(selectedItem.y)}</span>
@@ -456,6 +492,17 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
                   <span className={styles.propertyValue}>{selectedItem.prompt}</span>
                 </div>
               )}
+
+              <div className={styles.property}>
+                <span className={styles.propertyLabel}>Type</span>
+                <span className={styles.propertyValue}>
+                  {selectedItem.type === 'generated'
+                    ? 'AI Generated'
+                    : selectedItem.type === 'image'
+                      ? 'Imported Image'
+                      : 'Placeholder'}
+                </span>
+              </div>
             </div>
           </CollapsibleSection>
         )}
