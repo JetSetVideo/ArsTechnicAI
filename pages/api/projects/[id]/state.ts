@@ -10,13 +10,13 @@ async function handler(
   userId: string,
   _userRoles: string[]
 ) {
-  const { projectId } = req.query;
-  if (!projectId || typeof projectId !== 'string') {
+  const { id } = req.query;
+  if (!id || typeof id !== 'string') {
     return res.status(400).json({ message: 'Invalid project ID' });
   }
 
   const project = await prisma.project.findFirst({
-    where: { id: projectId, creatorId: userId },
+    where: { id: id, creatorId: userId },
     select: { id: true },
   });
   if (!project) {
@@ -25,7 +25,7 @@ async function handler(
 
   if (req.method === 'GET') {
     const row = await prisma.projectWorkspaceState.findUnique({
-      where: { projectId },
+      where: { id },
       select: { state: true, updatedAt: true },
     });
     return res.status(200).json({
@@ -41,8 +41,8 @@ async function handler(
     }
 
     const row = await prisma.projectWorkspaceState.upsert({
-      where: { projectId },
-      create: { projectId, state: state as object },
+      where: { id },
+      create: { id, state: state as object },
       update: { state: state as object },
       select: { updatedAt: true },
     });

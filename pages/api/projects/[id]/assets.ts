@@ -21,13 +21,13 @@ async function handler(
   userId: string,
   _userRoles: string[]
 ) {
-  const { projectId } = req.query;
-  if (!projectId || typeof projectId !== 'string') {
+  const { id } = req.query;
+  if (!id || typeof id !== 'string') {
     return res.status(400).json({ message: 'Invalid project ID' });
   }
 
   const project = await prisma.project.findFirst({
-    where: { id: projectId, creatorId: userId },
+    where: { id: id, creatorId: userId },
     select: { id: true },
   });
   if (!project) {
@@ -36,7 +36,7 @@ async function handler(
 
   if (req.method === 'GET') {
     const assets = await prisma.projectAsset.findMany({
-      where: { projectId },
+      where: { id },
       orderBy: { updatedAt: 'desc' },
     });
     return res.status(200).json({ assets });
@@ -54,13 +54,13 @@ async function handler(
         .map((asset) =>
           prisma.projectAsset.upsert({
             where: {
-              projectId_assetId: {
-                projectId,
+              id_assetId: {
+                id,
                 assetId: asset.assetId,
               },
             },
             create: {
-              projectId,
+              id,
               assetId: asset.assetId,
               name: asset.name,
               path: asset.path,

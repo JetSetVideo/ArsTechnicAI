@@ -436,19 +436,8 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
       </div>
 
-      {/* Bottom row: Project menu + mode nav | Settings + Help */}
-      <div className={styles.row}>
-        <div className={styles.section}>
-          <div className={styles.projectSelector} ref={menuRef}>
-            <button
-              className={`${styles.projectButton} ${menuOpen ? styles.open : ''}`}
-              onClick={() => setMenuOpen(!menuOpen)}
-              title="Project Menu"
-            >
-              <span className={styles.projectName}>{projectName}</span>
-              <ChevronDown size={14} className={styles.chevron} />
-            </button>
-
+      {/* Actions section */}
+      <div className={styles.section}>
         <div className={styles.actions}>
           <Button
             variant="ghost"
@@ -461,7 +450,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <Button variant="ghost" size="sm" onClick={onOpenSettings} title="Settings">
             <Settings size={16} />
           </Button>
-          <Button variant="ghost" size="sm" title="Help">
+          <Button variant="ghost" size="sm" onClick={onOpenHelp} title="Help">
             <HelpCircle size={16} />
           </Button>
           <ConnectionStatus />

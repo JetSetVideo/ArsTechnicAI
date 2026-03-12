@@ -12,6 +12,7 @@ import {
   Download,
   RotateCcw,
   RotateCw,
+  Lock,
 } from 'lucide-react';
 import { useCanvasStore, useFileStore, useLogStore, useSettingsStore } from '@/stores';
 import { Button } from '../ui/Button';
@@ -631,38 +632,12 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
               {item.locked && (
                 <div className={styles.lockIndicator}>
-                  <span style={{ fontSize: '10px' }}>🔒</span>
+                  <Lock size={12} />
                 </div>
-
-                {/* Selection handles */}
-                {selectedIds.includes(item.id) && !item.locked && (
-                  <>
-                    <div className={`${styles.handle} ${styles.handleNW}`} />
-                    <div className={`${styles.handle} ${styles.handleNE}`} />
-                    <div className={`${styles.handle} ${styles.handleSW}`} />
-                    <div className={`${styles.handle} ${styles.handleSE}`} />
-                  </>
-                )}
-
-                {/* Lock indicator */}
-                {item.locked && (
-                  <div className={styles.lockIndicator}>
-                    <Lock size={12} />
-                  </div>
-                )}
-
-                {/* Link indicators */}
-                {hasParent && (
-                  <div className={`${styles.linkDot} ${styles.linkDotLeft}`} title="Linked to parent" />
-                )}
-                {hasChildren && (
-                  <div className={`${styles.linkDot} ${styles.linkDotRight}`} title={`${children.length} linked outputs`}>
-                    {children.length}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              )}
+            </div>
+          )
+        )}
         </div>
 
         {items.length === 0 && (

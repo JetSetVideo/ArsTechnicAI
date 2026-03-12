@@ -12,8 +12,10 @@ import {
   BookOpen,
   Loader2,
   Clock,
+  Sliders,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../ui/Button';
 import { Input, Textarea } from '../ui/Input';
 import {
@@ -222,19 +224,23 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     isGenerating, startGeneration, completeJob, failJob, jobs,
   } = useGenerationStore();
 
-  const { updateItem } = useCanvasStore();
-  const { updateAsset } = useFileStore();
+  const { updateItem, addItem } = useCanvasStore();
+  const { updateAsset, addAsset } = useFileStore();
+  const settings = useSettingsStore((s) => s);
+  const updateAIProvider = useSettingsStore((s) => s.updateAIProvider);
   const log = useLogStore((s) => s.log);
   const selectedItems = useCanvasStore((s) => s.getSelectedItems());
   const selectedItem = selectedItems[0];
   const { projectId, markDirty } = useProjectStore();
 
-  const [localApiKey, setLocalApiKey] = useState(settings.aiProvider.apiKey);
+  const [localApiKey, setLocalApiKey] = useState(settings.aiProvider?.apiKey || '');
 
   // Sync localApiKey when settings change from DB sync
   useEffect(() => {
-    setLocalApiKey(settings.aiProvider.apiKey);
-  }, [settings.aiProvider.apiKey]);
+    if (settings.aiProvider?.apiKey) {
+      setLocalApiKey(settings.aiProvider.apiKey);
+    }
+  }, [settings.aiProvider?.apiKey]);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
@@ -268,16 +274,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         const error = await response.json();
         throw new Error(error.error || error.message || 'Generation failed');
       }
-    },
-    [selectedItem, updateItem, updateAsset, log],
-  );
 
-  const handleUpdatePosition = useCallback(
-    (axis: 'x' | 'y', value: number) => {
-      if (selectedItem) updateItem(selectedItem.id, { [axis]: value });
-    },
-    [selectedItem, updateItem],
-  );
+      const result = await response.json();
 
       const generationResult: GenerationResult = {
         id: uuidv4(),
@@ -338,6 +336,25 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
       log('generation_fail', `Generation failed: ${message}`, { error: message });
     }
   }, [prompt, negativePrompt, genWidth, genHeight, localApiKey, settings, isAuthenticated, projectId, startGeneration, completeJob, failJob, addItem, addAsset, updateAIProvider, markDirty, log]);
+
+  const handleUpdatePosition = useCallback(
+    (axis: 'x' | 'y', value: number) => {
+      if (selectedItem) updateItem(selectedItem.id, { [axis]: value });
+    },
+    [selectedItem, updateItem],
+  );
+
+  const handleRenameItem = useCallback(
+    (name: string) => {
+      if (selectedItem) {
+        updateItem(selectedItem.id, { name });
+        if (selectedItem.assetId) {
+          updateAsset(selectedItem.assetId, { name });
+        }
+      }
+    },
+    [selectedItem, updateItem, updateAsset],
+  );
 
   const recentJobs = jobs.slice(0, 5);
 

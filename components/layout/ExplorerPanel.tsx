@@ -62,7 +62,8 @@ interface FileTreeItemProps {
 }
 
 const FileTreeItem: React.FC<FileTreeItemProps> = ({
-  node, depth, onSelect, onToggle, onDragStart, isSelected, isExpanded,
+  node, depth, onSelect, onToggle, onDragStart, onDropNode, onStartRename, onDeleteNode, onContextMenu,
+  editingPath, editingName, onEditingNameChange, onRenameSubmit, onRenameCancel, isSelected, isExpanded,
 }) => {
   return (
     <div className={styles.treeItem}>
@@ -153,7 +154,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
       )}
     </div>
   );
-});
+};
 
 const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({ node, depth }) => {
   const { selectedPath, expandedPaths, selectPath, toggleExpanded } = useFileStore();
@@ -243,7 +244,7 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({ node
       isExpanded={expandedPaths.has(node.path)}
     />
   );
-});
+};
 
 // ─── Cloud asset card ─────────────────────────────────────────────────────────
 const CloudAssetCard: React.FC<{ asset: DbAsset }> = ({ asset }) => {
