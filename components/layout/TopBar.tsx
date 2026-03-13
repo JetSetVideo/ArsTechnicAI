@@ -22,7 +22,7 @@ import {
 import { useSession } from 'next-auth/react';
 import { SearchBar } from '../ui/SearchBar';
 import { Button } from '../ui/Button';
-import { ConnectionStatus } from '../ui/ConnectionStatus';
+import { AuthButton } from '../ui/AuthButton';
 import { useLogStore, useCanvasStore, useFileStore, useProjectStore } from '@/stores';
 import { useProjectSync } from '@/hooks/useProjectSync';
 import styles from './TopBar.module.css';
@@ -439,21 +439,43 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Actions section */}
       <div className={styles.section}>
         <div className={styles.actions}>
-          <Button
-            variant="ghost"
-            size="sm"
+          {/* Save button */}
+          <button
+            className={`${styles.actionButton} ${(isSaving || actionLoading) ? styles.saving : ''}`}
             onClick={handleSave}
-            title={lastSaved ? `Last saved ${formatRelative(lastSaved.toISOString())}` : 'Save'}
+            title={lastSaved ? `Dernière sauvegarde ${formatRelative(lastSaved.toISOString())}` : 'Sauvegarder'}
+            disabled={isSaving || actionLoading}
           >
-            {isSaving || actionLoading ? <Loader2 size={16} className={styles.spin} /> : <Save size={16} />}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onOpenSettings} title="Settings">
+            {isSaving || actionLoading ? (
+              <Loader2 size={16} className={styles.spin} />
+            ) : (
+              <Save size={16} />
+            )}
+          </button>
+
+          {/* Settings button - improved styling */}
+          <button
+            className={styles.actionButton}
+            onClick={onOpenSettings}
+            title="Paramètres (⌘,)"
+          >
             <Settings size={16} />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onOpenHelp} title="Help">
+          </button>
+
+          {/* Help button */}
+          <button
+            className={styles.actionButton}
+            onClick={onOpenHelp}
+            title="Aide"
+          >
             <HelpCircle size={16} />
-          </Button>
-          <ConnectionStatus />
+          </button>
+
+          {/* Divider */}
+          <div className={styles.actionDivider} />
+
+          {/* Auth button with dropdown */}
+          <AuthButton />
         </div>
       </div>
 

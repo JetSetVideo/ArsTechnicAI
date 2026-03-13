@@ -6,12 +6,13 @@ import styles from './AuthModal.module.css';
 interface AuthModalProps {
   onClose: () => void;
   callbackUrl?: string;
+  defaultTab?: 'login' | 'register';
 }
 
 type Tab = 'login' | 'register';
 
-export const AuthModal: React.FC<AuthModalProps> = ({ onClose, callbackUrl = '/' }) => {
-  const [tab, setTab] = useState<Tab>('login');
+export const AuthModal: React.FC<AuthModalProps> = ({ onClose, callbackUrl = '/', defaultTab = 'login' }) => {
+  const [tab, setTab] = useState<Tab>(defaultTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
