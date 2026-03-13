@@ -12,6 +12,7 @@ import styles from './DashboardLayout.module.css';
 import { Button } from '../ui';
 import { ConnectionBanner } from '../ui/ConnectionBanner';
 import { SettingsModal } from './SettingsModal';
+import { NavigationBar } from './NavigationBar';
 import { useProjectSync, saveProjectWorkspaceState } from '../../hooks/useProjectSync';
 import { useUserStore } from '../../stores/userStore';
 import { useTelemetryStore } from '../../stores/telemetryStore';
@@ -88,6 +89,9 @@ export function DashboardLayout() {
         onClose={() => setSettingsOpen(false)} 
         defaultTab={settingsTab} 
       />
+
+      {/* Secondary Navigation */}
+      <NavigationBar variant="compact" />
 
       <main id="dashboard-layout-main-content-region" className={styles.dashboardLayoutMainContentRegion}>
         <div className={styles.dashboardLayoutMainProjectsContentRegion}>

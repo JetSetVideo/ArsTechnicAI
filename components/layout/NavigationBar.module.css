@@ -1,0 +1,190 @@
+/**
+ * NavigationBar Styles
+ * 
+ * Compact secondary navigation with reduced spacing.
+ * Modern, subtle design that doesn't compete with main content.
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   BASE NAVIGATION BAR
+   ═══════════════════════════════════════════════════════════ */
+
+.navigationBar {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 var(--space-4);
+}
+
+.navContent {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.navContent::-webkit-scrollbar {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NAV ITEMS
+   ═══════════════════════════════════════════════════════════ */
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0.25rem 0;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.navItem:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.navItem:active {
+  background: var(--bg-elevated);
+}
+
+/* Active state */
+.navItem.active {
+  color: var(--accent-primary);
+  background: var(--accent-primary-alpha);
+}
+
+.navItem.active::after {
+  content: '';
+  position: absolute;
+  bottom: -0.25rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  height: 2px;
+  background: var(--accent-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NAV ELEMENTS
+   ═══════════════════════════════════════════════════════════ */
+
+.navIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.navItem:hover .navIcon,
+.navItem.active .navIcon {
+  opacity: 1;
+}
+
+.navLabel {
+  flex: 1;
+}
+
+/* Badge */
+.navBadge {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.125rem 0.375rem;
+  background: var(--accent-gradient);
+  color: var(--bg-primary);
+  border-radius: 10px;
+}
+
+/* External link icon */
+.externalIcon {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VARIANTS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Compact variant - even tighter spacing */
+.compact {
+  padding: 0 var(--space-3);
+}
+
+.compact .navItem {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.compact .navBadge {
+  font-size: 0.5rem;
+  padding: 0.0625rem 0.25rem;
+}
+
+/* Expanded variant - more breathing room */
+.expanded {
+  padding: 0 var(--space-6);
+}
+
+.expanded .navContent {
+  gap: 0.5rem;
+}
+
+.expanded .navItem {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .navigationBar {
+    padding: 0 var(--space-2);
+  }
+
+  .navItem {
+    padding: 0.5rem 0.625rem;
+  }
+
+  .navLabel {
+    display: none;
+  }
+
+  /* Show labels only for active item on mobile */
+  .navItem.active .navLabel {
+    display: inline;
+  }
+}
+
+@media (max-width: 480px) {
+  .navItem {
+    padding: 0.5rem;
+  }
+
+  .navBadge {
+    display: none;
+  }
+}
