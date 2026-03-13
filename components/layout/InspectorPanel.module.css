@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--panel-padding, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--panel-padding, 0.75rem);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
@@ -63,7 +63,7 @@
   align-items: center;
   gap: var(--space-2, 0.5rem);
   width: 100%;
-  padding: var(--panel-padding, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--panel-padding, 0.75rem);
   border: none;
   background: transparent;
   color: var(--text-secondary);

@@ -90,7 +90,7 @@
   --space-8: 2rem;      /* 32px */
   
   /* Component-specific spacing */
-  --panel-padding: var(--space-3);
+  --panel-padding: var(--space-2);
   --section-gap: var(--space-3);
   --input-padding-x: var(--space-3);
   --input-padding-y: var(--space-2);
@@ -101,7 +101,7 @@
      LAYOUT
      ═══════════════════════════════════════════════════════════ */
   
-  --topbar-height: 44px;
+  --topbar-height: 40px;
   --sidebar-width: 240px;
   --inspector-width: 300px;
   --timeline-height: 140px;
