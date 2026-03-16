@@ -25,6 +25,8 @@ export interface DashboardProject {
   style?: string;
   genre?: string;
   characters?: string;
+  type?: string;
+  aspectRatio?: string;
 }
 
 // ============================================

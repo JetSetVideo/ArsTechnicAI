@@ -169,6 +169,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
   const [newProjectStyle, setNewProjectStyle] = useState('');
   const [newProjectGenre, setNewProjectGenre] = useState('');
   const [newProjectCharacters, setNewProjectCharacters] = useState('');
+  const [newProjectType, setNewProjectType] = useState('generic');
+  const [newProjectAspectRatio, setNewProjectAspectRatio] = useState('16:9');
   const [minimumAssets, setMinimumAssets] = useState<number>(0);
   const [cloudSyncStatus, setCloudSyncStatus] = useState<{
     state: 'checking' | 'synced' | 'unauthenticated' | 'offline';
@@ -279,6 +281,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
     setNewProjectStyle('');
     setNewProjectGenre('');
     setNewProjectCharacters('');
+    setNewProjectType('generic');
+    setNewProjectAspectRatio('16:9');
     setShowCreateModal(true);
   };
 
@@ -290,6 +294,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
     setNewProjectStyle(project.style || '');
     setNewProjectGenre(project.genre || '');
     setNewProjectCharacters(project.characters || '');
+    setNewProjectType(project.type || 'generic');
+    setNewProjectAspectRatio(project.aspectRatio || '16:9');
     setShowCreateModal(true);
   };
 
@@ -307,6 +313,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
       style: newProjectStyle,
       genre: newProjectGenre,
       characters: newProjectCharacters,
+      type: newProjectType,
+      aspectRatio: newProjectAspectRatio,
     };
 
     if (editingProject) {
@@ -535,8 +543,9 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
                 {project.name}
               </h3>
               
-              {(project.genre || project.style || project.length) && (
+              {(project.genre || project.style || project.length || project.type) && (
                 <div className={styles.details}>
+                  {project.type && project.type !== 'generic' && <span className={styles.detailItem} style={{ color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}>{project.type}</span>}
                   {project.genre && <span className={styles.detailItem}>{project.genre}</span>}
                   {project.style && <span className={styles.detailItem}>{project.style}</span>}
                   {project.length && <span className={styles.detailItem}>{project.length}</span>}
@@ -597,6 +606,38 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
                   onChange={(e) => setNewProjectName(e.target.value)}
                   className={styles.input}
                 />
+              </label>
+              <label className={styles.formGroup}>
+                <span>Project Type</span>
+                <select
+                  value={newProjectType}
+                  onChange={(e) => setNewProjectType(e.target.value)}
+                  className={styles.input}
+                >
+                  <option value="generic">Generic Project</option>
+                  <option value="video">Video (Linear)</option>
+                  <option value="short">Short (Vertical)</option>
+                  <option value="feature">Feature Film</option>
+                  <option value="script">Script/Screenplay</option>
+                  <option value="comic">Comic Book</option>
+                  <option value="storyboard">Storyboard</option>
+                  <option value="audio">Audio Drama</option>
+                </select>
+              </label>
+              <label className={styles.formGroup}>
+                <span>Aspect Ratio</span>
+                <select
+                  value={newProjectAspectRatio}
+                  onChange={(e) => setNewProjectAspectRatio(e.target.value)}
+                  className={styles.input}
+                >
+                  <option value="16:9">16:9 (Widescreen)</option>
+                  <option value="9:16">9:16 (Vertical)</option>
+                  <option value="1:1">1:1 (Square)</option>
+                  <option value="2.35:1">2.35:1 (Cinemascope)</option>
+                  <option value="4:3">4:3 (TV)</option>
+                  <option value="custom">Custom</option>
+                </select>
               </label>
               <label className={styles.formGroup}>
                 <span>Tags (comma separated)</span>

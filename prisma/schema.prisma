@@ -293,6 +293,8 @@ model Project {
   style         String?
   genre         String?
   characters    String?
+  type          String        @default("generic") // video, short, script, comic, etc.
+  aspectRatio   String        @default("16:9")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
