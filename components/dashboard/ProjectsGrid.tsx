@@ -18,7 +18,8 @@ import {
   ArrowUpDown,
   Cloud,
   HardDrive,
-  RefreshCcw
+  RefreshCcw,
+  Edit
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useProjectsStore } from '../../stores';
@@ -53,6 +54,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
   const { 
     getSortedProjects, 
     addProject, 
+    updateProject,
     toggleFavorite, 
     deleteProject, 
     duplicateProject,
@@ -160,8 +162,13 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
 
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingProject, setEditingProject] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectTags, setNewProjectTags] = useState('');
+  const [newProjectLength, setNewProjectLength] = useState('');
+  const [newProjectStyle, setNewProjectStyle] = useState('');
+  const [newProjectGenre, setNewProjectGenre] = useState('');
+  const [newProjectCharacters, setNewProjectCharacters] = useState('');
   const [minimumAssets, setMinimumAssets] = useState<number>(0);
   const [cloudSyncStatus, setCloudSyncStatus] = useState<{
     state: 'checking' | 'synced' | 'unauthenticated' | 'offline';
@@ -265,26 +272,52 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
   const allTags = getAllTags();
 
   const handleNewProject = () => {
+    setEditingProject(null);
     setNewProjectName('');
     setNewProjectTags('');
+    setNewProjectLength('');
+    setNewProjectStyle('');
+    setNewProjectGenre('');
+    setNewProjectCharacters('');
     setShowCreateModal(true);
   };
 
-  const handleCreateProject = () => {
+  const handleEditProject = (project: any) => {
+    setEditingProject(project.id);
+    setNewProjectName(project.name);
+    setNewProjectTags(project.tags.join(', '));
+    setNewProjectLength(project.length || '');
+    setNewProjectStyle(project.style || '');
+    setNewProjectGenre(project.genre || '');
+    setNewProjectCharacters(project.characters || '');
+    setShowCreateModal(true);
+  };
+
+  const handleSaveProject = () => {
     const trimmedName = newProjectName.trim();
     const tags = newProjectTags
       .split(',')
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    const projectName = trimmedName || getNextDefaultName();
-    const newProject = addProject({
-      name: projectName,
+    const projectData = {
+      name: trimmedName || getNextDefaultName(),
       tags,
-    });
+      length: newProjectLength,
+      style: newProjectStyle,
+      genre: newProjectGenre,
+      characters: newProjectCharacters,
+    };
 
-    setShowCreateModal(false);
-    onOpenProject(newProject.id);
+    if (editingProject) {
+      updateProject(editingProject, projectData);
+      setShowCreateModal(false);
+      setEditingProject(null);
+    } else {
+      const newProject = addProject(projectData);
+      setShowCreateModal(false);
+      onOpenProject(newProject.id);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -443,6 +476,17 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
               {/* Favorite Button */}
               <button
                 className={styles.favoriteButton}
+                style={{ right: '40px' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditProject(project);
+                }}
+              >
+                <Edit size={16} />
+              </button>
+
+              <button
+                className={styles.favoriteButton}
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleFavorite(project.id);
@@ -486,7 +530,19 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
 
             {/* Info */}
             <div className={styles.info}>
-              <h3 className={styles.name}>{project.name}</h3>
+              <h3 className={styles.name}>
+                <span className={styles.pathPrefix}>/projects/</span>
+                {project.name}
+              </h3>
+              
+              {(project.genre || project.style || project.length) && (
+                <div className={styles.details}>
+                  {project.genre && <span className={styles.detailItem}>{project.genre}</span>}
+                  {project.style && <span className={styles.detailItem}>{project.style}</span>}
+                  {project.length && <span className={styles.detailItem}>{project.length}</span>}
+                </div>
+              )}
+
               <div className={styles.meta}>
                 <span className={styles.metaItem}>
                   <Calendar size={12} />
@@ -522,7 +578,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
         <div className={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3>Create New Project</h3>
+              <h3>{editingProject ? 'Edit Project' : 'Create New Project'}</h3>
               <button
                 className={styles.modalClose}
                 onClick={() => setShowCreateModal(false)}
@@ -552,6 +608,46 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
                   className={styles.input}
                 />
               </label>
+              <label className={styles.formGroup}>
+                <span>Length</span>
+                <input
+                  type="text"
+                  placeholder="e.g. 120 mins"
+                  value={newProjectLength}
+                  onChange={(e) => setNewProjectLength(e.target.value)}
+                  className={styles.input}
+                />
+              </label>
+              <label className={styles.formGroup}>
+                <span>Style</span>
+                <input
+                  type="text"
+                  placeholder="e.g. Noir, Minimalist"
+                  value={newProjectStyle}
+                  onChange={(e) => setNewProjectStyle(e.target.value)}
+                  className={styles.input}
+                />
+              </label>
+              <label className={styles.formGroup}>
+                <span>Genre</span>
+                <input
+                  type="text"
+                  placeholder="e.g. Sci-Fi, Drama"
+                  value={newProjectGenre}
+                  onChange={(e) => setNewProjectGenre(e.target.value)}
+                  className={styles.input}
+                />
+              </label>
+              <label className={styles.formGroup}>
+                <span>Characters</span>
+                <input
+                  type="text"
+                  placeholder="e.g. Hero, Villain"
+                  value={newProjectCharacters}
+                  onChange={(e) => setNewProjectCharacters(e.target.value)}
+                  className={styles.input}
+                />
+              </label>
               <div className={styles.helperText}>
                 If you leave the name empty, it will be created as {getNextDefaultName()}.
               </div>
@@ -560,8 +656,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
               <Button variant="ghost" onClick={() => setShowCreateModal(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={handleCreateProject}>
-                Create Project
+              <Button variant="primary" onClick={handleSaveProject}>
+                {editingProject ? 'Save Changes' : 'Create Project'}
               </Button>
             </div>
           </div>

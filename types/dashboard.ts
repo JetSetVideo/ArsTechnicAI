@@ -21,6 +21,10 @@ export interface DashboardProject {
   tags: string[];
   isFavorite?: boolean;
   lastOpenedAt?: Timestamp;
+  length?: string;
+  style?: string;
+  genre?: string;
+  characters?: string;
 }
 
 // ============================================

@@ -310,6 +310,31 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+}
+
+.pathPrefix {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-right: 4px;
+  font-family: monospace;
+}
+
+.details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-2xs);
+  color: var(--text-secondary);
+}
+
+.detailItem {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
 }
 
 .meta {

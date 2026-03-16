@@ -111,9 +111,6 @@ export function DashboardLayout() {
         
         <div className={styles.creationActions}>
            <span className={styles.creationLabel}>Creation Mode:</span>
-           <Button variant="ghost" size="sm" icon={<PlusCircle size={14} />} onClick={() => { /* Trigger new project modal */ }}>
-             New Project
-           </Button>
            <Button variant="ghost" size="sm" icon={<PenTool size={14} />} onClick={() => { /* Trigger character creator */ }}>
              Character
            </Button>
