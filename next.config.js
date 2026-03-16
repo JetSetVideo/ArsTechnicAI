@@ -9,6 +9,17 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  webpack: (config) => {
+    // Deno's watchFs misinterprets absolute paths passed by Next.js,
+    // causing "NotFound" errors with doubled project paths.
+    // Using poll-based watching avoids this incompatibility.
+    config.watchOptions = {
+      ...config.watchOptions,
+      poll: 1000,
+      aggregateTimeout: 300,
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

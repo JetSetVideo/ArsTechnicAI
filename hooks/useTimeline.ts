@@ -1,4 +1,5 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 
 interface TimelineTrack {
   id?: string;
@@ -7,34 +8,35 @@ interface TimelineTrack {
 }
 
 export function useTimelinePersistence(projectId: string | null) {
+  const { data: session } = useSession();
   const [tracks, setTracks] = useState<TimelineTrack[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadTimeline = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId || !session?.user) return;
     try {
       const resp = await fetch(`/api/projects/${projectId}/timeline`);
       const json = await resp.json();
       if (json.success) {
         setTracks(json.data.tracks || []);
       }
-    } catch (error) {
-      console.error('Timeline load failed:', error);
+    } catch {
+      // Silently fail when offline
     }
-  }, [projectId]);
+  }, [projectId, session?.user]);
 
   const saveTimeline = useCallback(async (data: Record<string, unknown>) => {
-    if (!projectId) return;
+    if (!projectId || !session?.user) return;
     try {
       await fetch(`/api/projects/${projectId}/timeline`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-    } catch (error) {
-      console.error('Timeline save failed:', error);
+    } catch {
+      // Silently fail when offline
     }
-  }, [projectId]);
+  }, [projectId, session?.user]);
 
   const debouncedSave = useCallback((data: Record<string, unknown>) => {
     if (timerRef.current) clearTimeout(timerRef.current);

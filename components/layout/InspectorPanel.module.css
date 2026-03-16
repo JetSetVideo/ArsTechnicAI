@@ -24,12 +24,41 @@
   color: var(--text-secondary);
 }
 
+.toggleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.toggleButton:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
 .content {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+/* Main Generator Section (replaces CollapsibleSection for Generate) */
+.mainGenerator {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--panel-padding, 0.75rem);
+  min-height: 0; /* Allow shrinking */
 }
 
 /* Sections */
@@ -93,6 +122,52 @@
   padding: 0 var(--panel-padding, 0.75rem) var(--panel-padding, 0.75rem);
 }
 
+/* ── Prompt Header (Label + Templates Toggle) ──────────────── */
+.promptHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.375rem;
+}
+
+.promptLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.templateToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.templateToggle:hover {
+  background: var(--accent-primary-alpha);
+}
+
+.templateSection {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  overflow-y: auto;
+  max-height: 200px; /* Limit height if expanded */
+}
+
 /* Form elements */
 .formGroup {
   margin-bottom: var(--space-3, 0.75rem);
@@ -100,6 +175,20 @@
 
 .formGroup:last-child {
   margin-bottom: 0;
+}
+
+/* Specifically target the prompt input wrapper to grow */
+.promptInputWrapper {
+  flex: 1;
+  min-height: 100px; /* Minimum usable height */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure textarea inside fills the wrapper */
+.promptInputWrapper textarea {
+  flex: 1 !important; /* Override inline style if needed, but style prop should work */
+  height: 100%;
 }
 
 .formRow {
@@ -123,9 +212,104 @@
   text-decoration: underline;
 }
 
-.generateButton {
-  width: 100%;
+/* Generate Button Group */
+.generateGroup {
+  display: flex;
+  gap: 0.5rem;
   margin-top: var(--space-2, 0.5rem);
+  flex-shrink: 0; /* Don't shrink */
+}
+
+.modelSelector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.modelButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  height: 32px;
+  padding: 0 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modelButton:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.modelButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modelDropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 0.25rem;
+  width: 200px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  overflow: hidden;
+  padding: 0.25rem;
+}
+
+.modelOption {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.modelOption:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.modelOption.active {
+  background: var(--accent-primary-alpha);
+  color: var(--accent-primary);
+}
+
+.generateButton {
+  flex: 1;
+}
+
+/* Negative Prompt */
+.negativePromptHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  margin-bottom: 0.375rem;
+}
+
+.negativePromptLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex: 1;
 }
 
 /* Property grid */

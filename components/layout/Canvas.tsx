@@ -14,9 +14,11 @@ import {
   RotateCw,
   Lock,
 } from 'lucide-react';
-import { useCanvasStore, useFileStore, useLogStore, useSettingsStore } from '@/stores';
+import { useCanvasStore, useFileStore, useLogStore, useSettingsStore, useNodeStore } from '@/stores';
 import { Button } from '../ui/Button';
 import styles from './Canvas.module.css';
+import nodeStyles from './NodeGraph.module.css';
+import { NodeCard, ConnLine } from './NodeComponents';
 import type { CanvasItem, Asset } from '@/types';
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -51,6 +53,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     canUndo,
     canRedo,
   } = useCanvasStore();
+
+  const { nodes, connections } = useNodeStore();
 
   const { getAsset, getAssetsByLineage, getAssetsByParentId, updateAsset } = useFileStore();
   const { settings } = useSettingsStore();
@@ -135,8 +139,15 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           removeSelected();
           log('canvas_remove', `Removed ${selectedIds.length} item(s)`);
         }
+        // Also remove selected nodes if any
+        const selectedNodeIds = useNodeStore.getState().selectedIds;
+        if (selectedNodeIds.length > 0) {
+          selectedNodeIds.forEach(id => useNodeStore.getState().removeNode(id));
+        }
       } else if (e.key === 'Escape') {
         clearSelection();
+        useNodeStore.getState().clearSelection();
+        useNodeStore.getState().cancelConnection();
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
         copy();
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
@@ -239,6 +250,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     (e: React.MouseEvent) => {
       if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains(styles.canvasContent)) {
         clearSelection();
+        useNodeStore.getState().clearSelection();
         setPromptOverlayItemId(null);
         setVersionOverlayItemId(null);
       }
@@ -482,6 +494,10 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     return 'default';
   };
 
+  // SVG dimensions for node connections
+  const svgW = 10000;
+  const svgH = 10000;
+
   return (
     <div className={styles.canvasWrapper}>
       {/* Toolbar */}
@@ -552,7 +568,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
         <div className={styles.toolbarGroup}>
           <Button
-            variant="ghost"
+            variant={showGrid ? 'secondary' : 'ghost'}
             size="sm"
             onClick={handleExport}
             disabled={items.length === 0}
@@ -588,6 +604,21 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
           }}
         >
+          {/* Node Connections Layer */}
+          <svg
+            className={nodeStyles.connSvg}
+            width={svgW}
+            height={svgH}
+            style={{ left: -svgW / 2, top: -svgH / 2 }}
+          >
+            <g transform={`translate(${svgW / 2}, ${svgH / 2})`}>
+              {connections.map((conn) => (
+                <ConnLine key={conn.id} conn={conn} nodes={nodes} zoom={viewport.zoom} />
+              ))}
+            </g>
+          </svg>
+
+          {/* Canvas Items */}
           {items.map((item) => (
             <div
               key={item.id}
@@ -636,11 +667,22 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                 </div>
               )}
             </div>
-          )
-        )}
+          ))}
+
+          {/* Node Cards Layer */}
+          {nodes.map((node) => (
+            <div key={node.id} data-node style={{ position: 'absolute', left: 0, top: 0 }}>
+              <NodeCard
+                node={node}
+                zoom={viewport.zoom}
+                isSelected={useNodeStore.getState().selectedIds.includes(node.id)}
+                connections={connections}
+              />
+            </div>
+          ))}
         </div>
 
-        {items.length === 0 && (
+        {items.length === 0 && nodes.length === 0 && (
           <div className={styles.emptyState}>
             <Layers size={48} />
             <h3>Start by generating an image or importing assets</h3>

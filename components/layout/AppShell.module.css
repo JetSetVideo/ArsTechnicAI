@@ -11,9 +11,10 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
-.appShellWorkspaceMainCanvasRegion {
+.mainArea {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -23,8 +24,7 @@
   position: relative;
 }
 
-/* Vertical resize handle (for side panels) */
-.appShellResizeHandleSidePanelsIdle {
+.resizeHandle {
   width: 4px;
   cursor: col-resize;
   background: transparent;
@@ -34,7 +34,7 @@
   z-index: 10;
 }
 
-.appShellResizeHandleSidePanelsIdle::before {
+.resizeHandle::before {
   content: '';
   position: absolute;
   top: 0;
@@ -43,16 +43,12 @@
   right: -2px;
 }
 
-.appShellResizeHandleSidePanelsIdle:hover {
+.resizeHandle:hover,
+.resizeHandle:active {
   background: var(--accent-primary);
 }
 
-.appShellResizeHandleSidePanelsIdle:active {
-  background: var(--accent-primary);
-}
-
-/* Horizontal resize handle (for timeline) */
-.appShellResizeHandleTimelineIdle {
+.resizeHandleHorizontal {
   height: 4px;
   cursor: row-resize;
   background: transparent;
@@ -62,7 +58,7 @@
   z-index: 10;
 }
 
-.appShellResizeHandleTimelineIdle::before {
+.resizeHandleHorizontal::before {
   content: '';
   position: absolute;
   left: 0;
@@ -71,10 +67,57 @@
   bottom: -2px;
 }
 
-.appShellResizeHandleTimelineIdle:hover {
+.resizeHandleHorizontal:hover,
+.resizeHandleHorizontal:active {
   background: var(--accent-primary);
 }
 
-.appShellResizeHandleTimelineIdle:active {
-  background: var(--accent-primary);
+.collapsedExplorerToggle {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.collapsedExplorerToggle:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+
+.collapsedInspectorToggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.collapsedInspectorToggle:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
 }

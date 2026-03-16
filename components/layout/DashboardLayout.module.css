@@ -111,6 +111,64 @@
 }
 
 /* ============================================
+   SUB NAVIGATION (View Toggles & Actions)
+   ============================================ */
+
+.dashboardSubNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.viewToggles {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.viewToggleButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.viewToggleButton:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.viewToggleButton.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.creationActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.creationLabel {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: var(--space-2);
+}
+
+/* ============================================
    MAIN CONTENT
    ============================================ */
 
@@ -190,6 +248,16 @@
 
   .dashboardLayoutMainProjectsContentRegion {
     gap: var(--space-3);
+  }
+
+  .dashboardSubNav {
+    flex-direction: column;
+    gap: var(--space-3);
+    align-items: stretch;
+  }
+  
+  .viewToggles, .creationActions {
+    justify-content: center;
   }
 }
 

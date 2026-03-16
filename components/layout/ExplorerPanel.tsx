@@ -10,24 +10,30 @@ import {
   ChevronDown,
   Upload,
   Cloud,
+  CloudOff,
   HardDrive,
   RefreshCw,
   Loader2,
   Sparkles,
+  Pencil,
+  Trash2,
+  PanelLeft,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useFileStore, useLogStore, useCanvasStore } from '@/stores';
+import { loadDemoFiles } from '@/stores/fileStore';
 import { useAssetLibrary, DbAsset } from '@/hooks/useAssetLibrary';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import styles from './ExplorerPanel.module.css';
-import type { FileNode } from '@/types';
+import type { FileNode, Asset } from '@/types';
 import { WORKSPACE_DEFAULTS, WORKSPACE_PROTECTED_PATHS, WORKSPACE_ROOT_PATHS } from '@/constants/workspace';
 
 type Tab = 'local' | 'cloud';
 
 interface ExplorerPanelProps {
   width: number;
+  onToggle: () => void;
 }
 
 const getFileIcon = (node: FileNode) => {
@@ -157,7 +163,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
 };
 
 const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({ node, depth }) => {
-  const { selectedPath, expandedPaths, selectPath, toggleExpanded } = useFileStore();
+  const { selectedPath, expandedPaths, selectPath, toggleExpanded, moveNode, deleteNode, renameNode } = useFileStore();
   const log = useLogStore((s) => s.log);
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -308,7 +314,7 @@ const CloudAssetCard: React.FC<{ asset: DbAsset }> = ({ asset }) => {
 };
 
 // ─── Main ExplorerPanel ───────────────────────────────────────────────────────
-export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
+export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle }) => {
   const {
     rootNodes,
     selectedPath,
@@ -356,7 +362,16 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
   return (
     <aside className={styles.explorer} style={{ width }} data-density="compact">
       <div className={styles.header}>
-        <h2 className={styles.title}>Explorer</h2>
+        <div className={styles.headerTitleRow}>
+          <button 
+            className={styles.toggleButton} 
+            onClick={onToggle}
+            title="Toggle Explorer (⌘1)"
+          >
+            <PanelLeft size={16} />
+          </button>
+          <h2 className={styles.title}>Explorer</h2>
+        </div>
         <div className={styles.headerActions}>
           <Button variant="ghost" size="sm" onClick={handleImportClick} title="Import local files">
             <Upload size={14} />
@@ -384,7 +399,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width }) => {
           disabled={!session?.user}
           title={session?.user ? 'Cloud library' : 'Sign in to view cloud assets'}
         >
-          <Cloud size={12} />
+          {session?.user ? <Cloud size={12} /> : <CloudOff size={12} />}
           Cloud
           {cloudAssets.length > 0 && <span className={styles.tabBadge}>{cloudAssets.length}</span>}
         </button>

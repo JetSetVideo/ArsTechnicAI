@@ -77,6 +77,10 @@ export interface DialogueLine {
   updatedAt: number;
 }
 
+export type OutputFormat = 'png' | 'jpeg' | 'webp' | 'gif' | 'mp4' | 'webm' | 'wav' | 'mp3';
+
+export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9';
+
 export interface PromptModelContext {
   provider: string;
   model: string;
@@ -89,7 +93,8 @@ export interface PromptModelContext {
   temperature?: number;
   topP?: number;
   maxTokens?: number;
-  aspectRatio?: string;
+  aspectRatio?: AspectRatio;
+  outputFormat?: OutputFormat;
   scheduler?: string;
   extraParams?: Record<string, unknown>;
 }

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi, CheckCircle, XCircle, Pencil, Check } from 'lucide-react';
+import { 
+  X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi, CheckCircle, 
+  XCircle, Pencil, Check, CloudOff, Smartphone, Tablet, Monitor, Crown, Shield, Sparkles, User 
+} from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
@@ -11,6 +14,52 @@ import { useAuthStore } from '@/stores/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
 import type { HealthResponse } from '@/pages/api/health';
 import styles from './SettingsModal.module.css';
+
+// ─── Helpers ported from AuthButton ──────────────────────────────────────────
+
+interface UserData {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  totalLogins: number;
+  _count?: { projects: number; assets: number };
+  devices?: Array<{
+    id: string;
+    name: string | null;
+    browser: string | null;
+    os: string | null;
+    deviceType: string | null;
+    city: string | null;
+    country: string | null;
+    countryCode: string | null;
+  }>;
+}
+
+const ROLE_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+  SUPERADMIN: { icon: <Crown size={10} />, color: '#f59e0b', label: 'Super Admin' },
+  ADMIN: { icon: <Shield size={10} />, color: '#6366f1', label: 'Admin' },
+  CREATOR: { icon: <Sparkles size={10} />, color: '#00d4aa', label: 'Créateur' },
+  USER: { icon: <User size={10} />, color: '#64748b', label: 'Utilisateur' },
+  VIEWER: { icon: <User size={10} />, color: '#475569', label: 'Visiteur' },
+};
+
+function getCountryFlag(code?: string | null): string {
+  if (!code || code.length !== 2) return '';
+  const [a, b] = code.toUpperCase().split('');
+  return String.fromCodePoint(0x1f1e6 + a.charCodeAt(0) - 65) + 
+         String.fromCodePoint(0x1f1e6 + b.charCodeAt(0) - 65);
+}
+
+function DeviceIcon({ type }: { type: string | null }) {
+  if (type === 'mobile') return <Smartphone size={12} />;
+  if (type === 'tablet') return <Tablet size={12} />;
+  return <Monitor size={12} />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -92,6 +141,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [accountHealth, setAccountHealth] = useState<HealthResponse | null>(null);
   const [accountHealthError, setAccountHealthError] = useState<string>('');
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loadingUser, setLoadingUser] = useState(false);
+  
   const session = useUserStore((s) => s.session);
   const currentProject = useUserStore((s) => s.currentProject);
   const projectCount = useProjectsStore((s) => s.projects.length);
@@ -113,11 +165,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     };
 
+    const loadUserData = async () => {
+      if (!isAuthenticated) return;
+      setLoadingUser(true);
+      try {
+        const res = await fetch('/api/users/me');
+        if (res.ok) {
+          const json = await res.json();
+          if (mounted) setUserData(json.data);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (mounted) setLoadingUser(false);
+      }
+    };
+
     void loadConnectionStatus();
+    void loadUserData();
+    
     return () => {
       mounted = false;
     };
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, isAuthenticated]);
+
+  const roleConfig = userData?.role ? ROLE_CONFIG[userData.role] : null;
 
   const [localApiKey, setLocalApiKey] = useState(settings.aiProvider.apiKey);
   const [localEndpoint, setLocalEndpoint] = useState(
@@ -218,7 +290,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {isAuthenticated ? (
                     <CheckCircle size={14} color="var(--success)" />
                   ) : (
-                    <XCircle size={14} color="var(--error)" />
+                    <CloudOff size={14} color="var(--error)" />
                   )}
                   <span style={{ fontWeight: 600, color: isAuthenticated ? 'var(--success)' : 'var(--error)' }}>
                     {isAuthenticated ? 'Connected' : 'Not connected'}
@@ -331,6 +403,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span className={styles.accountLabelBold}>Email:</span>
                       <span className={styles.accountValueNormal}>{authUser.email}</span>
                     </div>
+
+                    {/* Role */}
+                    {roleConfig && (
+                      <div className={styles.accountRow}>
+                        <span className={styles.accountLabelBold}>Role:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: roleConfig.color, fontSize: '0.8125rem', fontWeight: 500 }}>
+                          {roleConfig.icon}
+                          <span>{roleConfig.label}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stats */}
+                    {userData && (
+                      <div className={styles.accountRow} style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'var(--bg-tertiary)', borderRadius: '6px', justifyContent: 'space-around' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{userData.totalLogins}</span>
+                          <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Logins</span>
+                        </div>
+                        <div style={{ width: 1, height: 24, background: 'var(--border-color)' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{userData._count?.projects ?? 0}</span>
+                          <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Projects</span>
+                        </div>
+                        <div style={{ width: 1, height: 24, background: 'var(--border-color)' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{userData._count?.assets ?? 0}</span>
+                          <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assets</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Devices */}
+                    {userData?.devices && userData.devices.length > 0 && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <h4 style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Recent Devices</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {userData.devices.slice(0, 3).map(device => (
+                            <div key={device.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'var(--bg-tertiary)', borderRadius: '6px' }}>
+                              <div style={{ color: 'var(--text-muted)' }}>
+                                <DeviceIcon type={device.deviceType} />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>
+                                  {device.name ?? `${device.browser} on ${device.os}`}
+                                </span>
+                                {device.city && (
+                                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                                    {getCountryFlag(device.countryCode)} {device.city}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
 

@@ -1,13 +1,15 @@
 import { useCallback, useRef, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { useCanvasStore } from '@/stores';
 
 export function useCanvasPersistence(projectId: string | null) {
+  const { data: session } = useSession();
   const { items, viewport } = useCanvasStore();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>('');
 
   const save = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId || !session?.user) return;
 
     const stateHash = JSON.stringify({ items: items.length, viewport });
     if (stateHash === lastSavedRef.current) return;
@@ -41,7 +43,7 @@ export function useCanvasPersistence(projectId: string | null) {
     } catch (error) {
       console.error('Canvas save failed:', error);
     }
-  }, [projectId, items, viewport]);
+  }, [projectId, items, viewport, session?.user]);
 
   // Debounced auto-save (2s)
   useEffect(() => {

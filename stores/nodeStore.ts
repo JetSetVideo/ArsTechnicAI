@@ -78,8 +78,8 @@ export const NODE_DEFS: Record<NodeType, NodeDef> = {
       { id: 'negative', label: 'Negative', type: 'text' },
     ],
     outputs: [{ id: 'image', label: 'Image', type: 'image' }],
-    defaultData: { width: 1024, height: 1024, model: 'imagen-3.0-generate-001', apiKey: '' },
-    defaultWidth: 280,
+    defaultData: { width: 1024, height: 1024, model: 'imagen-3.0-generate-001', apiKey: '', text: '', negative: '' },
+    defaultWidth: 320,
   },
   'image-in': {
     title: 'Image Input',

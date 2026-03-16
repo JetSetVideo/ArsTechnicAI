@@ -20,6 +20,7 @@ import {
   HardDrive,
   RefreshCcw
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { useProjectsStore } from '../../stores';
 import { useUserStore } from '../../stores/userStore';
 import { useFileStore } from '../../stores/fileStore';
@@ -46,6 +47,9 @@ const findNodeByPath = (nodes: FileNode[], targetPath: string): FileNode | null 
 };
 
 export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridProps) {
+  const { data: session } = useSession();
+  const isAuthenticated = !!session?.user;
+
   const { 
     getSortedProjects, 
     addProject, 
@@ -177,7 +181,15 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
 
   const refreshCloudSyncStatus = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('token');
+
+    if (!isAuthenticated) {
+      setCloudSyncStatus({
+        state: 'unauthenticated',
+        detail: 'Local only. Sign in to enable cloud sync.',
+      });
+      return;
+    }
+
     let syncMeta: {
       lastWorkspaceSyncAt?: number;
       lastAssetSyncAt?: number;
@@ -190,18 +202,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
       syncMeta = {};
     }
 
-    if (!token) {
-      setCloudSyncStatus({
-        state: 'unauthenticated',
-        detail: 'Not signed in. Local storage is active.',
-      });
-      return;
-    }
-
     try {
-      const response = await fetch('/api/projects?limit=1', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch('/api/projects?limit=1');
       if (!response.ok) {
         setCloudSyncStatus({
           state: 'offline',
@@ -222,7 +224,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
         detail: syncMeta.lastSyncError || 'Cannot reach backend API.',
       });
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     deduplicateProjects();

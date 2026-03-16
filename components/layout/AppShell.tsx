@@ -8,7 +8,11 @@ import { Timeline } from './Timeline';
 import { SettingsModal } from './SettingsModal';
 import { ActionLog } from './ActionLog';
 import { useLogStore } from '@/stores';
+import { useUserStore } from '@/stores/userStore';
+import { useFileStore } from '@/stores/fileStore';
+import { useProjectSync, saveProjectWorkspaceState, loadProjectWorkspaceState } from '@/hooks/useProjectSync';
 import { useSettingsSync } from '@/hooks/useSettingsSync';
+import { PanelLeft, PanelRight } from 'lucide-react';
 import styles from './AppShell.module.css';
 import type { WorkspaceMode, WorkspaceLayout } from '@/types';
 
@@ -214,11 +218,19 @@ export const AppShell: React.FC = () => {
       />
 
       <div id="app-shell-workspace-region" className={styles.appShellWorkspaceRegion}>
-        {layout.explorer.visible && (
+        {layout.explorer.visible ? (
           <>
-            <ExplorerPanel width={layout.explorer.width} />
+            <ExplorerPanel width={layout.explorer.width} onToggle={() => togglePanel('explorer')} />
             <div className={styles.resizeHandle} onMouseDown={handleExplorerResizeStart} />
           </>
+        ) : (
+          <button
+            className={styles.collapsedExplorerToggle}
+            onClick={() => togglePanel('explorer')}
+            title="Open Explorer (⌘1)"
+          >
+            <PanelLeft size={18} />
+          </button>
         )}
 
         <div className={styles.mainArea}>
@@ -237,14 +249,25 @@ export const AppShell: React.FC = () => {
           )}
         </div>
 
-        {layout.inspector.visible && !showNodeGraph && (
+        {layout.inspector.visible && !showNodeGraph ? (
           <>
             <div className={styles.resizeHandle} onMouseDown={handleInspectorResizeStart} />
             <InspectorPanel
               width={layout.inspector.width}
               onOpenSettings={() => setSettingsOpen(true)}
+              onToggle={() => togglePanel('inspector')}
             />
           </>
+        ) : (
+          !showNodeGraph && (
+            <button
+              className={styles.collapsedInspectorToggle}
+              onClick={() => togglePanel('inspector')}
+              title="Open Inspector (⌘3)"
+            >
+              <PanelRight size={18} />
+            </button>
+          )
         )}
       </div>
 

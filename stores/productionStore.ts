@@ -111,6 +111,21 @@ interface ProductionActions {
     modelRunId: string,
     updates: Partial<ModelRun>
   ) => void;
+  updateIdea: (projectId: string, id: string, updates: Partial<Omit<IdeaCard, 'id' | 'createdAt'>>) => void;
+  deleteIdea: (projectId: string, id: string) => void;
+  updateGlossaryTerm: (projectId: string, id: string, updates: Partial<Omit<GlossaryTerm, 'id' | 'createdAt'>>) => void;
+  deleteGlossaryTerm: (projectId: string, id: string) => void;
+  updateScriptSegment: (projectId: string, id: string, updates: Partial<Omit<ScriptSegment, 'id' | 'createdAt'>>) => void;
+  deleteScriptSegment: (projectId: string, id: string) => void;
+  updateSourceReference: (projectId: string, id: string, updates: Partial<Omit<SourceReference, 'id' | 'createdAt'>>) => void;
+  deleteSourceReference: (projectId: string, id: string) => void;
+  updateDialogueLine: (projectId: string, id: string, updates: Partial<Omit<DialogueLine, 'id' | 'createdAt'>>) => void;
+  deleteDialogueLine: (projectId: string, id: string) => void;
+  updatePromptDraft: (projectId: string, id: string, updates: Partial<Omit<PromptDraft, 'id' | 'createdAt'>>) => void;
+  deletePromptDraft: (projectId: string, id: string) => void;
+  deleteModelRun: (projectId: string, id: string) => void;
+  updateTimelineEntry: (projectId: string, id: string, updates: { title?: string; notes?: string }) => void;
+  deleteTimelineEntry: (projectId: string, id: string) => void;
   addTimelineEntry: (
     projectId: string,
     input: {
@@ -478,6 +493,187 @@ export const useProductionStore = create<ProductionStore>()(
             },
           },
         }));
+      },
+
+      updateIdea: (projectId, id, updates) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            ideas: record.ideas.map((i) => i.id === id ? { ...i, ...updates, updatedAt: now() } : i),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      deleteIdea: (projectId, id) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            ideas: record.ideas.filter((i) => i.id !== id),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      updateGlossaryTerm: (projectId, id, updates) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            glossary: record.glossary.map((i) => i.id === id ? { ...i, ...updates, updatedAt: now() } : i),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      deleteGlossaryTerm: (projectId, id) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            glossary: record.glossary.filter((i) => i.id !== id),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      updateScriptSegment: (projectId, id, updates) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            script: record.script.map((i) => i.id === id ? { ...i, ...updates, updatedAt: now() } : i),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      deleteScriptSegment: (projectId, id) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            script: record.script.filter((i) => i.id !== id),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      updateSourceReference: (projectId, id, updates) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            sources: record.sources.map((i) => i.id === id ? { ...i, ...updates, updatedAt: now() } : i),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      deleteSourceReference: (projectId, id) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            sources: record.sources.filter((i) => i.id !== id),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      updateDialogueLine: (projectId, id, updates) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            dialogues: record.dialogues.map((i) => i.id === id ? { ...i, ...updates, updatedAt: now() } : i),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      deleteDialogueLine: (projectId, id) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            dialogues: record.dialogues.filter((i) => i.id !== id),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      updatePromptDraft: (projectId, id, updates) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            prompts: record.prompts.map((i) => i.id === id ? { ...i, ...updates, updatedAt: now() } : i),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      deletePromptDraft: (projectId, id) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            prompts: record.prompts.filter((i) => i.id !== id),
+            promptVersions: record.promptVersions.filter((v) => v.promptDraftId !== id),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      deleteModelRun: (projectId, id) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            modelRuns: record.modelRuns.filter((i) => i.id !== id),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      updateTimelineEntry: (projectId, id, updates) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            timeline: record.timeline.map((i) => i.id === id ? { ...i, ...updates } : i),
+            updatedAt: now(),
+          }}};
+        });
+      },
+
+      deleteTimelineEntry: (projectId, id) => {
+        set((state) => {
+          const record = state.records[projectId];
+          if (!record) return state;
+          return { records: { ...state.records, [projectId]: {
+            ...record,
+            timeline: record.timeline.filter((i) => i.id !== id),
+            updatedAt: now(),
+          }}};
+        });
       },
 
       addTimelineEntry: (projectId, input) => {

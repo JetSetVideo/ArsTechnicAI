@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
+import { useProjectsStore } from '@/stores/projectsStore';
+import { useUserStore } from '@/stores/userStore';
+import { useFileStore } from '@/stores/fileStore';
+import { STORAGE_KEYS, WORKSPACE_DATA_KEYS_TO_CLEAR } from '@/constants/workspace';
+import { projectPathFromName } from '@/utils/project';
 
 type VersionTrigger = 'MANUAL' | 'GENERATE' | 'DELETE' | 'AUTO';
 
@@ -9,13 +14,68 @@ interface ProjectSyncState {
   saveVersion: (trigger: VersionTrigger, label?: string) => Promise<void>;
   syncCanvas: () => Promise<void>;
   loadProjectFromDb: (id: string) => Promise<Record<string, unknown> | null>;
+  openProjectFromDashboard: (projectId: string) => void;
   isSaving: boolean;
   lastSaved: Date | null;
 }
 
 const AUTOSAVE_INTERVAL_MS = 30_000;
 
-export function useProjectSync(projectId: string | null): ProjectSyncState {
+// ============================================
+// Standalone helpers (usable outside React)
+// ============================================
+
+function canvasStateKey(projectId: string): string {
+  return `${STORAGE_KEYS.canvasStates}:${projectId}`;
+}
+
+export function saveProjectWorkspaceState(projectId: string, _projectName: string): void {
+  if (!projectId || typeof window === 'undefined') return;
+  try {
+    const { items, viewport } = useCanvasStore.getState();
+    const payload = { items, viewport, savedAt: Date.now() };
+    localStorage.setItem(canvasStateKey(projectId), JSON.stringify(payload));
+  } catch {
+    // localStorage quota or serialisation errors are non-fatal
+  }
+}
+
+export function loadProjectWorkspaceState(projectId: string, _projectName: string): void {
+  if (!projectId || typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(canvasStateKey(projectId));
+    if (!raw) return;
+    const { items, viewport } = JSON.parse(raw);
+    const canvas = useCanvasStore.getState();
+    if (viewport) canvas.setViewport(viewport);
+    if (Array.isArray(items) && items.length > 0) {
+      canvas.clearCanvas();
+      for (const item of items) canvas.addItem(item);
+    }
+  } catch {
+    // Corrupt data is non-fatal — start with a blank canvas
+  }
+}
+
+export function clearAllWorkspaceData(): void {
+  if (typeof window === 'undefined') return;
+  for (const key of WORKSPACE_DATA_KEYS_TO_CLEAR) {
+    localStorage.removeItem(key);
+  }
+  // Also clear per-project canvas snapshots
+  const toRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith(`${STORAGE_KEYS.canvasStates}:`)) toRemove.push(k);
+  }
+  for (const k of toRemove) localStorage.removeItem(k);
+}
+
+// ============================================
+// React hook
+// ============================================
+
+export function useProjectSync(projectId?: string | null): ProjectSyncState {
   const { data: session } = useSession();
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -165,5 +225,23 @@ export function useProjectSync(projectId: string | null): ProjectSyncState {
     }
   }, [markDirty]);
 
-  return { saveVersion, syncCanvas, loadProjectFromDb, isSaving, lastSaved };
+  const openProjectFromDashboard = useCallback((targetId: string) => {
+    const dashProject = useProjectsStore.getState().getProject(targetId);
+    if (!dashProject) return;
+
+    useUserStore.setState({
+      currentProject: {
+        id: dashProject.id,
+        name: dashProject.name,
+        createdAt: dashProject.createdAt,
+        modifiedAt: dashProject.modifiedAt,
+        path: projectPathFromName(dashProject.name),
+      },
+    });
+
+    useFileStore.getState().switchToProject(dashProject.name, dashProject.id);
+    loadProjectWorkspaceState(targetId, dashProject.name);
+  }, []);
+
+  return { saveVersion, syncCanvas, loadProjectFromDb, openProjectFromDashboard, isSaving, lastSaved };
 }

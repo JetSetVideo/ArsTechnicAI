@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, UserRound } from 'lucide-react';
+import { Search, UserRound, LayoutGrid, Image as ImageIcon, PlusCircle, PenTool } from 'lucide-react';
 import { useRouter } from 'next/router';
 import styles from './DashboardLayout.module.css';
 import { Button } from '../ui';
@@ -17,10 +17,12 @@ import { useProjectSync, saveProjectWorkspaceState } from '../../hooks/useProjec
 import { useUserStore } from '../../stores/userStore';
 import { useTelemetryStore } from '../../stores/telemetryStore';
 import { ProjectsGrid } from '../dashboard/ProjectsGrid';
+import { AssetsGrid } from '../dashboard/AssetsGrid';
 
 export function DashboardLayout() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'projects' | 'assets'>('projects');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'account' | 'api' | 'appearance' | 'shortcuts' | 'help' | 'about'>('account');
 
@@ -32,7 +34,7 @@ export function DashboardLayout() {
     (projectId: string) => {
       void saveProjectWorkspaceState(currentProject.id, currentProject.name);
       openProjectFromDashboard(projectId);
-      router.push(`/?project=${projectId}`);
+      router.push(`/project/${projectId}`);
     },
     [router, currentProject.id, currentProject.name, openProjectFromDashboard]
   );
@@ -58,7 +60,7 @@ export function DashboardLayout() {
             <Search size={18} className={styles.dashboardLayoutHeaderSearchIcon} />
             <input
               type="text"
-              placeholder="Search projects..."
+              placeholder={`Search ${viewMode}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={styles.dashboardLayoutHeaderSearchInputField}
@@ -90,12 +92,41 @@ export function DashboardLayout() {
         defaultTab={settingsTab} 
       />
 
-      {/* Secondary Navigation */}
-      <NavigationBar variant="compact" />
+      {/* Secondary Navigation & View Toggles */}
+      <div className={styles.dashboardSubNav}>
+        <div className={styles.viewToggles}>
+          <button 
+            className={`${styles.viewToggleButton} ${viewMode === 'projects' ? styles.active : ''}`}
+            onClick={() => setViewMode('projects')}
+          >
+            <LayoutGrid size={16} /> Projects
+          </button>
+          <button 
+            className={`${styles.viewToggleButton} ${viewMode === 'assets' ? styles.active : ''}`}
+            onClick={() => setViewMode('assets')}
+          >
+            <ImageIcon size={16} /> All Assets
+          </button>
+        </div>
+        
+        <div className={styles.creationActions}>
+           <span className={styles.creationLabel}>Creation Mode:</span>
+           <Button variant="ghost" size="sm" icon={<PlusCircle size={14} />} onClick={() => { /* Trigger new project modal */ }}>
+             New Project
+           </Button>
+           <Button variant="ghost" size="sm" icon={<PenTool size={14} />} onClick={() => { /* Trigger character creator */ }}>
+             Character
+           </Button>
+        </div>
+      </div>
 
       <main id="dashboard-layout-main-content-region" className={styles.dashboardLayoutMainContentRegion}>
         <div className={styles.dashboardLayoutMainProjectsContentRegion}>
-          <ProjectsGrid onOpenProject={handleOpenProject} searchQuery={searchQuery} />
+          {viewMode === 'projects' ? (
+            <ProjectsGrid onOpenProject={handleOpenProject} searchQuery={searchQuery} />
+          ) : (
+            <AssetsGrid searchQuery={searchQuery} />
+          )}
         </div>
       </main>
     </div>

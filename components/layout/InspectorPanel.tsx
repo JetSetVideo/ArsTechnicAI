@@ -1,18 +1,17 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   Sparkles,
   ChevronDown,
   ChevronRight,
   History,
   Palette,
-  Settings2,
-  Cloud,
-  CloudOff,
   RotateCcw,
   BookOpen,
   Loader2,
   Clock,
-  Sliders,
+  Cloud,
+  PanelRight,
+  Cpu,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,11 +25,14 @@ import {
   useFileStore,
   useProjectStore,
 } from '@/stores';
+import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
+import type { GenerationResult } from '@/types';
 import styles from './InspectorPanel.module.css';
 
 interface InspectorPanelProps {
   width: number;
   onOpenSettings: () => void;
+  onToggle: () => void;
 }
 
 interface CollapsibleSectionProps {
@@ -43,7 +45,7 @@ interface CollapsibleSectionProps {
 }
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
-  title, icon, defaultOpen = true, children, badge,
+  title, icon, defaultOpen = true, expandable, children, badge,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
   const sectionClasses = [
@@ -55,7 +57,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     .join(' ');
 
   return (
-    <div className={styles.section}>
+    <div className={sectionClasses}>
       <button className={styles.sectionHeader} onClick={() => setOpen(!open)}>
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         {icon}
@@ -87,7 +89,7 @@ const VersionHistorySection: React.FC<{ projectId: string }> = ({ projectId }) =
     fetch(`/api/projects/${projectId}/versions?pageSize=10`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => setVersions(d?.data ?? []))
-      .catch(() => {})
+      .catch(() => { setVersions([]); })
       .finally(() => setLoading(false));
   }, [projectId]);
 
@@ -157,19 +159,23 @@ interface PromptTemplate {
   variables: Record<string, string>;
 }
 
-const PromptTemplatesSection: React.FC<{ onUse: (text: string) => void }> = ({ onUse }) => {
+const PromptTemplatesSection: React.FC<{ onUse: (text: string) => void; isAuthenticated: boolean }> = ({ onUse, isAuthenticated }) => {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setTemplates([]);
+      return;
+    }
     setLoading(true);
     fetch('/api/prompts/templates?pageSize=20')
       .then((r) => r.ok ? r.json() : null)
       .then((d) => setTemplates(d?.data ?? []))
-      .catch(() => {})
+      .catch(() => { setTemplates([]); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAuthenticated]);
 
   const fillTemplate = (template: PromptTemplate) => {
     let text = template.template;
@@ -213,8 +219,28 @@ const PromptTemplatesSection: React.FC<{ onUse: (text: string) => void }> = ({ o
   );
 };
 
+const BananaIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M4 13c3.5-2 8-2 10 2a5.5 5.5 0 0 1 4 5" />
+    <path d="M5.1 15c5.5-2.8 11-2.8 15 2" />
+    <path d="M5 15a7 7 0 0 0 14 0" />
+    <path d="M5 15c5.5-2.8 11-2.8 15 2" />
+  </svg>
+);
+
 // ─── Main InspectorPanel ──────────────────────────────────────────────────────
-export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSettings }) => {
+export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSettings, onToggle }) => {
   const { data: session, status: sessionStatus } = useSession();
   const isAuthenticated = sessionStatus === 'authenticated' && !!session?.user;
 
@@ -234,6 +260,23 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   const { projectId, markDirty } = useProjectStore();
 
   const [localApiKey, setLocalApiKey] = useState(settings.aiProvider?.apiKey || '');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showNegativePrompt, setShowNegativePrompt] = useState(false);
+  const [showNegativeTemplates, setShowNegativeTemplates] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowModelDropdown(false);
+      }
+    };
+    if (showModelDropdown) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showModelDropdown]);
 
   // Sync localApiKey when settings change from DB sync
   useEffect(() => {
@@ -245,7 +288,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
 
-    if (localApiKey !== settings.aiProvider.apiKey) {
+    if (localApiKey !== settings.aiProvider?.apiKey) {
       updateAIProvider({ apiKey: localApiKey });
     }
 
@@ -256,7 +299,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
 
     log('generation_start', `Started generating: "${prompt.slice(0, 50)}…"`, { prompt, width: genWidth, height: genHeight });
 
-    const job = startGeneration({ prompt, negativePrompt, width: genWidth, height: genHeight, model: settings.aiProvider.model });
+    const job = startGeneration({ prompt, negativePrompt, width: genWidth, height: genHeight, model: settings.aiProvider?.model ?? 'imagen-3.0-generate-002' });
 
     try {
       const body: Record<string, unknown> = {
@@ -284,7 +327,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         dataUrl: result.dataUrl,
         width: genWidth,
         height: genHeight,
-        model: settings.aiProvider.model,
+        model: settings.aiProvider?.model ?? 'imagen-3.0-generate-002',
         seed: result.seed || Math.floor(Math.random() * 1000000),
         createdAt: Date.now(),
       };
@@ -319,7 +362,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         createdAt: Date.now(),
         modifiedAt: Date.now(),
         thumbnail: result.dataUrl || result.imageUrl,
-        metadata: { width: genWidth, height: genHeight, prompt, model: settings.aiProvider.model, seed: generationResult.seed },
+        metadata: { width: genWidth, height: genHeight, prompt, model: settings.aiProvider?.model ?? '', seed: generationResult.seed },
       });
 
       if (projectId) markDirty();
@@ -357,97 +400,133 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   );
 
   const recentJobs = jobs.slice(0, 5);
+  const currentModel = settings.aiProvider?.model || 'imagen-3.0-generate-002';
+  const hasApiKey = !!localApiKey;
 
   return (
     <aside className={styles.inspector} style={{ width }}>
       <div className={styles.header}>
         <h2 className={styles.title}>Inspector</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-          {isAuthenticated ? (
-            <Cloud size={12} style={{ color: 'var(--success-solid)', opacity: 0.8 }} title="Cloud save enabled" />
-          ) : (
-            <CloudOff size={12} style={{ color: 'var(--text-muted)' }} title="Sign in to enable cloud save" />
-          )}
-          <Button variant="ghost" size="sm" onClick={onOpenSettings} title="Settings">
-            <Settings2 size={14} />
-          </Button>
-        </div>
+        <button 
+          className={styles.toggleButton} 
+          onClick={onToggle}
+          title="Toggle Inspector (⌘3)"
+        >
+          <PanelRight size={16} />
+        </button>
       </div>
 
       <div className={styles.content}>
-        {/* Generate */}
-        <CollapsibleSection title="Generate Image" icon={<Sparkles size={14} />} defaultOpen>
-          <div className={styles.formGroup}>
+        {/* Generate - Main Content */}
+        <div className={styles.mainGenerator}>
+          <div className={styles.formGroup} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div className={styles.promptHeader}>
+              <label className={styles.promptLabel}>Prompt</label>
+              <button 
+                className={styles.templateToggle} 
+                onClick={() => setShowTemplates(!showTemplates)}
+                title={showTemplates ? "Hide Templates" : "Show Templates"}
+              >
+                <BookOpen size={10} />
+                TEMPLATES
+              </button>
+            </div>
+            {showTemplates && (
+              <div className={styles.templateSection}>
+                <PromptTemplatesSection onUse={(t) => { setPrompt(t); setShowTemplates(false); }} isAuthenticated={isAuthenticated} />
+              </div>
+            )}
             <Textarea
-              label="Prompt"
               placeholder="Describe the image you want to create…"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={4}
+              wrapperClassName={styles.promptInputWrapper}
             />
           </div>
+
           <div className={styles.formGroup}>
-            <Textarea
-              label="Negative Prompt (optional)"
-              placeholder="What to avoid…"
-              value={negativePrompt}
-              onChange={(e) => setNegativePrompt(e.target.value)}
-              rows={2}
-            />
-          </div>
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <Input label="Width" type="number" value={genWidth}
-                onChange={(e) => setDimensions(parseInt(e.target.value) || 1024, genHeight)}
-                min={256} max={2048} step={64} />
+            <div className={styles.negativePromptHeader} onClick={() => setShowNegativePrompt(!showNegativePrompt)}>
+              {showNegativePrompt ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <label className={styles.negativePromptLabel}>Negative Prompt (Optional)</label>
+              {showNegativePrompt && (
+                <button 
+                  className={styles.templateToggle} 
+                  onClick={(e) => { e.stopPropagation(); setShowNegativeTemplates(!showNegativeTemplates); }}
+                  title="Show Templates"
+                >
+                  <BookOpen size={10} />
+                  TEMPLATES
+                </button>
+              )}
             </div>
-            <div className={styles.formGroup}>
-              <Input label="Height" type="number" value={genHeight}
-                onChange={(e) => setDimensions(genWidth, parseInt(e.target.value) || 1024)}
-                min={256} max={2048} step={64} />
-            </div>
+            
+            {showNegativePrompt && (
+              <>
+                {showNegativeTemplates && (
+                  <div className={styles.templateSection}>
+                    <PromptTemplatesSection onUse={(t) => { setNegativePrompt(t); setShowNegativeTemplates(false); }} isAuthenticated={isAuthenticated} />
+                  </div>
+                )}
+                <Textarea
+                  placeholder="What to avoid…"
+                  value={negativePrompt}
+                  onChange={(e) => setNegativePrompt(e.target.value)}
+                  rows={2}
+                />
+              </>
+            )}
           </div>
-          <Button
-            variant="primary"
-            className={styles.generateButton}
-            onClick={handleGenerate}
-            disabled={!prompt.trim() || isGenerating}
-            loading={isGenerating}
-            icon={<Sparkles size={16} />}
-          >
-            {isGenerating ? 'Generating…' : 'Generate'}
-          </Button>
+
+          <div className={styles.generateGroup}>
+            <div className={styles.modelSelector} ref={dropdownRef}>
+              <button 
+                className={styles.modelButton}
+                onClick={() => setShowModelDropdown(!showModelDropdown)}
+                disabled={!hasApiKey}
+                title={hasApiKey ? `Current Model: ${currentModel}` : 'Enter API Key to select model'}
+              >
+                {(settings.aiProvider?.provider === 'nanobanana' || currentModel.includes('banana')) ? <BananaIcon /> : <Sparkles size={16} />}
+                <ChevronDown size={12} />
+              </button>
+              
+              {showModelDropdown && (
+                <div className={styles.modelDropdown}>
+                  {RECOMMENDED_GENERATION_MODELS.map((model) => (
+                    <button
+                      key={model}
+                      className={`${styles.modelOption} ${currentModel === model ? styles.active : ''}`}
+                      onClick={() => {
+                        updateAIProvider({ model });
+                        setShowModelDropdown(false);
+                      }}
+                    >
+                      {model}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Button
+              variant="primary"
+              className={styles.generateButton}
+              onClick={handleGenerate}
+              disabled={!prompt.trim() || isGenerating || !hasApiKey}
+              loading={isGenerating}
+              icon={<Sparkles size={16} />}
+            >
+              {isGenerating ? 'Generating…' : 'Generate'}
+            </Button>
+          </div>
+
           {isAuthenticated && (
             <p className={styles.hint} style={{ marginTop: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
               <Cloud size={10} style={{ color: 'var(--success-solid)' }} />
               Images saved to your account
             </p>
           )}
-        </CollapsibleSection>
-
-        {/* Prompt Templates */}
-        <CollapsibleSection title="Prompt Templates" icon={<BookOpen size={14} />} defaultOpen={false}>
-          <PromptTemplatesSection onUse={setPrompt} />
-        </CollapsibleSection>
-
-        {/* API Settings */}
-        <CollapsibleSection title="API Settings" icon={<Sliders size={14} />} defaultOpen={!settings.aiProvider.apiKey}>
-          <div className={styles.formGroup}>
-            <Input
-              label="API Key"
-              type="password"
-              placeholder="Enter your API key…"
-              value={localApiKey}
-              onChange={(e) => setLocalApiKey(e.target.value)}
-            />
-            <p className={styles.hint}>
-              Get your key from{' '}
-              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
-                Google AI Studio
-              </a>
-            </p>
-          </div>
-        </CollapsibleSection>
+        </div>
 
         {/* Selected Item */}
         {selectedItem && (

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 
-export type ConnectionStatus = 'pending' | 'connected' | 'denied' | 'unauthenticated';
+export type ConnectionStatus = 'pending' | 'connected' | 'denied' | 'unauthenticated' | 'offline';
 
 export interface HealthData {
   database: 'ok' | 'error';
@@ -20,17 +20,41 @@ export interface ConnectionState {
   disconnect: () => void;
 }
 
-const POLL_INTERVAL_MS = 30_000;
+const BASE_INTERVAL_MS = 30_000;
+const MAX_INTERVAL_MS = 300_000;
 
 export function useConnectionStatus(): ConnectionState {
   const { data: session, status: sessionStatus } = useSession();
   const [health, setHealth] = useState<HealthData | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const failCountRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const checkHealth = useCallback(async () => {
+  const scheduleNext = useCallback((failCount: number) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const delay = failCount === 0
+      ? BASE_INTERVAL_MS
+      : Math.min(BASE_INTERVAL_MS * Math.pow(2, failCount), MAX_INTERVAL_MS);
+    timerRef.current = setTimeout(() => void checkHealthInner(), delay);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const checkHealthInner = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setHealthError('offline');
+      setHealth(null);
+      setLastChecked(new Date());
+      failCountRef.current += 1;
+      scheduleNext(failCountRef.current);
+      return;
+    }
+
     try {
-      const res = await fetch('/api/health', { method: 'GET' });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      const res = await fetch('/api/health', { method: 'GET', signal: controller.signal });
+      clearTimeout(timeout);
       if (!res.ok && res.status !== 503) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -38,29 +62,43 @@ export function useConnectionStatus(): ConnectionState {
       setHealth(data.checks ?? null);
       setHealthError(null);
       setLastChecked(new Date());
-    } catch (e) {
-      setHealthError(e instanceof Error ? e.message : 'Cannot reach server');
+      failCountRef.current = 0;
+    } catch {
+      failCountRef.current += 1;
+      setHealthError('offline');
       setHealth(null);
       setLastChecked(new Date());
     }
-  }, []);
+    scheduleNext(failCountRef.current);
+  }, [scheduleNext]);
+
+  const checkHealth = useCallback(async () => {
+    failCountRef.current = 0;
+    await checkHealthInner();
+  }, [checkHealthInner]);
 
   useEffect(() => {
-    checkHealth();
-    const id = setInterval(checkHealth, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [checkHealth]);
+    void checkHealthInner();
 
-  // Derive connection status from health + session
+    const handleOnline = () => { failCountRef.current = 0; void checkHealthInner(); };
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [checkHealthInner]);
+
   let status: ConnectionStatus;
-  if (sessionStatus === 'loading' || (health === null && !healthError)) {
+  if (healthError === 'offline') {
+    status = 'offline';
+  } else if (sessionStatus === 'loading' || (health === null && !healthError)) {
     status = 'pending';
   } else if (healthError || health?.database === 'error') {
     status = 'denied';
   } else if (sessionStatus === 'authenticated' && session?.user) {
     status = 'connected';
   } else {
-    // Backend reachable but user not authenticated — neutral state (not an error)
     status = 'unauthenticated';
   }
 

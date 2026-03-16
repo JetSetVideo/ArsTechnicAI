@@ -34,8 +34,8 @@ export function useSettingsSync() {
           gridSize: data.gridSize ?? settings.gridSize,
           autoSavePrompts: data.autoSavePrompts ?? settings.autoSavePrompts,
           aiProvider: {
-            ...settings.aiProvider,
-            model: data.defaultModel ?? settings.aiProvider.model,
+            ...(settings.aiProvider ?? {}),
+            model: data.defaultModel ?? settings.aiProvider?.model ?? 'imagen-3.0-generate-002',
           },
         });
       } catch {
@@ -60,7 +60,7 @@ export function useSettingsSync() {
       snapToGrid: settings.snapToGrid,
       gridSize: settings.gridSize,
       autoSavePrompts: settings.autoSavePrompts,
-      defaultModel: settings.aiProvider.model,
+      defaultModel: settings.aiProvider?.model,
     });
 
     if (key === lastSyncedRef.current) return;
@@ -78,7 +78,7 @@ export function useSettingsSync() {
             snapToGrid: settings.snapToGrid,
             gridSize: settings.gridSize,
             autoSavePrompts: settings.autoSavePrompts,
-            defaultModel: settings.aiProvider.model,
+            defaultModel: settings.aiProvider?.model,
           }),
         });
       } catch {

@@ -1,38 +1,22 @@
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import {
-  ChevronDown,
   Settings,
-  PanelLeft,
-  PanelRight,
-  PanelBottom,
   ImagePlus,
   Wand2,
   Layers,
   Film,
   Save,
-  FolderOpen,
-  FolderPlus,
-  HelpCircle,
-  FileText,
-  Clock,
   Loader2,
-  X,
+  ChevronRight,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { SearchBar } from '../ui/SearchBar';
-import { Button } from '../ui/Button';
-import { AuthButton } from '../ui/AuthButton';
-import { useLogStore, useCanvasStore, useFileStore, useProjectStore } from '@/stores';
+import { useLogStore, useCanvasStore, useProjectStore, useNodeStore } from '@/stores';
 import { useProjectSync } from '@/hooks/useProjectSync';
 import styles from './TopBar.module.css';
 import type { WorkspaceMode, SearchScope } from '@/types';
-
-interface RemoteProject {
-  id: string;
-  name: string;
-  updatedAt: string;
-}
 
 interface TopBarProps {
   currentMode: WorkspaceMode;
@@ -82,45 +66,18 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const { data: session } = useSession();
   const log = useLogStore((s) => s.log);
-  const canvasStore = useCanvasStore();
-  const fileStore = useFileStore();
-  const { projectId, setProject, clearProject } = useProjectStore();
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [recentProjects, setRecentProjects] = useState<RemoteProject[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
-  const [openProjectModal, setOpenProjectModal] = useState(false);
-  const [allProjects, setAllProjects] = useState<RemoteProject[]>([]);
+  const { projectId, setProject } = useProjectStore();
   const [actionLoading, setActionLoading] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [localName, setLocalName] = useState(projectName);
 
-  const menuRef = useRef<HTMLDivElement>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  const { saveVersion, loadProjectFromDb, isSaving, lastSaved } = useProjectSync(projectId);
-
+  const { saveVersion, isSaving, lastSaved } = useProjectSync(projectId);
   const isAuthenticated = !!session?.user;
 
-  // Close menu on outside click
+  // Sync local name when prop changes
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [menuOpen]);
-
-  // Close open-project modal on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
-        setOpenProjectModal(false);
-      }
-    };
-    if (openProjectModal) document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [openProjectModal]);
+    setLocalName(projectName);
+  }, [projectName]);
 
   // Cmd+S shortcut
   useEffect(() => {
@@ -134,26 +91,6 @@ export const TopBar: React.FC<TopBarProps> = ({
     return () => window.removeEventListener('keydown', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, projectName, isAuthenticated]);
-
-  const fetchRecentProjects = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const res = await fetch('/api/projects?pageSize=5');
-      if (res.ok) {
-        const { data } = await res.json();
-        setRecentProjects(data ?? []);
-      }
-    } catch {
-      // Ignore
-    }
-  }, [isAuthenticated]);
-
-  const handleMenuOpen = () => {
-    setMenuOpen((v) => {
-      if (!v) fetchRecentProjects();
-      return !v;
-    });
-  };
 
   const handleSearch = useCallback(
     (query: string, scope: SearchScope) => {
@@ -169,8 +106,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   );
 
   const handleSave = useCallback(async () => {
-    setMenuOpen(false);
-
     if (!isAuthenticated) {
       log('project_save', 'Must be signed in to save to the cloud');
       return;
@@ -217,184 +152,118 @@ export const TopBar: React.FC<TopBarProps> = ({
     } finally {
       setActionLoading(false);
     }
-  }, [projectId, projectName, isAuthenticated, saveVersion, log, onProjectNameChange]);
+  }, [projectId, projectName, isAuthenticated, saveVersion, log, onProjectNameChange, setProject]);
 
-  const handleNewProject = useCallback(async () => {
-    setMenuOpen(false);
-    canvasStore.clearCanvas();
-    canvasStore.resetViewport();
-    fileStore.loadDemoFiles();
-    onProjectNameChange('Untitled Project');
-    clearProject();
-
-    if (!isAuthenticated) {
-      log('folder_create', 'Created new local project');
-      return;
+  const handleNameBlur = () => {
+    setIsEditingName(false);
+    if (localName.trim() && localName !== projectName) {
+      onProjectNameChange(localName.trim());
+    } else {
+      setLocalName(projectName);
     }
+  };
 
-    setActionLoading(true);
-    try {
-      const res = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Untitled Project' }),
-      });
-      if (res.ok) {
-        const { data } = await res.json();
-        setProject(data.id, data.name);
-        onProjectNameChange(data.name);
-        log('folder_create', `Created project: ${data.name}`);
-      }
-    } catch {
-      log('folder_create', 'Failed to create project in DB');
-    } finally {
-      setActionLoading(false);
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameBlur();
     }
-  }, [canvasStore, fileStore, onProjectNameChange, isAuthenticated, log]);
+  };
 
-  const handleOpenProjectClick = useCallback(async () => {
-    setMenuOpen(false);
-
-    if (!isAuthenticated) {
-      log('folder_open', 'Must be signed in to open cloud projects');
-      return;
+  const handleModeClick = (modeId: WorkspaceMode) => {
+    onModeChange(modeId);
+    
+    if (modeId === 'create') {
+      const { addNode } = useNodeStore.getState();
+      const { viewport } = useCanvasStore.getState();
+      
+      // Calculate center of viewport
+      // We use window dimensions as a proxy for canvas size since we don't have ref here
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      
+      const x = (cx - viewport.x) / viewport.zoom - 130; // Center horizontally (node width ~260)
+      const y = (cy - viewport.y) / viewport.zoom - 100; // Center vertically
+      
+      addNode('prompt', x, y);
+      log('canvas_add', 'Added prompt node via Create button');
     }
-
-    setLoadingProjects(true);
-    setOpenProjectModal(true);
-    try {
-      const res = await fetch('/api/projects?pageSize=20');
-      if (res.ok) {
-        const { data } = await res.json();
-        setAllProjects(data ?? []);
-      }
-    } catch {
-      setAllProjects([]);
-    } finally {
-      setLoadingProjects(false);
-    }
-  }, [isAuthenticated, log]);
-
-  const handleSelectProject = useCallback(
-    async (project: RemoteProject) => {
-      setOpenProjectModal(false);
-      canvasStore.clearCanvas();
-      canvasStore.resetViewport();
-      onProjectNameChange(project.name);
-      await loadProjectFromDb(project.id);
-      log('folder_open', `Opened project: ${project.name}`);
-    },
-    [canvasStore, loadProjectFromDb, onProjectNameChange, log]
-  );
-
-  const handleOpenRecentProject = useCallback(
-    async (project: RemoteProject) => {
-      setMenuOpen(false);
-      canvasStore.clearCanvas();
-      canvasStore.resetViewport();
-      onProjectNameChange(project.name);
-      await loadProjectFromDb(project.id);
-      log('folder_open', `Opened recent project: ${project.name}`);
-    },
-    [canvasStore, loadProjectFromDb, onProjectNameChange, log]
-  );
+  };
 
   return (
     <header className={styles.topBar}>
-      {/* Left section - Project Menu & Logo */}
+      {/* Left section - Logo, Breadcrumbs, Save, Search */}
       <div className={styles.section}>
-        <div className={styles.projectSelector} ref={menuRef}>
-          <button
-            className={`${styles.projectButton} ${menuOpen ? styles.open : ''}`}
-            onClick={handleMenuOpen}
-            title="Project Menu"
-          >
-            <div className={styles.logo}>
-              <span className={styles.logoArs}>Ars</span>
-              <span className={styles.logoTechnic}>Technic</span>
-              <span className={styles.logoAI}>AI</span>
-            </div>
-            <span className={styles.projectName}>{projectName}</span>
-            <ChevronDown size={14} className={styles.chevron} />
-          </button>
-
-          {menuOpen && (
-            <div className={styles.projectMenu}>
-              <div className={styles.menuSection}>
-                <button className={styles.menuItem} onClick={handleNewProject}>
-                  <FolderPlus size={14} />
-                  <span>New Project</span>
-                  <kbd>⌘N</kbd>
-                </button>
-                <button className={styles.menuItem} onClick={handleOpenProjectClick}>
-                  <FolderOpen size={14} />
-                  <span>Open Project…</span>
-                  <kbd>⌘O</kbd>
-                </button>
-                <button className={styles.menuItem} onClick={handleSave} disabled={actionLoading}>
-                  <Save size={14} />
-                  <span>
-                    {isSaving || actionLoading ? 'Saving…' : 'Save Project'}
-                  </span>
-                  <kbd>⌘S</kbd>
-                </button>
-              </div>
-
-              <div className={styles.menuDivider} />
-
-              <div className={styles.menuSection}>
-                <div className={styles.menuLabel}>
-                  Recent Projects
-                  {!isAuthenticated && (
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> (sign in)</span>
-                  )}
-                </div>
-                {recentProjects.length === 0 && (
-                  <div className={styles.menuItem} style={{ opacity: 0.5, cursor: 'default' }}>
-                    <FileText size={14} />
-                    <span>No recent projects</span>
-                  </div>
-                )}
-                {recentProjects.map((project) => (
-                  <button
-                    key={project.id}
-                    className={styles.menuItem}
-                    onClick={() => handleOpenRecentProject(project)}
-                  >
-                    <FileText size={14} />
-                    <span className={styles.menuItemContent}>
-                      <span className={styles.projectTitle}>{project.name}</span>
-                      <span className={styles.projectMeta}>
-                        <Clock size={10} />
-                        {formatRelative(project.updatedAt)}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className={styles.menuDivider} />
-
-              <div className={styles.menuSection}>
-                <button className={styles.menuItem} onClick={onOpenSettings}>
-                  <Settings size={14} />
-                  <span>Settings</span>
-                  <kbd>⌘,</kbd>
-                </button>
-              </div>
-            </div>
+        <Link href="/home" className={styles.homeLink} title="Back to Dashboard">
+          <div className={styles.logo}>
+            <span className={styles.logoArs}>Ars</span>
+            <span className={styles.logoTechnic}>Technic</span>
+            <span className={styles.logoAI}>AI</span>
+          </div>
+        </Link>
+        
+        <ChevronRight size={14} className={styles.breadcrumbSeparator} />
+        
+        <div className={styles.projectNameContainer}>
+          {isEditingName ? (
+            <input
+              type="text"
+              value={localName}
+              onChange={(e) => setLocalName(e.target.value)}
+              onBlur={handleNameBlur}
+              onKeyDown={handleNameKeyDown}
+              className={styles.projectNameInput}
+              autoFocus
+            />
+          ) : (
+            <span 
+              className={styles.projectNameDisplay} 
+              onClick={() => setIsEditingName(true)}
+              title="Click to rename"
+            >
+              {projectName}
+            </span>
           )}
         </div>
 
         <div className={styles.divider} />
 
+        {/* Save button */}
+        <button
+          className={`${styles.actionButton} ${(isSaving || actionLoading) ? styles.saving : ''}`}
+          onClick={handleSave}
+          title={lastSaved ? `Last saved ${formatRelative(lastSaved.toISOString())}` : 'Save'}
+          disabled={isSaving || actionLoading}
+        >
+          {isSaving || actionLoading ? (
+            <Loader2 size={16} className={styles.spin} />
+          ) : (
+            <Save size={16} />
+          )}
+        </button>
+
+        <div className={styles.searchWrapper}>
+          <SearchBar onSearch={handleSearch} placeholder="Search files..." />
+        </div>
+
+        {/* Settings button */}
+        <button
+          className={styles.actionButton}
+          onClick={onOpenSettings}
+          title="Settings (⌘,)"
+        >
+          <Settings size={16} />
+        </button>
+      </div>
+
+      {/* Right section - Mode Nav, Inspector Toggle, Settings */}
+      <div className={styles.section}>
         {/* Mode switcher */}
         <nav className={styles.modeNav}>
           {modes.map((mode) => (
             <button
               key={mode.id}
               className={`${styles.modeButton} ${currentMode === mode.id ? styles.active : ''}`}
-              onClick={() => onModeChange(mode.id)}
+              onClick={() => handleModeClick(mode.id)}
               title={mode.label}
             >
               {mode.icon}
@@ -403,121 +272,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           ))}
         </nav>
       </div>
-
-      {/* Center section - Search */}
-      <div className={styles.section}>
-        <SearchBar onSearch={handleSearch} placeholder="Search files or Google images..." />
-      </div>
-
-      {/* Right section */}
-      <div className={styles.section}>
-        <div className={styles.panelToggles}>
-          <button
-            className={`${styles.toggleButton} ${explorerVisible ? styles.active : ''}`}
-            onClick={onToggleExplorer}
-            title="Toggle Explorer (⌘1)"
-          >
-            <PanelLeft size={18} />
-          </button>
-          <button
-            className={`${styles.toggleButton} ${timelineVisible ? styles.active : ''}`}
-            onClick={onToggleTimeline}
-            title="Toggle Timeline (⌘2)"
-          >
-            <PanelBottom size={18} />
-          </button>
-          <button
-            className={`${styles.toggleButton} ${inspectorVisible ? styles.active : ''}`}
-            onClick={onToggleInspector}
-            title="Toggle Inspector (⌘3)"
-          >
-            <PanelRight size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Actions section */}
-      <div className={styles.section}>
-        <div className={styles.actions}>
-          {/* Save button */}
-          <button
-            className={`${styles.actionButton} ${(isSaving || actionLoading) ? styles.saving : ''}`}
-            onClick={handleSave}
-            title={lastSaved ? `Dernière sauvegarde ${formatRelative(lastSaved.toISOString())}` : 'Sauvegarder'}
-            disabled={isSaving || actionLoading}
-          >
-            {isSaving || actionLoading ? (
-              <Loader2 size={16} className={styles.spin} />
-            ) : (
-              <Save size={16} />
-            )}
-          </button>
-
-          {/* Settings button - improved styling */}
-          <button
-            className={styles.actionButton}
-            onClick={onOpenSettings}
-            title="Paramètres (⌘,)"
-          >
-            <Settings size={16} />
-          </button>
-
-          {/* Help button */}
-          <button
-            className={styles.actionButton}
-            onClick={onOpenHelp}
-            title="Aide"
-          >
-            <HelpCircle size={16} />
-          </button>
-
-          {/* Divider */}
-          <div className={styles.actionDivider} />
-
-          {/* Auth button with dropdown */}
-          <AuthButton />
-        </div>
-      </div>
-
-      {/* Open Project modal */}
-      {openProjectModal && (
-        <div className={styles.projectModalOverlay}>
-          <div className={styles.projectModal} ref={modalRef}>
-            <div className={styles.projectModalHeader}>
-              <span>Open Project</span>
-              <button onClick={() => setOpenProjectModal(false)}>
-                <X size={14} />
-              </button>
-            </div>
-            {loadingProjects ? (
-              <div className={styles.projectModalLoading}>
-                <Loader2 size={16} className={styles.spin} /> Loading projects…
-              </div>
-            ) : allProjects.length === 0 ? (
-              <div className={styles.projectModalEmpty}>No projects found.</div>
-            ) : (
-              <div className={styles.projectModalList}>
-                {allProjects.map((project) => (
-                  <button
-                    key={project.id}
-                    className={styles.projectModalItem}
-                    onClick={() => handleSelectProject(project)}
-                  >
-                    <FileText size={14} />
-                    <span className={styles.menuItemContent}>
-                      <span className={styles.projectTitle}>{project.name}</span>
-                      <span className={styles.projectMeta}>
-                        <Clock size={10} />
-                        {formatRelative(project.updatedAt)}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </header>
   );
 };

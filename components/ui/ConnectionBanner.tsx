@@ -31,10 +31,8 @@ export const ConnectionBanner: React.FC = () => {
       const timeoutId = setTimeout(() => controller.abort(), HEALTH_REQUEST_TIMEOUT_MS);
       try {
         const res = await fetch('/api/health', { signal: controller.signal });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        return (await res.json()) as HealthResponse;
+        const json = (await res.json()) as HealthResponse;
+        return json;
       } finally {
         clearTimeout(timeoutId);
       }
@@ -62,6 +60,8 @@ export const ConnectionBanner: React.FC = () => {
         error instanceof Error ? error.message : lastErrorMessage;
       setData({
         status: 'degraded',
+        version: '',
+        checks: {},
         services: [
           { name: 'Health check', status: 'degraded', message: `Health endpoint unavailable: ${lastErrorMessage}` },
         ],

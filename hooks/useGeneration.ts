@@ -26,15 +26,30 @@ export function useGeneration() {
     model?: string;
     projectId?: string;
   }) => {
-    const resp = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-    });
-    const json = await resp.json();
+    let resp: Response;
+    try {
+      resp = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+    } catch {
+      throw new Error('Network error: cannot reach the generation API. Check your connection.');
+    }
 
-    if (json.success && json.data?.jobId) {
-      const jobId = json.data.jobId;
+    let json: Record<string, unknown>;
+    try {
+      json = await resp.json();
+    } catch {
+      throw new Error(`Server returned invalid response (HTTP ${resp.status})`);
+    }
+
+    if (!resp.ok && !json.dataUrl) {
+      throw new Error((json.error as string) || (json.message as string) || `Generation failed (HTTP ${resp.status})`);
+    }
+
+    if (json.success && (json.data as Record<string, unknown>)?.jobId) {
+      const jobId = (json.data as Record<string, unknown>).jobId as string;
       setActiveJobs((prev) => new Map(prev).set(jobId, {
         id: jobId,
         status: 'QUEUED',
@@ -43,12 +58,11 @@ export function useGeneration() {
       return jobId;
     }
 
-    // Direct generation (backwards compat)
     if (json.dataUrl) {
-      return { dataUrl: json.dataUrl, seed: json.seed };
+      return { dataUrl: json.dataUrl as string, seed: json.seed as number | undefined };
     }
 
-    throw new Error(json.error || 'Generation failed');
+    throw new Error((json.error as string) || 'Generation failed');
   }, []);
 
   const pollJobs = useCallback(async () => {
@@ -89,7 +103,11 @@ export function useGeneration() {
   }, [activeJobs, pollJobs]);
 
   const cancelJob = useCallback(async (jobId: string) => {
-    await fetch(`/api/jobs/${jobId}/cancel`, { method: 'POST' });
+    try {
+      await fetch(`/api/jobs/${jobId}/cancel`, { method: 'POST' });
+    } catch {
+      // Network error — still mark locally as cancelled
+    }
     setActiveJobs((prev) => {
       const next = new Map(prev);
       const job = next.get(jobId);

@@ -2,7 +2,8 @@
   "nodeModulesDir": "auto",
   "tasks": {
     "install": "deno install --allow-scripts",
-    "dev": "deno run -A npm:next@14.2.15 dev -p 3002",
+    "postinstall": "deno run -A npm:prisma generate && deno run -A scripts/patch-nextjs.ts",
+    "dev": "deno run -A npm:prisma generate && deno run -A scripts/patch-nextjs.ts && deno run -A npm:next@14.2.15 dev -p 3002",
     "build": "deno run -A npm:next@14.2.15 build",
     "start": "deno run -A npm:next@14.2.15 start -p 3002",
     "lint": "deno run -A npm:next@14.2.15 lint",
