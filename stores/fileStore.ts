@@ -61,6 +61,15 @@ interface FileState {
   // File import from browser
   importFiles: (files: FileList) => Promise<ImageAsset[]>;
 
+  // Import local files by reference (no copy)
+  importLocalFiles: (files: File[]) => Promise<Asset[]>;
+
+  // Asset tracking
+  trackAssetUsage: (assetId: string) => void;
+  associateAssetWithProject: (assetId: string, projectId: string) => void;
+  dissociateAssetFromProject: (assetId: string, projectId: string) => void;
+  getProjectsForAsset: (assetId: string) => string[];
+
   // Initialize structure
   initializeFileStructure: (projectName?: string) => void;
 }
@@ -813,6 +822,237 @@ export const useFileStore = create<FileState>()(
         }
 
         return importedAssets;
+      },
+
+      importLocalFiles: async (files: File[]) => {
+        const ALLOWED_MIME_PREFIXES: Record<string, Asset['type']> = {
+          'image/': 'image',
+          'video/': 'video',
+          'audio/': 'audio',
+          'text/': 'text',
+          'application/json': 'text',
+        };
+
+        const EXT_FALLBACK: Record<string, { type: Asset['type']; mime: string }> = {
+          '.mp4': { type: 'video', mime: 'video/mp4' },
+          '.webm': { type: 'video', mime: 'video/webm' },
+          '.mov': { type: 'video', mime: 'video/quicktime' },
+          '.avi': { type: 'video', mime: 'video/x-msvideo' },
+          '.mkv': { type: 'video', mime: 'video/x-matroska' },
+          '.m4v': { type: 'video', mime: 'video/x-m4v' },
+          '.ogv': { type: 'video', mime: 'video/ogg' },
+          '.flv': { type: 'video', mime: 'video/x-flv' },
+          '.wmv': { type: 'video', mime: 'video/x-ms-wmv' },
+          '.mp3': { type: 'audio', mime: 'audio/mpeg' },
+          '.wav': { type: 'audio', mime: 'audio/wav' },
+          '.ogg': { type: 'audio', mime: 'audio/ogg' },
+          '.flac': { type: 'audio', mime: 'audio/flac' },
+          '.aac': { type: 'audio', mime: 'audio/aac' },
+          '.m4a': { type: 'audio', mime: 'audio/x-m4a' },
+          '.aiff': { type: 'audio', mime: 'audio/aiff' },
+          '.opus': { type: 'audio', mime: 'audio/opus' },
+          '.png': { type: 'image', mime: 'image/png' },
+          '.jpg': { type: 'image', mime: 'image/jpeg' },
+          '.jpeg': { type: 'image', mime: 'image/jpeg' },
+          '.gif': { type: 'image', mime: 'image/gif' },
+          '.webp': { type: 'image', mime: 'image/webp' },
+          '.svg': { type: 'image', mime: 'image/svg+xml' },
+          '.bmp': { type: 'image', mime: 'image/bmp' },
+          '.avif': { type: 'image', mime: 'image/avif' },
+          '.txt': { type: 'text', mime: 'text/plain' },
+          '.md': { type: 'text', mime: 'text/markdown' },
+          '.json': { type: 'text', mime: 'application/json' },
+          '.csv': { type: 'text', mime: 'text/csv' },
+          '.srt': { type: 'text', mime: 'text/srt' },
+          '.vtt': { type: 'text', mime: 'text/vtt' },
+        };
+
+        const resolveType = (file: File): { assetType: Asset['type']; mime: string } => {
+          if (file.type) {
+            for (const [prefix, type] of Object.entries(ALLOWED_MIME_PREFIXES)) {
+              if (file.type.startsWith(prefix)) return { assetType: type, mime: file.type };
+            }
+          }
+          const ext = ('.' + file.name.split('.').pop()?.toLowerCase()) || '';
+          const fb = EXT_FALLBACK[ext];
+          if (fb) return { assetType: fb.type, mime: fb.mime };
+          return { assetType: 'text', mime: file.type || 'application/octet-stream' };
+        };
+
+        const imported: Asset[] = [];
+
+        for (const file of files) {
+          const { assetType, mime } = resolveType(file);
+
+          let thumbnail: string | undefined;
+          let width: number | undefined;
+          let height: number | undefined;
+          let duration: number | undefined;
+
+          if (assetType === 'image') {
+            try {
+              const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+              thumbnail = dataUrl;
+              const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+                const img = new window.Image();
+                img.onload = () => resolve({ width: img.width, height: img.height });
+                img.onerror = () => resolve({ width: 0, height: 0 });
+                img.src = dataUrl;
+              });
+              width = dims.width;
+              height = dims.height;
+            } catch { /* non-fatal */ }
+          }
+
+          if (assetType === 'video') {
+            try {
+              const objUrl = URL.createObjectURL(file);
+              const videoMeta = await new Promise<{ w: number; h: number; dur: number; thumb: string }>((resolve) => {
+                const video = document.createElement('video');
+                video.preload = 'auto';
+                video.muted = true;
+                video.playsInline = true;
+
+                const cleanup = () => URL.revokeObjectURL(objUrl);
+
+                video.onloadedmetadata = () => {
+                  video.currentTime = Math.min(1, video.duration * 0.1);
+                };
+
+                video.onseeked = () => {
+                  try {
+                    const thumbW = Math.min(video.videoWidth, 320);
+                    const thumbH = video.videoWidth > 0
+                      ? Math.round(thumbW * (video.videoHeight / video.videoWidth))
+                      : 180;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = thumbW;
+                    canvas.height = thumbH;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(video, 0, 0, thumbW, thumbH);
+                    const thumbUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    resolve({ w: video.videoWidth, h: video.videoHeight, dur: video.duration, thumb: thumbUrl });
+                  } catch {
+                    resolve({ w: video.videoWidth, h: video.videoHeight, dur: video.duration, thumb: '' });
+                  }
+                  cleanup();
+                };
+
+                video.onerror = () => {
+                  resolve({ w: 0, h: 0, dur: 0, thumb: '' });
+                  cleanup();
+                };
+
+                setTimeout(() => {
+                  resolve({ w: 0, h: 0, dur: 0, thumb: '' });
+                  cleanup();
+                }, 15000);
+
+                video.src = objUrl;
+              });
+
+              width = videoMeta.w;
+              height = videoMeta.h;
+              duration = videoMeta.dur;
+              thumbnail = videoMeta.thumb || undefined;
+            } catch { /* non-fatal */ }
+          }
+
+          if (assetType === 'audio') {
+            try {
+              const objUrl = URL.createObjectURL(file);
+              const audioDur = await new Promise<number>((resolve) => {
+                const audio = document.createElement('audio');
+                audio.preload = 'metadata';
+                audio.onloadedmetadata = () => {
+                  resolve(audio.duration);
+                  URL.revokeObjectURL(objUrl);
+                };
+                audio.onerror = () => {
+                  resolve(0);
+                  URL.revokeObjectURL(objUrl);
+                };
+                setTimeout(() => { resolve(0); URL.revokeObjectURL(objUrl); }, 10000);
+                audio.src = objUrl;
+              });
+              duration = audioDur;
+            } catch { /* non-fatal */ }
+          }
+
+          const now = Date.now();
+          const asset: Asset = {
+            id: uuidv4(),
+            name: file.name,
+            type: assetType,
+            path: `/imports/${file.name}`,
+            size: file.size,
+            createdAt: now,
+            modifiedAt: now,
+            thumbnail,
+            metadata: {
+              width,
+              height,
+              duration,
+              mimeType: mime,
+              fileSize: file.size,
+              importedAt: now,
+              source: 'imported',
+              usageCount: 0,
+              projectIds: [],
+              variationIds: [],
+              childAssetIds: [],
+            },
+          };
+
+          get().addAssetToFolder(asset, '/imports');
+          imported.push(asset);
+        }
+
+        return imported;
+      },
+
+      trackAssetUsage: (assetId: string) => {
+        const asset = get().assets.get(assetId);
+        if (!asset) return;
+        const meta = asset.metadata || {};
+        get().updateAsset(assetId, {
+          metadata: {
+            ...meta,
+            usageCount: (meta.usageCount || 0) + 1,
+            lastUsedAt: Date.now(),
+          },
+        });
+      },
+
+      associateAssetWithProject: (assetId: string, projectId: string) => {
+        const asset = get().assets.get(assetId);
+        if (!asset) return;
+        const meta = asset.metadata || {};
+        const existing = meta.projectIds || [];
+        if (existing.includes(projectId)) return;
+        get().updateAsset(assetId, {
+          metadata: { ...meta, projectIds: [...existing, projectId] },
+        });
+      },
+
+      dissociateAssetFromProject: (assetId: string, projectId: string) => {
+        const asset = get().assets.get(assetId);
+        if (!asset) return;
+        const meta = asset.metadata || {};
+        const existing = meta.projectIds || [];
+        get().updateAsset(assetId, {
+          metadata: { ...meta, projectIds: existing.filter((id) => id !== projectId) },
+        });
+      },
+
+      getProjectsForAsset: (assetId: string) => {
+        const asset = get().assets.get(assetId);
+        return asset?.metadata?.projectIds || [];
       },
 
       // Initialize file structure with project support

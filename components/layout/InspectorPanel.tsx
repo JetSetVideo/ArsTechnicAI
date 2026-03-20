@@ -19,6 +19,12 @@ import {
   GitBranch,
   Users,
   Layers,
+  Film,
+  Headphones,
+  FileText,
+  Eye,
+  HardDrive,
+  FolderOpen,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
@@ -354,10 +360,13 @@ const BananaIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 // ─── Tag config & helpers ─────────────────────────────────────────────────────
-const TAG_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  generated: { label: 'Generated', color: '#00d4aa', bg: 'rgba(0,212,170,0.12)', border: 'rgba(0,212,170,0.4)' },
-  image: { label: 'Imported', color: '#a855f7', bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.4)' },
-  placeholder: { label: 'Placeholder', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)' },
+const TAG_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
+  generated: { label: 'Generated', color: '#00d4aa', bg: 'rgba(0,212,170,0.12)', border: 'rgba(0,212,170,0.4)', icon: <Sparkles size={10} /> },
+  image: { label: 'Image', color: '#a855f7', bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.4)', icon: <Palette size={10} /> },
+  video: { label: 'Video', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.4)', icon: <Film size={10} /> },
+  audio: { label: 'Audio', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)', icon: <Headphones size={10} /> },
+  text: { label: 'Text', color: '#10b981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.4)', icon: <FileText size={10} /> },
+  placeholder: { label: 'Placeholder', color: '#6b7280', bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.4)', icon: <Layers size={10} /> },
 };
 
 const SIZE_PRESETS: { label: string; w: number; h: number; color: string }[] = [
@@ -382,6 +391,22 @@ const formatRelativeTime = (timestamp: number): string => {
   return new Date(timestamp).toLocaleDateString();
 };
 
+const formatFileSize = (bytes: number): string => {
+  if (!bytes || bytes === 0) return '';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+};
+
+const formatDuration = (seconds: number): string => {
+  if (!seconds || !isFinite(seconds)) return '';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
 // ─── Main InspectorPanel ──────────────────────────────────────────────────────
 export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSettings, onToggle }) => {
   const { data: session, status: sessionStatus } = useSession();
@@ -395,7 +420,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
 
   const { updateItem, addItem, removeSelected, copy, paste } = useCanvasStore();
   const allItems = useCanvasStore((s) => s.items);
-  const { updateAsset, addAsset, addAssetToFolder, getProjectGeneratedPath } = useFileStore();
+  const { updateAsset, addAsset, addAssetToFolder, getProjectGeneratedPath, getAsset } = useFileStore();
   const settings = useSettingsStore((s) => s.settings);
   const updateAIProvider = useSettingsStore((s) => s.updateAIProvider);
   const log = useLogStore((s) => s.log);
@@ -664,6 +689,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
               const tagCfg = TAG_CONFIG[selectedItem.type] || TAG_CONFIG.placeholder;
               const promptText = selectedItem.generationMeta?.prompt || selectedItem.prompt;
               const meta = selectedItem.generationMeta;
+              const mm = selectedItem.mediaMeta;
+              const linkedAsset = selectedItem.assetId ? getAsset(selectedItem.assetId) : undefined;
+              const assetMeta = linkedAsset?.metadata;
               const parentIds = meta?.parentIds ?? [];
               const childIds = meta?.childIds ?? [];
               const variations = meta?.variations ?? [];
@@ -673,6 +701,24 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
               const curW = Math.round(selectedItem.width * selectedItem.scale);
               const curH = Math.round(selectedItem.height * selectedItem.scale);
               const curSizeLabel = `${curW} × ${curH}`;
+
+              const mimeType = mm?.mimeType || assetMeta?.mimeType || '';
+              const fileSize = mm?.fileSize || assetMeta?.fileSize || linkedAsset?.size || 0;
+              const duration = mm?.duration || assetMeta?.duration || 0;
+              const fps = mm?.fps || assetMeta?.fps;
+              const codec = mm?.codec || assetMeta?.codec;
+              const channels = mm?.channels || assetMeta?.channels;
+              const sampleRate = mm?.sampleRate || assetMeta?.sampleRate;
+              const bitRate = mm?.bitRate || assetMeta?.bitRate;
+              const source = mm?.source || assetMeta?.source;
+              const usageCount = assetMeta?.usageCount || 0;
+              const variationIds = assetMeta?.variationIds || [];
+              const childAssetIds = assetMeta?.childAssetIds || [];
+              const projectIds = assetMeta?.projectIds || [];
+              const isVideo = selectedItem.type === 'video';
+              const isAudio = selectedItem.type === 'audio';
+              const isText = selectedItem.type === 'text';
+              const filmstripFrames = mm?.filmstripFrames || [];
 
               return (
                 <div className={styles.selectedInContent}>
@@ -690,10 +736,94 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
                       <img src={selectedItem.src} alt="" className={styles.selectedPreviewImg} />
                     ) : (
                       <div className={styles.selectedPreviewPlaceholder}>
-                        <Palette size={24} />
+                        {tagCfg.icon}
                         <span>No preview</span>
                       </div>
                     )}
+                    {/* Duration overlay for video/audio */}
+                    {duration > 0 && (
+                      <span className={styles.previewDuration}>{formatDuration(duration)}</span>
+                    )}
+                  </div>
+
+                  {/* Filmstrip for video */}
+                  {isVideo && filmstripFrames.length > 0 && (
+                    <div className={styles.filmstrip}>
+                      {filmstripFrames.map((frame, i) => (
+                        <img key={i} src={frame} alt={`Frame ${i + 1}`} className={styles.filmstripFrame} />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── Format & Media Info Card ── */}
+                  <div className={styles.mediaInfoCard}>
+                    <div className={styles.mediaInfoHeader}>
+                      <span className={styles.mediaInfoIcon} style={{ color: tagCfg.color }}>
+                        {tagCfg.icon}
+                      </span>
+                      <span className={styles.mediaInfoType} style={{ color: tagCfg.color }}>
+                        {tagCfg.label}
+                      </span>
+                      {mimeType && (
+                        <span className={styles.mediaInfoMime}>{mimeType}</span>
+                      )}
+                    </div>
+                    <div className={styles.mediaInfoGrid}>
+                      {curW > 0 && curH > 0 && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>Resolution</span>
+                          <span className={styles.mediaInfoValue}>{curW} × {curH}</span>
+                        </div>
+                      )}
+                      {fileSize > 0 && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>Size</span>
+                          <span className={styles.mediaInfoValue}>{formatFileSize(fileSize)}</span>
+                        </div>
+                      )}
+                      {duration > 0 && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>Duration</span>
+                          <span className={styles.mediaInfoValue}>{formatDuration(duration)}</span>
+                        </div>
+                      )}
+                      {fps != null && fps > 0 && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>FPS</span>
+                          <span className={styles.mediaInfoValue}>{fps}</span>
+                        </div>
+                      )}
+                      {codec && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>Codec</span>
+                          <span className={styles.mediaInfoValue}>{codec}</span>
+                        </div>
+                      )}
+                      {bitRate != null && bitRate > 0 && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>Bit Rate</span>
+                          <span className={styles.mediaInfoValue}>{formatFileSize(bitRate)}/s</span>
+                        </div>
+                      )}
+                      {channels != null && channels > 0 && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>Channels</span>
+                          <span className={styles.mediaInfoValue}>{channels === 1 ? 'Mono' : channels === 2 ? 'Stereo' : `${channels}ch`}</span>
+                        </div>
+                      )}
+                      {sampleRate != null && sampleRate > 0 && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>Sample Rate</span>
+                          <span className={styles.mediaInfoValue}>{(sampleRate / 1000).toFixed(1)} kHz</span>
+                        </div>
+                      )}
+                      {source && (
+                        <div className={styles.mediaInfoItem}>
+                          <span className={styles.mediaInfoLabel}>Source</span>
+                          <span className={styles.mediaInfoValue} style={{ textTransform: 'capitalize' }}>{source}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className={styles.propertyGrid}>
@@ -801,24 +931,38 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
                       </div>
                     )}
 
-                    {/* ── Metadata: Versions, Parents, Children ── */}
+                    {/* ── Usage & Tracking ── */}
                     <div className={styles.metaRow}>
+                      <div className={`${styles.metaChip} ${usageCount > 0 ? '' : styles.metaChipMuted}`}>
+                        <Eye size={10} />
+                        <span>{usageCount} use{usageCount !== 1 ? 's' : ''}</span>
+                      </div>
                       <div className={`${styles.metaChip} ${versionCount > 1 ? '' : styles.metaChipMuted}`}>
                         <GitBranch size={10} />
                         <span>v{versionCount}</span>
-                        {variations.length > 0 && (
-                          <span className={styles.metaChipBadge}>{variations.length} var</span>
+                        {(variations.length > 0 || variationIds.length > 0) && (
+                          <span className={styles.metaChipBadge}>{variations.length + variationIds.length} var</span>
                         )}
                       </div>
+                    </div>
+                    <div className={styles.metaRow}>
                       <div className={`${styles.metaChip} ${parentItems.length > 0 ? '' : styles.metaChipMuted}`}>
                         <Users size={10} />
-                        <span>{parentItems.length > 0 ? `${parentItems.length} parent${parentItems.length > 1 ? 's' : ''}` : 'No parent'}</span>
+                        <span>{parentItems.length > 0 ? `${parentItems.length} parent${parentItems.length > 1 ? 's' : ''}` : 'No parents'}</span>
                       </div>
-                      <div className={`${styles.metaChip} ${childItems.length > 0 ? '' : styles.metaChipMuted}`}>
+                      <div className={`${styles.metaChip} ${(childItems.length + childAssetIds.length) > 0 ? '' : styles.metaChipMuted}`}>
                         <Layers size={10} />
-                        <span>{childItems.length > 0 ? `${childItems.length} child${childItems.length > 1 ? 'ren' : ''}` : 'No children'}</span>
+                        <span>{(childItems.length + childAssetIds.length) > 0 ? `${childItems.length + childAssetIds.length} child${(childItems.length + childAssetIds.length) > 1 ? 'ren' : ''}` : 'No children'}</span>
                       </div>
                     </div>
+
+                    {/* ── Projects ── */}
+                    {projectIds.length > 0 && (
+                      <div className={styles.projectsRow}>
+                        <FolderOpen size={10} />
+                        <span className={styles.projectsLabel}>In {projectIds.length} project{projectIds.length > 1 ? 's' : ''}</span>
+                      </div>
+                    )}
 
                     {/* ── Footer: tag + timestamps ── */}
                     <div className={styles.inspectorFooter}>
@@ -826,6 +970,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
                         className={styles.itemTag}
                         style={{ background: tagCfg.bg, color: tagCfg.color, borderColor: tagCfg.border }}
                       >
+                        {tagCfg.icon}
                         {tagCfg.label}
                       </span>
                       {selectedItem.generationMeta?.model && (

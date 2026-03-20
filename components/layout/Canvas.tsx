@@ -24,6 +24,9 @@ import {
   BoxSelect,
   MousePointer2,
   Hand,
+  Film,
+  Headphones,
+  Music,
 } from 'lucide-react';
 import { useCanvasStore, useFileStore, useLogStore, useSettingsStore, useNodeStore } from '@/stores';
 import { Button } from '../ui/Button';
@@ -104,7 +107,10 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const NODE_COLORS: Record<string, string> = {
     generated: '#00d4aa',
     image: '#a855f7',
-    placeholder: '#f59e0b',
+    video: '#3b82f6',
+    audio: '#f59e0b',
+    text: '#10b981',
+    placeholder: '#6b7280',
   };
 
   const getOrbColor = (type: string) => NODE_COLORS[type] ?? '#00d4aa';
@@ -893,7 +899,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                       onClick={() => toggleNodeTab(item.id, 'name')}
                     >
                       <span className={styles.expandedTabIcon}>
-                        {isGenerated ? <Sparkles size={11} /> : <ImageIcon size={11} />}
+                        {isGenerated ? <Sparkles size={11} /> : item.type === 'video' ? <Film size={11} /> : item.type === 'audio' ? <Headphones size={11} /> : <ImageIcon size={11} />}
                       </span>
                       {item.name}
                     </div>
@@ -1141,14 +1147,77 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   </div>
                 )}
 
-                {item.src ? (
+                {/* ── Media rendering ── */}
+                {item.type === 'video' && item.src && (
+                  <div className={styles.videoNode}>
+                    <img
+                      src={item.src}
+                      alt={item.name}
+                      className={styles.itemImage}
+                      draggable={false}
+                    />
+                    {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0 && (
+                      <span className={styles.videoDuration}>
+                        {(() => {
+                          const d = item.mediaMeta.duration;
+                          const h = Math.floor(d / 3600);
+                          const m = Math.floor((d % 3600) / 60);
+                          const s = Math.floor(d % 60);
+                          return h > 0
+                            ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+                            : `${m}:${s.toString().padStart(2, '0')}`;
+                        })()}
+                      </span>
+                    )}
+                    <div className={styles.videoTypeBadge}><Film size={10} /> VIDEO</div>
+                    {/* Filmstrip layer */}
+                    {item.mediaMeta?.filmstripFrames && item.mediaMeta.filmstripFrames.length > 0 && (
+                      <div className={styles.videoFilmstrip}>
+                        {item.mediaMeta.filmstripFrames.map((frame, i) => (
+                          <img key={i} src={frame} alt="" className={styles.filmstripThumb} draggable={false} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {item.type === 'audio' && (
+                  <div className={styles.audioNode}>
+                    {item.src && (
+                      <img src={item.src} alt={item.name} className={styles.itemImage} draggable={false} />
+                    )}
+                    {!item.src && (
+                      <div className={styles.audioWaveform}>
+                        <Music size={28} />
+                        <span className={styles.audioName}>{item.name}</span>
+                      </div>
+                    )}
+                    {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0 && (
+                      <span className={styles.videoDuration}>
+                        {(() => {
+                          const d = item.mediaMeta.duration;
+                          const m = Math.floor(d / 60);
+                          const s = Math.floor(d % 60);
+                          return `${m}:${s.toString().padStart(2, '0')}`;
+                        })()}
+                      </span>
+                    )}
+                    <div className={styles.videoTypeBadge} style={{ background: 'rgba(245, 158, 11, 0.85)' }}>
+                      <Headphones size={10} /> AUDIO
+                    </div>
+                  </div>
+                )}
+
+                {item.type !== 'video' && item.type !== 'audio' && item.src && (
                   <img
                     src={item.src}
                     alt={item.name}
                     className={styles.itemImage}
                     draggable={false}
                   />
-                ) : (
+                )}
+
+                {!item.src && item.type !== 'audio' && (
                   <div className={styles.placeholder}>
                     <Layers size={32} />
                     <span>{item.name}</span>

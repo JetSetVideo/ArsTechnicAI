@@ -3,6 +3,7 @@ import { useFileStore } from '@/stores/fileStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useProjectsStore } from '@/stores/projectsStore';
+import { useNodeStore } from '@/stores/nodeStore';
 
 /**
  * Saves all workspace state to disk via the /api/workspace/save endpoint.
@@ -13,6 +14,7 @@ export async function saveToDisk(): Promise<boolean> {
     const projectId = useProjectStore.getState().projectId;
     const projectName = useProjectStore.getState().projectName || 'Untitled Project';
     const { items, viewport } = useCanvasStore.getState();
+    const { nodes, connections } = useNodeStore.getState();
     const settings = useSettingsStore.getState().settings;
     const projects = useProjectsStore.getState().projects;
     const fileState = useFileStore.getState().exportProjectFileState(projectName);
@@ -30,6 +32,7 @@ export async function saveToDisk(): Promise<boolean> {
             dataUrl: item.src,
           })),
         },
+        workflow: { nodes, connections },
         fileState: {
           projectPath: fileState.projectPath,
           selectedPath: fileState.selectedPath,

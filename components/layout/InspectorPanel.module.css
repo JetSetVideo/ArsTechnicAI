@@ -183,6 +183,7 @@
 }
 
 .selectedPreview {
+  position: relative;
   padding: 0 var(--panel-padding, 0.75rem) 10px;
 }
 
@@ -1178,4 +1179,130 @@
   margin-left: auto;
   text-align: right;
   white-space: nowrap;
+}
+
+/* ── Preview duration overlay ─────────────────────────────── */
+.previewDuration {
+  position: absolute;
+  bottom: 16px;
+  right: 14px;
+  padding: 2px 7px;
+  background: rgba(0, 0, 0, 0.78);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.02em;
+}
+
+/* ── Filmstrip (video frames) ─────────────────────────────── */
+.filmstrip {
+  display: flex;
+  gap: 2px;
+  padding: 0 var(--panel-padding, 0.75rem) 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.filmstripFrame {
+  width: 48px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: opacity 0.12s, border-color 0.12s;
+}
+
+.filmstripFrame:hover {
+  opacity: 1;
+  border-color: var(--accent-primary);
+}
+
+/* ── Media Info Card ──────────────────────────────────────── */
+.mediaInfoCard {
+  margin: 0 var(--panel-padding, 0.75rem) 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mediaInfoHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mediaInfoIcon {
+  display: flex;
+  align-items: center;
+}
+
+.mediaInfoType {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mediaInfoMime {
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+  font-family: monospace;
+  margin-left: auto;
+}
+
+.mediaInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.mediaInfoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mediaInfoItem:nth-child(odd) {
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mediaInfoLabel {
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.mediaInfoValue {
+  font-size: 0.6875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Projects row ─────────────────────────────────────────── */
+.projectsRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  color: var(--text-muted);
+  font-size: 0.625rem;
+}
+
+.projectsLabel {
+  color: var(--accent-primary);
+  font-weight: 500;
 }

@@ -138,18 +138,26 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   addItemFromAsset: (asset, x, y) => {
     const metadata = asset.metadata || {};
     const isPrompt = asset.type === 'prompt';
-    
-    // Default size proportional to screen, ~1/4 viewport width, max 320px
+
     const screenW = typeof window !== 'undefined' ? window.innerWidth : 1920;
-    const screenH = typeof window !== 'undefined' ? window.innerHeight : 1080;
     const defaultSize = Math.min(320, Math.round(screenW * 0.2));
-    
+
     const width = metadata.width || (isPrompt ? Math.min(280, defaultSize) : defaultSize);
     const height = metadata.height || (isPrompt ? Math.min(180, Math.round(defaultSize * 0.6)) : defaultSize);
 
+    const typeMap: Record<string, CanvasItem['type']> = {
+      image: 'image',
+      video: 'video',
+      audio: 'audio',
+      text: 'text',
+      prompt: 'placeholder',
+      folder: 'placeholder',
+    };
+    const itemType = typeMap[asset.type] || 'image';
+
     return get().addItem({
       assetId: asset.id,
-      type: isPrompt ? 'placeholder' : 'image',
+      type: itemType,
       x,
       y,
       width,
@@ -165,6 +173,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       lineageId: metadata.lineageId,
       version: metadata.version,
       parentAssetId: metadata.parentAssetId,
+      mediaMeta: {
+        mimeType: metadata.mimeType,
+        fileSize: metadata.fileSize,
+        duration: metadata.duration,
+        fps: metadata.fps,
+        codec: metadata.codec,
+        bitRate: metadata.bitRate,
+        channels: metadata.channels,
+        sampleRate: metadata.sampleRate,
+        source: metadata.source,
+      },
     });
   },
 

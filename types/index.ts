@@ -39,6 +39,21 @@ export interface AssetMetadata {
   lineageId?: UUID;
   version?: string;
   parentAssetId?: UUID;
+  localPath?: string;
+  isReference?: boolean;
+  fileSize?: number;
+  codec?: string;
+  fps?: number;
+  channels?: number;
+  sampleRate?: number;
+  bitRate?: number;
+  importedAt?: Timestamp;
+  projectIds?: UUID[];
+  usageCount?: number;
+  variationIds?: UUID[];
+  childAssetIds?: UUID[];
+  source?: 'imported' | 'generated' | 'duplicated' | 'modified';
+  lastUsedAt?: Timestamp;
 }
 
 export interface ImageAsset extends Asset {
@@ -69,7 +84,7 @@ export interface GenerationMeta {
 export interface CanvasItem {
   id: UUID;
   assetId?: UUID;
-  type: 'image' | 'generated' | 'placeholder';
+  type: 'image' | 'generated' | 'placeholder' | 'video' | 'audio' | 'text';
   x: number;
   y: number;
   width: number;
@@ -89,6 +104,20 @@ export interface CanvasItem {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   generationMeta?: GenerationMeta;
+  mediaMeta?: MediaMeta;
+}
+
+export interface MediaMeta {
+  mimeType?: string;
+  fileSize?: number;
+  duration?: number;
+  fps?: number;
+  codec?: string;
+  bitRate?: number;
+  channels?: number;
+  sampleRate?: number;
+  filmstripFrames?: string[];
+  source?: 'imported' | 'generated' | 'duplicated' | 'modified';
 }
 
 export interface CanvasViewport {

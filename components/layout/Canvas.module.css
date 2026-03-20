@@ -858,3 +858,104 @@
   background: #fff;
   border-radius: 1px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   VIDEO NODE
+   ═══════════════════════════════════════════════════════════ */
+.videoNode {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.videoDuration {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  padding: 2px 7px;
+  background: rgba(0, 0, 0, 0.82);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.02em;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.videoTypeBadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  background: rgba(59, 130, 246, 0.85);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff;
+  z-index: 5;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* Filmstrip at bottom of video node */
+.videoFilmstrip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 1px;
+  padding: 2px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.filmstripThumb {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AUDIO NODE
+   ═══════════════════════════════════════════════════════════ */
+.audioNode {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.audioWaveform {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%);
+  color: #f59e0b;
+}
+
+.audioName {
+  font-size: 0.625rem;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

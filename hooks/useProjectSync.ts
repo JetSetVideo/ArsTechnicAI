@@ -6,6 +6,7 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useProjectsStore } from '@/stores/projectsStore';
 import { useUserStore } from '@/stores/userStore';
 import { useFileStore } from '@/stores/fileStore';
+import { useNodeStore } from '@/stores/nodeStore';
 import { STORAGE_KEYS, WORKSPACE_DATA_KEYS_TO_CLEAR } from '@/constants/workspace';
 import { projectPathFromName } from '@/utils/project';
 import type { GenerationMeta } from '@/types';
@@ -35,8 +36,9 @@ export function saveProjectWorkspaceState(projectId: string, projectName: string
   if (!projectId || typeof window === 'undefined') return;
   try {
     const { items, viewport } = useCanvasStore.getState();
+    const { nodes, connections } = useNodeStore.getState();
     // Guard: don't overwrite existing saved state with empty canvas
-    if (items.length === 0) {
+    if (items.length === 0 && nodes.length === 0) {
       const existing = localStorage.getItem(canvasStateKey(projectId));
       if (existing) {
         try {
@@ -45,7 +47,7 @@ export function saveProjectWorkspaceState(projectId: string, projectName: string
         } catch { /* corrupt data, ok to overwrite */ }
       }
     }
-    const payload = { items, viewport, savedAt: Date.now() };
+    const payload = { items, viewport, workflow: { nodes, connections }, savedAt: Date.now() };
     localStorage.setItem(canvasStateKey(projectId), JSON.stringify(payload));
   } catch {
     // localStorage quota or serialisation errors are non-fatal
@@ -68,9 +70,14 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
   try {
     const raw = localStorage.getItem(canvasStateKey(projectId));
     if (raw) {
-      const { items, viewport } = JSON.parse(raw);
+      const { items, viewport, workflow } = JSON.parse(raw);
       const canvas = useCanvasStore.getState();
       if (viewport) canvas.setViewport(viewport);
+
+      if (workflow) {
+        useNodeStore.getState().loadWorkflow(JSON.stringify(workflow));
+      }
+
       if (Array.isArray(items) && items.length > 0) {
         canvas.clearCanvas();
         for (const item of items) canvas.addItem(item);
@@ -87,6 +94,9 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
     const diskRes = await fetch(`/api/workspace/load?projectId=${encodeURIComponent(projectId)}`);
     if (diskRes.ok) {
       const diskData = await diskRes.json();
+      if (diskData?.workflow) {
+        useNodeStore.getState().loadWorkflow(JSON.stringify(diskData.workflow));
+      }
       const diskCanvas = diskData?.canvas;
       if (diskCanvas?.items?.length) {
         const canvasStore = useCanvasStore.getState();
@@ -244,6 +254,7 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
     if (!projectId || !session?.user) return;
 
     const { items, viewport } = useCanvasStore.getState();
+    const { nodes, connections } = useNodeStore.getState();
 
     try {
       await fetch(`/api/projects/${projectId}/canvas`, {
@@ -271,6 +282,7 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
             nodeData: item.generationMeta ? JSON.parse(JSON.stringify(item.generationMeta)) : null,
           })),
           edges: [],
+          workflow: nodes.length > 0 ? { nodes, connections } : undefined,
         }),
       });
 

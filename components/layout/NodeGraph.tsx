@@ -3,7 +3,6 @@ import {
   Play,
   Trash2,
   Plus,
-  Save,
   Upload,
   Loader2,
   ChevronDown,
@@ -40,7 +39,7 @@ const AddNodeMenu: React.FC<{ onAdd: (type: NodeType) => void; onClose: () => vo
 
 // ─── Main NodeGraph ───────────────────────────────────────────────────────────
 export const NodeGraph: React.FC = () => {
-  const { nodes, connections, isRunning, addNode, clearWorkflow, saveWorkflow, loadWorkflow, cancelConnection, pendingConnection } = useNodeStore();
+  const { nodes, connections, isRunning, addNode, clearWorkflow, loadWorkflow, cancelConnection, pendingConnection } = useNodeStore();
   const { settings } = useSettingsStore();
   const { addItem } = useCanvasStore();
 
@@ -152,17 +151,6 @@ export const NodeGraph: React.FC = () => {
       });
   }, [settings.aiProvider.apiKey, addItem]);
 
-  const handleSave = useCallback(() => {
-    const json = saveWorkflow();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'workflow.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [saveWorkflow]);
-
   const handleLoad = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -205,9 +193,6 @@ export const NodeGraph: React.FC = () => {
 
         <div className={styles.toolbarDivider} />
 
-        <button className={styles.toolbarBtn} onClick={handleSave} title="Save workflow JSON">
-          <Save size={16} />
-        </button>
         <button className={styles.toolbarBtn} onClick={() => fileInputRef.current?.click()} title="Load workflow JSON">
           <Upload size={16} />
         </button>
