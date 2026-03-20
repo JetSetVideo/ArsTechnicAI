@@ -189,6 +189,25 @@ describe('GenerationStore', () => {
       expect(state.isGenerating).toBe(false);
     });
 
+    it('reset restores defaults for prompts, dimensions, and jobs', () => {
+      const store = useGenerationStore.getState();
+      store.setPrompt('x');
+      store.setNegativePrompt('y');
+      store.setDimensions(256, 512);
+      store.startGeneration({ prompt: 'Job', width: 100, height: 100, model: 'm' });
+
+      store.reset();
+
+      const state = useGenerationStore.getState();
+      expect(state.jobs).toHaveLength(0);
+      expect(state.prompt).toBe('');
+      expect(state.negativePrompt).toBe('');
+      expect(state.width).toBe(1024);
+      expect(state.height).toBe(1024);
+      expect(state.isGenerating).toBe(false);
+      expect(state.currentJobId).toBeNull();
+    });
+
     it('should maintain job order (newest first)', () => {
       const store = useGenerationStore.getState();
       

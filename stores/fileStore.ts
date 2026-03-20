@@ -217,10 +217,17 @@ export const useFileStore = create<FileState>()(
         set((state) => {
           const newAssets = new Map(state.assets);
           const existing = newAssets.get(id);
-          if (existing) {
-            newAssets.set(id, { ...existing, ...updates, modifiedAt: Date.now() });
-          }
-          return { assets: newAssets };
+          if (!existing) return state;
+          const updated = { ...existing, ...updates, modifiedAt: Date.now() };
+          newAssets.set(id, updated);
+          // Sync the embedded FileNode.asset reference so the tree stays in sync
+          const syncNodeAsset = (nodes: FileNode[]): FileNode[] =>
+            nodes.map((node) => ({
+              ...node,
+              asset: node.asset?.id === id ? updated : node.asset,
+              children: node.children ? syncNodeAsset(node.children) : node.children,
+            }));
+          return { assets: newAssets, rootNodes: syncNodeAsset(state.rootNodes) };
         });
       },
 
@@ -256,6 +263,12 @@ export const useFileStore = create<FileState>()(
           modifiedAt: Date.now(),
           metadata: {
             prompt: normalized,
+            mimeType: 'text/plain',
+            source: 'generated',
+            usageCount: 0,
+            projectIds: [],
+            variationIds: [],
+            childAssetIds: [],
           },
         };
 
@@ -441,13 +454,9 @@ export const useFileStore = create<FileState>()(
         if (findNodeByPathInTree(get().rootNodes, nextPath)) return false;
 
         const descendants = listDescendantNodes(sourceNode);
-        const assetPathChanges = descendants
-          .filter((node) => node.asset?.id)
-          .map((node) => ({
-            id: node.asset!.id,
-            oldPath: normalizePath(node.asset!.path),
-            newPath: normalizePath(node.asset!.path).replace(targetPath, nextPath),
-          }));
+        const renamedAssetIds = new Set(
+          descendants.filter((node) => node.asset?.id).map((node) => node.asset!.id)
+        );
 
         let renamed = false;
         set((state) => {
@@ -460,6 +469,8 @@ export const useFileStore = create<FileState>()(
                 const updatedAsset = node.asset
                   ? {
                       ...node.asset,
+                      // Update name only for the directly renamed node
+                      name: nodePath === targetPath ? safeName : node.asset.name,
                       path: normalizePath(node.asset.path).replace(targetPath, nextPath),
                       modifiedAt: Date.now(),
                     }
@@ -477,11 +488,17 @@ export const useFileStore = create<FileState>()(
                 : node;
             });
 
+          const nextRoot = renameInTree(state.rootNodes);
           const nextAssets = new Map(state.assets);
-          assetPathChanges.forEach(({ id, newPath }) => {
-            const existing = nextAssets.get(id);
-            if (existing) nextAssets.set(id, { ...existing, path: newPath, modifiedAt: Date.now() });
-          });
+          const syncRenamedAssetsFromTree = (nodes: FileNode[]) => {
+            for (const node of nodes) {
+              if (node.asset && renamedAssetIds.has(node.asset.id)) {
+                nextAssets.set(node.asset.id, node.asset);
+              }
+              if (node.children) syncRenamedAssetsFromTree(node.children);
+            }
+          };
+          syncRenamedAssetsFromTree(nextRoot);
 
           const nextExpanded = new Set<string>();
           state.expandedPaths.forEach((p) => {
@@ -498,7 +515,7 @@ export const useFileStore = create<FileState>()(
               : state.selectedPath;
 
           return {
-            rootNodes: renameInTree(state.rootNodes),
+            rootNodes: nextRoot,
             assets: nextAssets,
             expandedPaths: nextExpanded,
             selectedPath: nextSelectedPath,

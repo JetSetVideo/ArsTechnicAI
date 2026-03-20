@@ -69,6 +69,8 @@ interface CanvasState {
 
   // Clear
   clearCanvas: () => void;
+  /** Full reset: items, selection, history, clipboard, viewport (e.g. project switch). */
+  clearAll: () => void;
 
   // History
   snapshot: () => void;
@@ -301,5 +303,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   clearCanvas: () => {
     get().snapshot();
     set({ items: [], selectedIds: [] });
+  },
+
+  clearAll: () => {
+    set({
+      items: [],
+      selectedIds: [],
+      clipboard: [],
+      past: [],
+      future: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    });
   },
 }));

@@ -49,7 +49,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const meta = await readMetaFile();
-    meta.generations.push(record);
+    const idx = meta.generations.findIndex((g) => g.id === record.id);
+    if (idx >= 0) {
+      meta.generations[idx] = record;
+    } else {
+      meta.generations.push(record);
+    }
     meta.updatedAt = Date.now();
     await writeMetaFile(meta);
 

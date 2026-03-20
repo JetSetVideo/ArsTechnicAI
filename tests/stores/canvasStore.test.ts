@@ -28,6 +28,8 @@ describe('CanvasStore', () => {
       selectedIds: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       clipboard: [],
+      past: [],
+      future: [],
     });
   });
 
@@ -116,6 +118,25 @@ describe('CanvasStore', () => {
       store.clearCanvas();
       
       expect(useCanvasStore.getState().items).toHaveLength(0);
+    });
+
+    it('clearAll resets items, selection, history, clipboard, and viewport', () => {
+      const store = useCanvasStore.getState();
+      const { id, createdAt, zIndex, ...itemData } = createMockCanvasItem();
+      store.addItem(itemData);
+      store.setViewport({ x: 50, y: 50, zoom: 2 });
+      store.copy();
+      store.snapshot();
+
+      store.clearAll();
+
+      const state = useCanvasStore.getState();
+      expect(state.items).toHaveLength(0);
+      expect(state.selectedIds).toHaveLength(0);
+      expect(state.clipboard).toHaveLength(0);
+      expect(state.past).toHaveLength(0);
+      expect(state.future).toHaveLength(0);
+      expect(state.viewport).toEqual({ x: 0, y: 0, zoom: 1 });
     });
 
     it('should duplicate an item', () => {

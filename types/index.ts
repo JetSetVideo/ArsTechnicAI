@@ -32,6 +32,7 @@ export interface AssetMetadata {
   duration?: number;
   mimeType?: string;
   prompt?: string;
+  negativePrompt?: string;
   model?: string;
   seed?: number;
   parentId?: UUID;

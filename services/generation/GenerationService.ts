@@ -24,7 +24,12 @@ import { useSettingsStore, getRecommendedModelFallbacks } from '@/stores/setting
 import { useUserStore } from '@/stores/userStore';
 import { useProjectsStore } from '@/stores/projectsStore';
 import { useProductionStore } from '@/stores/productionStore';
-import type { GenerationResult, CanvasItem } from '@/types';
+import type { AssetMetadata, GenerationResult, CanvasItem } from '@/types';
+
+function appendChildAssetId(meta: AssetMetadata | undefined, childId: string): string[] {
+  const cur = meta?.childAssetIds ?? [];
+  return cur.includes(childId) ? cur : [...cur, childId];
+}
 
 export interface GenerateImageInput {
   prompt: string;
@@ -232,19 +237,58 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
     });
 
     const generatedFolderPath = fileStore.getProjectGeneratedPath();
+    const now = Date.now();
     fileStore.addAssetToFolder(
       {
         id: assetId,
         name: filename,
         type: 'image',
         path: `${generatedFolderPath}/${filename}`,
-        createdAt: Date.now(),
-        modifiedAt: Date.now(),
+        createdAt: now,
+        modifiedAt: now,
         thumbnail: imageSrc,
-        metadata: { width, height, prompt, model: settings.aiProvider.model, seed, promptId: promptAsset.id, lineageId, parentAssetId, version: versionLabel },
+        metadata: {
+          width,
+          height,
+          prompt,
+          negativePrompt,
+          model: settings.aiProvider.model,
+          seed,
+          promptId: promptAsset.id,
+          lineageId,
+          parentAssetId,
+          version: versionLabel,
+          source: 'generated',
+          usageCount: 0,
+          projectIds: [currentProject.id],
+          variationIds: [],
+          childAssetIds: [],
+        },
       },
       generatedFolderPath,
     );
+
+    fileStore.associateAssetWithProject(assetId, currentProject.id);
+
+    const promptForLineage = fileStore.getAsset(promptAsset.id) ?? promptAsset;
+    fileStore.updateAsset(promptAsset.id, {
+      metadata: {
+        ...promptForLineage.metadata,
+        childAssetIds: appendChildAssetId(promptForLineage.metadata, assetId),
+      },
+    });
+
+    if (parentAssetId) {
+      const parent = fileStore.getAsset(parentAssetId);
+      if (parent) {
+        fileStore.updateAsset(parentAssetId, {
+          metadata: {
+            ...parent.metadata,
+            childAssetIds: appendChildAssetId(parent.metadata, assetId),
+          },
+        });
+      }
+    }
 
     useProjectsStore.getState().updateProject(currentProject.id, { thumbnail: imageSrc });
     recordRun(currentProject, prompt, negativePrompt, settings, job.id, 'completed', width, height, assetId, seed);

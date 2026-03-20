@@ -25,6 +25,8 @@ interface GenerationState {
   getJob: (id: string) => GenerationJob | undefined;
   getRecentJobs: (count: number) => GenerationJob[];
   clearJobs: () => void;
+  /** Reset store to initial UI/job state (prompts, dimensions, jobs). */
+  reset: () => void;
 }
 
 export const useGenerationStore = create<GenerationState>((set, get) => ({
@@ -99,4 +101,15 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   getRecentJobs: (count) => get().jobs.slice(0, count),
 
   clearJobs: () => set({ jobs: [], currentJobId: null, isGenerating: false }),
+
+  reset: () =>
+    set({
+      jobs: [],
+      currentJobId: null,
+      prompt: '',
+      negativePrompt: '',
+      width: 1024,
+      height: 1024,
+      isGenerating: false,
+    }),
 }));

@@ -33,8 +33,8 @@ function seedSettings(overrides: Record<string, unknown> = {}) {
 describe('GenerationService – generateImage', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    useGenerationStore.getState().reset?.();
-    useCanvasStore.getState().clearAll?.();
+    useGenerationStore.getState().reset();
+    useCanvasStore.getState().clearAll();
   });
 
   // ── Validation ─────────────────────────────────────────────

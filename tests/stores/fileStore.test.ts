@@ -293,4 +293,125 @@ describe('FileStore', () => {
       expect(state.expandedPaths.has(generatedPath)).toBe(true);
     });
   });
+
+  describe('Metadata sync, lineage, project tracking, rename/move/delete', () => {
+    it('createPromptAsset includes standard metadata fields', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Meta Project');
+      const asset = store.createPromptAsset('  A unique prompt for metadata test  ');
+      expect(asset.type).toBe('prompt');
+      expect(asset.metadata?.prompt?.trim()).toBe('A unique prompt for metadata test');
+      expect(asset.metadata?.mimeType).toBe('text/plain');
+      expect(asset.metadata?.source).toBe('generated');
+      expect(asset.metadata?.usageCount).toBe(0);
+      expect(asset.metadata?.projectIds).toEqual([]);
+      expect(asset.metadata?.variationIds).toEqual([]);
+      expect(asset.metadata?.childAssetIds).toEqual([]);
+    });
+
+    it('updateAsset keeps tree node.asset in sync with Map', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Sync Project');
+      const genPath = store.getProjectGeneratedPath();
+      const asset = createMockAsset({
+        id: 'sync-asset-1',
+        name: 'pic.png',
+        path: `${genPath}/pic.png`,
+      });
+      store.addAssetToFolder(asset as any, genPath);
+      store.updateAsset('sync-asset-1', { name: 'renamed.png' });
+      const fromMap = store.getAsset('sync-asset-1');
+      const node = store.findNodeByPath(`${genPath}/pic.png`);
+      expect(fromMap?.name).toBe('renamed.png');
+      expect(node?.asset?.name).toBe('renamed.png');
+      expect(node?.asset?.id).toBe('sync-asset-1');
+    });
+
+    it('renameNode updates asset name and path in both Map and tree', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Rename Project');
+      const genPath = store.getProjectGeneratedPath();
+      const asset = createMockAsset({
+        id: 'rename-asset-1',
+        name: 'before.png',
+        path: `${genPath}/before.png`,
+      });
+      store.addAssetToFolder(asset as any, genPath);
+      const oldFilePath = `${genPath}/before.png`;
+      expect(store.renameNode(oldFilePath, 'after.png')).toBe(true);
+
+      const fromMap = store.getAsset('rename-asset-1');
+      expect(fromMap?.name).toBe('after.png');
+      expect(fromMap?.path).toBe(`${genPath}/after.png`);
+
+      const node = store.findNodeByPath(`${genPath}/after.png`);
+      expect(node?.asset?.name).toBe('after.png');
+      expect(node?.asset?.path).toBe(`${genPath}/after.png`);
+      expect(node?.name).toBe('after.png');
+    });
+
+    it('getAssetsByLineage returns assets sharing lineageId', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Lineage Project');
+      const genPath = store.getProjectGeneratedPath();
+      const a1 = createMockAsset({
+        id: 'lin-a',
+        name: 'a.png',
+        path: `${genPath}/a.png`,
+        metadata: { lineageId: 'lineage-x' },
+      });
+      const a2 = createMockAsset({
+        id: 'lin-b',
+        name: 'b.png',
+        path: `${genPath}/b.png`,
+        metadata: { lineageId: 'lineage-x' },
+      });
+      store.addAssetToFolder(a1 as any, genPath);
+      store.addAssetToFolder(a2 as any, genPath);
+      const list = store.getAssetsByLineage('lineage-x').map((a) => a.id).sort();
+      expect(list).toEqual(['lin-a', 'lin-b'].sort());
+    });
+
+    it('associateAssetWithProject and getProjectsForAsset track project ids', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Assoc Project');
+      const asset = createMockAsset({ id: 'assoc-1' });
+      store.addAsset(asset as any);
+      store.associateAssetWithProject('assoc-1', 'project-42');
+      store.associateAssetWithProject('assoc-1', 'project-42');
+      expect(store.getProjectsForAsset('assoc-1')).toEqual(['project-42']);
+      store.dissociateAssetFromProject('assoc-1', 'project-42');
+      expect(store.getProjectsForAsset('assoc-1')).toEqual([]);
+    });
+
+    it('moveNode updates asset path in Map and tree', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Move Project');
+      const projectPath = useFileStore.getState().currentProjectPath;
+      const genPath = store.getProjectGeneratedPath();
+      const exportsPath = `${projectPath}/exports`;
+      const asset = createMockAsset({
+        id: 'move-1',
+        name: 'file.png',
+        path: `${genPath}/file.png`,
+      });
+      store.addAssetToFolder(asset as any, genPath);
+      expect(store.moveNode(`${genPath}/file.png`, exportsPath)).toBe(true);
+      const moved = store.getAsset('move-1');
+      expect(moved?.path).toBe(`${exportsPath}/file.png`);
+      const node = store.findNodeByPath(`${exportsPath}/file.png`);
+      expect(node?.asset?.path).toBe(`${exportsPath}/file.png`);
+    });
+
+    it('deleteNode removes descendant assets from Map', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Delete Project');
+      const genPath = store.getProjectGeneratedPath();
+      const asset = createMockAsset({ id: 'del-1', name: 'gone.png', path: `${genPath}/gone.png` });
+      store.addAssetToFolder(asset as any, genPath);
+      expect(store.getAsset('del-1')).toBeDefined();
+      expect(store.deleteNode(genPath)).toBe(true);
+      expect(store.getAsset('del-1')).toBeUndefined();
+    });
+  });
 });
