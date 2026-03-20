@@ -157,7 +157,7 @@
 /* Grid */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--space-4);
 }
 
@@ -168,7 +168,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 200px;
+  min-height: 280px;
   background: var(--bg-tertiary);
   border: 2px dashed var(--border-color);
   border-radius: var(--radius-lg);
@@ -183,8 +183,11 @@
   background: var(--accent-primary-alpha);
 }
 
-/* Project Card */
+/* ═══════════════════════════════════════════════════
+   PROJECT CARD — overlay design
+   ═══════════════════════════════════════════════════ */
 .projectCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
@@ -192,27 +195,30 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+  min-height: 280px;
 }
 
 .projectCard:hover {
   border-color: var(--accent-primary);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   transform: translateY(-2px);
 }
 
-/* Thumbnail */
+/* Thumbnail — fills the entire card */
 .thumbnail {
-  position: relative;
-  aspect-ratio: 16 / 10;
+  position: absolute;
+  inset: 0;
   background: var(--bg-tertiary);
   overflow: hidden;
+  z-index: 0;
 }
 
 .thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .placeholderThumb {
@@ -224,52 +230,72 @@
   color: var(--text-muted);
 }
 
-.favoriteButton,
-.menuButton {
-  position: absolute;
-  top: var(--space-2);
-  padding: var(--space-1);
-  background: var(--bg-overlay);
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
+/* ── Top toolbar row ────────────────────────────── */
+.cardToolbar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2);
   opacity: 0;
-  transition: all var(--transition-fast);
+  transition: opacity 0.15s;
 }
 
-.projectCard:hover .favoriteButton,
-.projectCard:hover .menuButton {
+.projectCard:hover .cardToolbar {
   opacity: 1;
 }
 
-.favoriteButton {
-  right: calc(var(--space-2) + 28px);
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.favoriteButton:hover {
-  color: var(--accent-tertiary);
+.toolbarRight {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.menuButton {
-  right: var(--space-2);
+.toolbarBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
 }
 
-.menuButton:hover {
+.toolbarBtn:hover {
+  background: rgba(0, 0, 0, 0.75);
   color: var(--text-primary);
 }
 
-/* Dropdown Menu */
+.toolbarBtnFav:hover {
+  color: var(--accent-tertiary);
+}
+
+/* ── Context menu (top-right) ──────────────────── */
 .menu {
   position: absolute;
-  top: calc(var(--space-2) + 28px);
-  right: var(--space-2);
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 180px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-  z-index: 10;
+  z-index: 30;
 }
 
 .menu button {
@@ -283,7 +309,7 @@
   color: var(--text-primary);
   font-size: var(--font-sm);
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background 0.1s;
 }
 
 .menu button:hover {
@@ -298,24 +324,94 @@
   background: rgba(239, 68, 68, 0.1) !important;
 }
 
-/* Info */
+.menuDivider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 2px 0;
+}
+
+/* Cover picker sub-list inside menu */
+.coverPickerLabel {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.coverPickerItem {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+}
+
+.coverPickerThumb {
+  width: 28px;
+  height: 20px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+}
+
+.coverPickerName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+}
+
+.coverPickerActive {
+  color: var(--accent-primary) !important;
+}
+
+/* ═══════════════════════════════════════════════════
+   INFO OVERLAY — slides over the bottom of the card
+   ═══════════════════════════════════════════════════ */
 .info {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
   padding: var(--space-3);
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.80) 0%,
+    rgba(0, 0, 0, 0.72) 40%,
+    rgba(0, 0, 0, 0.40) 75%,
+    transparent 100%
+  );
+  transition: padding-top 0.25s ease;
+}
+
+/* When assets drawer is expanded, grow the overlay */
+.infoExpanded {
+  padding-top: var(--space-2);
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.80) 0%,
+    rgba(0, 0, 0, 0.78) 60%,
+    rgba(0, 0, 0, 0.55) 85%,
+    rgba(0, 0, 0, 0.30) 100%
+  );
 }
 
 .name {
   font-size: var(--font-sm);
   font-weight: 600;
-  margin: 0 0 var(--space-2) 0;
+  margin: 0 0 var(--space-1) 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: flex;
   align-items: center;
+  color: #fff;
 }
 
 .pathPrefix {
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.45);
   font-weight: 400;
   margin-right: 4px;
   font-family: monospace;
@@ -327,20 +423,21 @@
   gap: var(--space-2);
   margin-bottom: var(--space-2);
   font-size: var(--font-2xs);
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .detailItem {
-  background: var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.08);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .meta {
   display: flex;
+  align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .metaItem {
@@ -348,21 +445,127 @@
   align-items: center;
   gap: var(--space-1);
   font-size: var(--font-xs);
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Asset toggle button ───────────────────────── */
+.assetButton {
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  font: inherit;
+  border-radius: var(--radius-sm);
+  transition: color 0.12s, background 0.12s;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-xs);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.assetButton:hover {
+  color: var(--accent-primary);
+  background: rgba(0, 212, 170, 0.12);
+}
+
+.assetButtonActive {
+  color: var(--accent-primary);
+  background: rgba(0, 212, 170, 0.12);
+}
+
+.assetButtonChevron {
+  transition: transform 0.2s ease;
+}
+
+.assetButtonChevronOpen {
+  transform: rotate(180deg);
+}
+
+/* ── Expanded asset list (inline, full-width) ──── */
+.assetListExpanded {
+  margin-top: var(--space-2);
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.assetListItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.1s;
+}
+
+.assetListItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.assetListThumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.assetListIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+}
+
+.assetListName {
+  font-size: var(--font-xs);
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assetListType {
+  font-size: var(--font-2xs);
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.assetListEmpty {
+  padding: var(--space-2) 0;
+  font-size: var(--font-xs);
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
 }
 
 .tags {
   display: flex;
   gap: var(--space-1);
   flex-wrap: wrap;
+  margin-top: var(--space-1);
 }
 
 .tag {
   padding: 2px var(--space-2);
-  background: var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-sm);
   font-size: var(--font-2xs);
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 /* Empty State */
@@ -469,7 +672,7 @@
 /* Responsive */
 @media (max-width: 768px) {
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: var(--space-3);
   }
 }

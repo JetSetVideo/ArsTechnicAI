@@ -5,6 +5,7 @@ import { InspectorPanel } from './InspectorPanel';
 import { Canvas } from './Canvas';
 import { NodeGraph } from './NodeGraph';
 import { Timeline } from './Timeline';
+import { ConnectionOverlay } from './ConnectionOverlay';
 import { SettingsModal } from './SettingsModal';
 import { ActionLog } from './ActionLog';
 import { useLogStore } from '@/stores';
@@ -81,6 +82,7 @@ export const AppShell: React.FC = () => {
   // Sync settings with DB
   useSettingsSync();
 
+  const mainAreaRef = useRef<HTMLDivElement>(null);
   const isResizingExplorer = useRef(false);
   const isResizingInspector = useRef(false);
   const isResizingTimeline = useRef(false);
@@ -188,17 +190,24 @@ export const AppShell: React.FC = () => {
   }, []);
 
   const handleModeChange = useCallback((newMode: WorkspaceMode) => {
+    if (newMode === 'timeline') {
+      // Toggle timeline visibility when clicking the Timeline button
+      setLayout((prev) => {
+        const next = !prev.timeline.visible;
+        return { ...prev, timeline: { ...prev.timeline, visible: next } };
+      });
+      if (mode !== 'timeline') setMode(newMode);
+      log('settings_change', `Toggled timeline`, { mode: newMode });
+      return;
+    }
+
     setMode(newMode);
     log('settings_change', `Switched to ${newMode} mode`, { mode: newMode });
 
-    if (newMode === 'timeline') {
-      setLayout((prev) => ({ ...prev, timeline: { ...prev.timeline, visible: true } }));
-    }
-    // Hide inspector in rework (node graph) mode to maximise graph space
     if (newMode === 'rework') {
       setLayout((prev) => ({ ...prev, timeline: { ...prev.timeline, visible: false } }));
     }
-  }, [log]);
+  }, [log, mode]);
 
   return (
     <div id="app-shell-layout-root" className={styles.appShellLayoutRoot}>
@@ -233,7 +242,7 @@ export const AppShell: React.FC = () => {
           </button>
         )}
 
-        <div className={styles.mainArea}>
+        <div ref={mainAreaRef} className={styles.mainArea}>
           {showNodeGraph ? (
             <NodeGraph />
           ) : (
@@ -244,6 +253,9 @@ export const AppShell: React.FC = () => {
                   <div className={styles.resizeHandleHorizontal} onMouseDown={handleTimelineResizeStart} />
                   <Timeline height={timelineHeight} />
                 </>
+              )}
+              {layout.timeline.visible && (
+                <ConnectionOverlay containerRef={mainAreaRef} />
               )}
             </>
           )}

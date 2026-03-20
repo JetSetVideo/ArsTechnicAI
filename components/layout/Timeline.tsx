@@ -51,9 +51,77 @@ export const Timeline: React.FC<TimelineProps> = ({ height }) => {
 
   const playheadPosition = (currentTime / duration) * 100;
 
+  const visualItems = items.filter(
+    (item) => item.type === 'image' || item.type === 'generated',
+  );
+
   return (
     <div className={styles.timeline} style={{ height }}>
-      {/* Transport controls */}
+      {/* ── Tracks + Ruler area (scrollable body) ──────── */}
+      <div className={styles.tracksBody}>
+        {/* Tracks */}
+        <div className={styles.tracks} onClick={handleSeek}>
+          {/* Video track */}
+          <div className={styles.track}>
+            <div className={styles.trackHeader}>
+              <span className={styles.trackLabel}>V1</span>
+            </div>
+            <div className={styles.trackContent} style={{ transform: `scaleX(${zoom})` }}>
+              {visualItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  data-item-id={item.id}
+                  className={styles.clip}
+                  style={{
+                    left: `${(index * 5) % 80}%`,
+                    width: '15%',
+                  }}
+                  title={item.name}
+                >
+                  {item.src && (
+                    <img src={item.src} alt="" className={styles.clipThumb} />
+                  )}
+                  <span className={styles.clipName}>{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Audio track placeholder */}
+          <div className={styles.track}>
+            <div className={styles.trackHeader}>
+              <span className={styles.trackLabel}>A1</span>
+            </div>
+            <div className={styles.trackContent}>
+              <div className={styles.emptyTrack}>
+                <span>Drop clips here to begin editing</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Playhead */}
+          <div
+            className={styles.playhead}
+            style={{ left: `calc(60px + ${playheadPosition}% * (100% - 60px) / 100)` }}
+          >
+            <div className={styles.playheadHead} />
+            <div className={styles.playheadLine} />
+          </div>
+        </div>
+
+        {/* Ruler (below tracks) */}
+        <div className={styles.ruler}>
+          <div className={styles.rulerContent} style={{ transform: `scaleX(${zoom})` }}>
+            {Array.from({ length: Math.ceil(duration) + 1 }).map((_, i) => (
+              <div key={i} className={styles.rulerMark} style={{ left: `${(i / duration) * 100}%` }}>
+                <span>{i}s</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Transport controls (pinned to bottom) ──────── */}
       <div className={styles.transport}>
         <div className={styles.transportControls}>
           <Button
@@ -116,68 +184,6 @@ export const Timeline: React.FC<TimelineProps> = ({ height }) => {
               <Plus size={12} />
             </Button>
           </div>
-        </div>
-      </div>
-
-      {/* Timeline ruler */}
-      <div className={styles.ruler}>
-        <div className={styles.rulerContent} style={{ transform: `scaleX(${zoom})` }}>
-          {Array.from({ length: Math.ceil(duration) + 1 }).map((_, i) => (
-            <div key={i} className={styles.rulerMark} style={{ left: `${(i / duration) * 100}%` }}>
-              <span>{i}s</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tracks area */}
-      <div className={styles.tracks} onClick={handleSeek}>
-        {/* Video track */}
-        <div className={styles.track}>
-          <div className={styles.trackHeader}>
-            <span className={styles.trackLabel}>V1</span>
-          </div>
-          <div className={styles.trackContent} style={{ transform: `scaleX(${zoom})` }}>
-            {items
-              .filter((item) => item.type === 'image' || item.type === 'generated')
-              .map((item, index) => (
-                <div
-                  key={item.id}
-                  className={styles.clip}
-                  style={{
-                    left: `${(index * 5) % 80}%`,
-                    width: '15%',
-                  }}
-                  title={item.name}
-                >
-                  {item.src && (
-                    <img src={item.src} alt="" className={styles.clipThumb} />
-                  )}
-                  <span className={styles.clipName}>{item.name}</span>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {/* Audio track placeholder */}
-        <div className={styles.track}>
-          <div className={styles.trackHeader}>
-            <span className={styles.trackLabel}>A1</span>
-          </div>
-          <div className={styles.trackContent}>
-            <div className={styles.emptyTrack}>
-              <span>Drop clips here to begin editing</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Playhead */}
-        <div
-          className={styles.playhead}
-          style={{ left: `calc(60px + ${playheadPosition}% * (100% - 60px) / 100)` }}
-        >
-          <div className={styles.playheadHead} />
-          <div className={styles.playheadLine} />
         </div>
       </div>
     </div>

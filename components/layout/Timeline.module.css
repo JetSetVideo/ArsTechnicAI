@@ -6,14 +6,172 @@
   overflow: hidden;
 }
 
-/* Transport controls */
+/* ── Scrollable body: tracks + ruler ─────────────── */
+.tracksBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Tracks ──────────────────────────────────────── */
+.tracks {
+  position: relative;
+  overflow-x: hidden;
+}
+
+.track {
+  display: flex;
+  height: 48px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.trackHeader {
+  width: 60px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+  padding-left: var(--space-2, 0.5rem);
+}
+
+.trackLabel {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.trackContent {
+  flex: 1;
+  position: relative;
+  background: var(--bg-primary);
+  transform-origin: left center;
+}
+
+.emptyTrack {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* ── Clips ────────────────────────────────────────── */
+.clip {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  background: var(--accent-primary-alpha, rgba(0, 212, 170, 0.2));
+  border: 1px solid var(--accent-primary);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.clip:hover {
+  background: var(--accent-primary-alpha, rgba(0, 212, 170, 0.3));
+}
+
+.clipThumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 2px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.clipName {
+  font-size: 0.6875rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Playhead ─────────────────────────────────────── */
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.playheadHead {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--error-solid);
+}
+
+.playheadLine {
+  position: absolute;
+  top: 6px;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: var(--error-solid);
+}
+
+/* ── Ruler (below tracks) ─────────────────────────── */
+.ruler {
+  height: 24px;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+  padding-left: 60px;
+}
+
+.rulerContent {
+  position: relative;
+  height: 100%;
+  transform-origin: left center;
+}
+
+.rulerMark {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-left: 1px solid var(--border-color);
+}
+
+.rulerMark span {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--text-muted);
+}
+
+/* ── Transport controls (pinned to bottom) ─────── */
 .transport {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: var(--space-2, 0.5rem) var(--panel-padding, 0.75rem);
   background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
   gap: var(--space-3, 0.75rem);
   flex-shrink: 0;
 }
@@ -74,152 +232,4 @@
   color: var(--text-muted);
   min-width: 32px;
   text-align: center;
-}
-
-/* Ruler */
-.ruler {
-  height: 24px;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
-  position: relative;
-  overflow: hidden;
-  padding-left: 60px;
-}
-
-.rulerContent {
-  position: relative;
-  height: 100%;
-  transform-origin: left center;
-}
-
-.rulerMark {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  border-left: 1px solid var(--border-color);
-}
-
-.rulerMark span {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  color: var(--text-muted);
-}
-
-/* Tracks */
-.tracks {
-  flex: 1;
-  position: relative;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.track {
-  display: flex;
-  height: 48px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.trackHeader {
-  width: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-tertiary);
-  border-right: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
-
-.trackLabel {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.trackContent {
-  flex: 1;
-  position: relative;
-  background: var(--bg-primary);
-  transform-origin: left center;
-}
-
-.emptyTrack {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
-
-/* Clips */
-.clip {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  background: var(--accent-primary-alpha, rgba(0, 212, 170, 0.2));
-  border: 1px solid var(--accent-primary);
-  border-radius: 4px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0 0.375rem;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.clip:hover {
-  background: var(--accent-primary-alpha, rgba(0, 212, 170, 0.3));
-}
-
-.clipThumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 2px;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.clipName {
-  font-size: 0.6875rem;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Playhead */
-.playhead {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  pointer-events: none;
-  z-index: 100;
-}
-
-.playheadHead {
-  position: absolute;
-  top: -1px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-top: 8px solid var(--error-solid);
-}
-
-.playheadLine {
-  position: absolute;
-  top: 6px;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  background: var(--error-solid);
 }

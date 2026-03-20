@@ -641,6 +641,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             return (
               <div
                 key={item.id}
+                data-canvas-item-id={item.id}
                 className={`${styles.canvasItem} ${selectedIds.includes(item.id) ? styles.selected : ''} ${item.locked ? styles.locked : ''}`}
                 style={{
                   left: item.x,

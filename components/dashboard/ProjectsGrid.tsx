@@ -19,7 +19,15 @@ import {
   Cloud,
   HardDrive,
   RefreshCcw,
-  Edit
+  Edit,
+  Image,
+  FileText,
+  Film,
+  Music,
+  File,
+  ChevronDown,
+  ImageIcon,
+  Check,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useProjectsStore } from '../../stores';
@@ -351,6 +359,28 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
     return date.toLocaleDateString();
   };
 
+  const [assetDrawerOpen, setAssetDrawerOpen] = useState<string | null>(null);
+  const [coverPickerOpen, setCoverPickerOpen] = useState<string | null>(null);
+
+  const getProjectAssets = useCallback((projectName: string) => {
+    const projectSlug = slugifyProjectName(projectName);
+    const generatedPrefix = `/projects/${projectSlug}/generated/`;
+    return Array.from(assets.values()).filter(
+      (asset) => asset.path.startsWith(generatedPrefix)
+    );
+  }, [assets]);
+
+  const assetTypeIcon = (type: string) => {
+    switch (type) {
+      case 'image': return <Image size={12} />;
+      case 'video': return <Film size={12} />;
+      case 'audio': return <Music size={12} />;
+      case 'text':
+      case 'prompt': return <FileText size={12} />;
+      default: return <File size={12} />;
+    }
+  };
+
   const librarySyncBadgeClass =
     cloudSyncStatus.state === 'synced'
       ? styles.librarySyncStatusConnected
@@ -465,113 +495,198 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
         </button>
 
         {/* Project Cards */}
-        {projects.map((project) => (
-          <div 
-            key={project.id} 
-            className={styles.projectCard}
-            onClick={() => onOpenProject(project.id)}
-          >
-            {/* Thumbnail */}
-            <div className={styles.thumbnail}>
-              {project.thumbnail ? (
-                <img src={project.thumbnail} alt={project.name} />
-              ) : (
-                <div className={styles.placeholderThumb}>
-                  <FolderOpen size={32} />
-                </div>
-              )}
-              
-              {/* Favorite Button */}
-              <button
-                className={styles.favoriteButton}
-                style={{ right: '40px' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEditProject(project);
-                }}
-              >
-                <Edit size={16} />
-              </button>
+        {projects.map((project) => {
+          const isAssetsOpen = assetDrawerOpen === project.id;
+          const projectAssets = getProjectAssets(project.name);
+          const imageAssets = projectAssets.filter((a) => a.type === 'image' && a.thumbnail);
 
-              <button
-                className={styles.favoriteButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFavorite(project.id);
-                }}
-              >
-                {project.isFavorite ? (
-                  <Star size={16} fill="var(--accent-tertiary)" />
+          return (
+            <div
+              key={project.id}
+              className={styles.projectCard}
+              onClick={() => onOpenProject(project.id)}
+            >
+              {/* Full-bleed thumbnail */}
+              <div className={styles.thumbnail}>
+                {project.thumbnail ? (
+                  <img src={project.thumbnail} alt={project.name} />
                 ) : (
-                  <StarOff size={16} />
+                  <div className={styles.placeholderThumb}>
+                    <FolderOpen size={32} />
+                  </div>
                 )}
-              </button>
-
-              {/* Menu Button */}
-              <button
-                className={styles.menuButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen(menuOpen === project.id ? null : project.id);
-                }}
-              >
-                <MoreVertical size={16} />
-              </button>
-
-              {/* Dropdown Menu */}
-              {menuOpen === project.id && (
-                <div className={styles.menu}>
-                  <button onClick={() => handleDuplicate(project.id)}>
-                    <Copy size={14} />
-                    Duplicate
-                  </button>
-                  <button 
-                    className={styles.menuDanger}
-                    onClick={() => handleDelete(project.id)}
-                  >
-                    <Trash2 size={14} />
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Info */}
-            <div className={styles.info}>
-              <h3 className={styles.name}>
-                <span className={styles.pathPrefix}>/projects/</span>
-                {project.name}
-              </h3>
-              
-              {(project.genre || project.style || project.length || project.type) && (
-                <div className={styles.details}>
-                  {project.type && project.type !== 'generic' && <span className={styles.detailItem} style={{ color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}>{project.type}</span>}
-                  {project.genre && <span className={styles.detailItem}>{project.genre}</span>}
-                  {project.style && <span className={styles.detailItem}>{project.style}</span>}
-                  {project.length && <span className={styles.detailItem}>{project.length}</span>}
-                </div>
-              )}
-
-              <div className={styles.meta}>
-                <span className={styles.metaItem}>
-                  <Calendar size={12} />
-                  {formatDate(project.modifiedAt)}
-                </span>
-                <span className={styles.metaItem}>
-                  <Layers size={12} />
-                  {project.assetCount} assets
-                </span>
               </div>
-              {project.tags.length > 0 && (
-                <div className={styles.tags}>
-                  {project.tags.slice(0, 3).map((tag) => (
-                    <span key={tag} className={styles.tag}>{tag}</span>
-                  ))}
+
+              {/* Top toolbar — left & right groups */}
+              <div className={styles.cardToolbar}>
+                <div className={styles.toolbarLeft}>
+                  <button
+                    className={`${styles.toolbarBtn} ${styles.toolbarBtnFav}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(project.id);
+                    }}
+                  >
+                    {project.isFavorite ? (
+                      <Star size={14} fill="var(--accent-tertiary)" />
+                    ) : (
+                      <StarOff size={14} />
+                    )}
+                  </button>
+                  <button
+                    className={styles.toolbarBtn}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditProject(project);
+                    }}
+                  >
+                    <Edit size={14} />
+                  </button>
                 </div>
-              )}
+
+                <div className={styles.toolbarRight}>
+                  <button
+                    className={styles.toolbarBtn}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCoverPickerOpen(null);
+                      setMenuOpen(menuOpen === project.id ? null : project.id);
+                    }}
+                  >
+                    <MoreVertical size={14} />
+                  </button>
+
+                  {menuOpen === project.id && (
+                    <div className={styles.menu} onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => handleDuplicate(project.id)}>
+                        <Copy size={14} />
+                        Duplicate
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCoverPickerOpen(coverPickerOpen === project.id ? null : project.id);
+                        }}
+                      >
+                        <ImageIcon size={14} />
+                        Set Cover Image
+                      </button>
+
+                      {coverPickerOpen === project.id && (
+                        <>
+                          <div className={styles.menuDivider} />
+                          <div className={styles.coverPickerLabel}>Choose cover</div>
+                          {imageAssets.length === 0 ? (
+                            <button disabled style={{ opacity: 0.4, cursor: 'default' }}>
+                              No images available
+                            </button>
+                          ) : (
+                            imageAssets.map((asset) => (
+                              <button
+                                key={asset.id}
+                                className={`${styles.coverPickerItem} ${asset.thumbnail === project.thumbnail ? styles.coverPickerActive : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateProject(project.id, { thumbnail: asset.thumbnail });
+                                  setCoverPickerOpen(null);
+                                  setMenuOpen(null);
+                                }}
+                              >
+                                <img src={asset.thumbnail} alt="" className={styles.coverPickerThumb} />
+                                <span className={styles.coverPickerName}>{asset.name}</span>
+                                {asset.thumbnail === project.thumbnail && <Check size={12} />}
+                              </button>
+                            ))
+                          )}
+                        </>
+                      )}
+
+                      <div className={styles.menuDivider} />
+                      <button
+                        className={styles.menuDanger}
+                        onClick={() => handleDelete(project.id)}
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Info overlay at the bottom */}
+              <div className={`${styles.info} ${isAssetsOpen ? styles.infoExpanded : ''}`}>
+                <h3 className={styles.name}>
+                  <span className={styles.pathPrefix}>/projects/</span>
+                  {project.name}
+                </h3>
+
+                {(project.genre || project.style || project.length || project.type) && (
+                  <div className={styles.details}>
+                    {project.type && project.type !== 'generic' && (
+                      <span className={styles.detailItem} style={{ color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}>
+                        {project.type}
+                      </span>
+                    )}
+                    {project.genre && <span className={styles.detailItem}>{project.genre}</span>}
+                    {project.style && <span className={styles.detailItem}>{project.style}</span>}
+                    {project.length && <span className={styles.detailItem}>{project.length}</span>}
+                  </div>
+                )}
+
+                <div className={styles.meta}>
+                  <span className={styles.metaItem}>
+                    <Calendar size={12} />
+                    {formatDate(project.modifiedAt)}
+                  </span>
+                  <button
+                    className={`${styles.assetButton} ${isAssetsOpen ? styles.assetButtonActive : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAssetDrawerOpen(isAssetsOpen ? null : project.id);
+                    }}
+                  >
+                    <Layers size={12} />
+                    {project.assetCount} asset{project.assetCount !== 1 ? 's' : ''}
+                    <ChevronDown
+                      size={10}
+                      className={`${styles.assetButtonChevron} ${isAssetsOpen ? styles.assetButtonChevronOpen : ''}`}
+                    />
+                  </button>
+                </div>
+
+                {/* Expanded asset list — inline, full width */}
+                {isAssetsOpen && (
+                  <div className={styles.assetListExpanded} onClick={(e) => e.stopPropagation()}>
+                    {projectAssets.length === 0 ? (
+                      <div className={styles.assetListEmpty}>No assets yet</div>
+                    ) : (
+                      projectAssets.map((asset) => (
+                        <div key={asset.id} className={styles.assetListItem}>
+                          {asset.thumbnail ? (
+                            <img src={asset.thumbnail} alt="" className={styles.assetListThumb} />
+                          ) : (
+                            <span className={styles.assetListIcon}>{assetTypeIcon(asset.type)}</span>
+                          )}
+                          <span className={styles.assetListName}>{asset.name}</span>
+                          <span className={styles.assetListType}>{asset.type}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {project.tags.length > 0 && (
+                  <div className={styles.tags}>
+                    {project.tags.slice(0, 3).map((tag) => (
+                      <span key={tag} className={styles.tag}>{tag}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {projects.length === 0 && (
