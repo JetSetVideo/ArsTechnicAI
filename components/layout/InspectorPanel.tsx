@@ -265,7 +265,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   const [showNegativePrompt, setShowNegativePrompt] = useState(false);
   const [showNegativeTemplates, setShowNegativeTemplates] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
-  
+  /** Selected Item section: lives in header; collapsible */
+  const [selectedItemOpen, setSelectedItemOpen] = useState(true);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -468,17 +470,138 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   const currentModel = settings.aiProvider?.model || 'imagen-3.0-generate-002';
   const hasApiKey = !!localApiKey;
 
+  const selectedTypeLabel =
+    selectedItem?.type === 'generated'
+      ? 'AI Generated'
+      : selectedItem?.type === 'image'
+        ? 'Imported Image'
+        : 'Placeholder';
+
   return (
     <aside className={styles.inspector} style={{ width }}>
       <div className={styles.header}>
-        <h2 className={styles.title}>Inspector</h2>
-        <button 
-          className={styles.toggleButton} 
-          onClick={onToggle}
-          title="Toggle Inspector (⌘3)"
-        >
-          <PanelRight size={16} />
-        </button>
+        <div className={styles.headerTitleRow}>
+          <h2 className={styles.title}>Inspector</h2>
+          <button
+            className={styles.toggleButton}
+            onClick={onToggle}
+            title="Toggle Inspector (⌘3)"
+          >
+            <PanelRight size={16} />
+          </button>
+        </div>
+
+        {selectedItem && (
+          <div className={styles.selectedInHeader}>
+            <button
+              type="button"
+              className={styles.sectionHeader}
+              onClick={() => setSelectedItemOpen((o) => !o)}
+            >
+              {selectedItemOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <Palette size={14} />
+              <span>Selected Item</span>
+            </button>
+            {selectedItemOpen && (
+              <>
+                <div className={styles.selectedTagRow}>
+                  <span className={styles.itemTag}>{selectedTypeLabel}</span>
+                  {selectedItem.generationMeta?.model && (
+                    <span className={styles.itemTagMuted} title="Model">
+                      {selectedItem.generationMeta.model}
+                    </span>
+                  )}
+                  <span className={styles.itemTagName} title={selectedItem.name}>
+                    {selectedItem.name.length > 28 ? `${selectedItem.name.slice(0, 26)}…` : selectedItem.name}
+                  </span>
+                </div>
+                <div className={styles.selectedPreview}>
+                  {selectedItem.src ? (
+                    <img
+                      src={selectedItem.src}
+                      alt=""
+                      className={styles.selectedPreviewImg}
+                    />
+                  ) : (
+                    <div className={styles.selectedPreviewPlaceholder}>
+                      <Palette size={24} />
+                      <span>No preview</span>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.propertyGrid}>
+                  <div className={styles.formGroup}>
+                    <Input
+                      label="Name"
+                      value={selectedItem.name}
+                      onChange={(e) => handleRenameItem(e.target.value)}
+                      placeholder="Item name..."
+                    />
+                  </div>
+
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <Input
+                        label="X"
+                        type="number"
+                        value={Math.round(selectedItem.x)}
+                        onChange={(e) => handleUpdatePosition('x', parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <Input
+                        label="Y"
+                        type="number"
+                        value={Math.round(selectedItem.y)}
+                        onChange={(e) => handleUpdatePosition('y', parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={styles.property}>
+                    <span className={styles.propertyLabel}>Position</span>
+                    <span className={styles.propertyValue}>
+                      {Math.round(selectedItem.x)}, {Math.round(selectedItem.y)}
+                    </span>
+                  </div>
+                  <div className={styles.property}>
+                    <span className={styles.propertyLabel}>Size</span>
+                    <span className={styles.propertyValue}>
+                      {Math.round(selectedItem.width * selectedItem.scale)} ×{' '}
+                      {Math.round(selectedItem.height * selectedItem.scale)}
+                    </span>
+                  </div>
+                  {selectedItem.rotation !== 0 && (
+                    <div className={styles.property}>
+                      <span className={styles.propertyLabel}>Rotation</span>
+                      <span className={styles.propertyValue}>{selectedItem.rotation}°</span>
+                    </div>
+                  )}
+                  {selectedItem.assetId && (
+                    <div className={styles.property}>
+                      <span className={styles.propertyLabel}>Cloud ID</span>
+                      <span className={styles.propertyValue} style={{ fontSize: '0.625rem', opacity: 0.6 }}>
+                        {selectedItem.assetId.slice(0, 14)}…
+                      </span>
+                    </div>
+                  )}
+                  {(selectedItem.prompt || selectedItem.generationMeta?.prompt) && (
+                    <div className={styles.property}>
+                      <span className={styles.propertyLabel}>Prompt</span>
+                      <span className={styles.propertyValue}>
+                        {selectedItem.generationMeta?.prompt || selectedItem.prompt}
+                      </span>
+                    </div>
+                  )}
+                  <div className={styles.property}>
+                    <span className={styles.propertyLabel}>Type</span>
+                    <span className={styles.propertyValue}>{selectedTypeLabel}</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className={styles.content}>
@@ -592,81 +715,6 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
             </p>
           )}
         </div>
-
-        {/* Selected Item */}
-        {selectedItem && (
-          <CollapsibleSection title="Selected Item" icon={<Palette size={14} />} defaultOpen>
-            <div className={styles.propertyGrid}>
-              <div className={styles.formGroup}>
-                <Input
-                  label="Name"
-                  value={selectedItem.name}
-                  onChange={(e) => handleRenameItem(e.target.value)}
-                  placeholder="Item name..."
-                />
-              </div>
-
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <Input
-                    label="X"
-                    type="number"
-                    value={Math.round(selectedItem.x)}
-                    onChange={(e) => handleUpdatePosition('x', parseInt(e.target.value) || 0)}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <Input
-                    label="Y"
-                    type="number"
-                    value={Math.round(selectedItem.y)}
-                    onChange={(e) => handleUpdatePosition('y', parseInt(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.property}>
-                <span className={styles.propertyLabel}>Position</span>
-                <span className={styles.propertyValue}>{Math.round(selectedItem.x)}, {Math.round(selectedItem.y)}</span>
-              </div>
-              <div className={styles.property}>
-                <span className={styles.propertyLabel}>Size</span>
-                <span className={styles.propertyValue}>{Math.round(selectedItem.width * selectedItem.scale)} × {Math.round(selectedItem.height * selectedItem.scale)}</span>
-              </div>
-              {selectedItem.rotation !== 0 && (
-                <div className={styles.property}>
-                  <span className={styles.propertyLabel}>Rotation</span>
-                  <span className={styles.propertyValue}>{selectedItem.rotation}°</span>
-                </div>
-              )}
-              {selectedItem.assetId && (
-                <div className={styles.property}>
-                  <span className={styles.propertyLabel}>Cloud ID</span>
-                  <span className={styles.propertyValue} style={{ fontSize: '0.625rem', opacity: 0.6 }}>
-                    {selectedItem.assetId.slice(0, 14)}…
-                  </span>
-                </div>
-              )}
-              {selectedItem.prompt && (
-                <div className={styles.property}>
-                  <span className={styles.propertyLabel}>Prompt</span>
-                  <span className={styles.propertyValue}>{selectedItem.prompt}</span>
-                </div>
-              )}
-
-              <div className={styles.property}>
-                <span className={styles.propertyLabel}>Type</span>
-                <span className={styles.propertyValue}>
-                  {selectedItem.type === 'generated'
-                    ? 'AI Generated'
-                    : selectedItem.type === 'image'
-                      ? 'Imported Image'
-                      : 'Placeholder'}
-                </span>
-              </div>
-            </div>
-          </CollapsibleSection>
-        )}
 
         {/* Version History */}
         {projectId && isAuthenticated && (
