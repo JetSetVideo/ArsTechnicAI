@@ -87,6 +87,7 @@ export interface CanvasItem {
   version?: string;
   parentAssetId?: UUID;
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
   generationMeta?: GenerationMeta;
 }
 

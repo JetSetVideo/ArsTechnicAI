@@ -189,7 +189,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   updateItem: (id, updates) => {
     set((state) => ({
-      items: state.items.map((i) => (i.id === id ? { ...i, ...updates } : i)),
+      items: state.items.map((i) => (i.id === id ? { ...i, ...updates, updatedAt: Date.now() } : i)),
     }));
     schedulePersist();
   },

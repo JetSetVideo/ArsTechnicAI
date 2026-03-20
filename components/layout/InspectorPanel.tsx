@@ -12,6 +12,13 @@ import {
   Cloud,
   PanelRight,
   Cpu,
+  Trash2,
+  Copy,
+  Lock,
+  Plus,
+  GitBranch,
+  Users,
+  Layers,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
@@ -346,6 +353,35 @@ const BananaIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// ─── Tag config & helpers ─────────────────────────────────────────────────────
+const TAG_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  generated: { label: 'Generated', color: '#00d4aa', bg: 'rgba(0,212,170,0.12)', border: 'rgba(0,212,170,0.4)' },
+  image: { label: 'Imported', color: '#a855f7', bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.4)' },
+  placeholder: { label: 'Placeholder', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)' },
+};
+
+const SIZE_PRESETS: { label: string; w: number; h: number; color: string }[] = [
+  { label: '512 × 512', w: 512, h: 512, color: 'var(--accent-primary)' },
+  { label: '768 × 768', w: 768, h: 768, color: '#a855f7' },
+  { label: '1024 × 1024', w: 1024, h: 1024, color: '#3b82f6' },
+  { label: '1024 × 1792', w: 1024, h: 1792, color: '#f59e0b' },
+  { label: '1792 × 1024', w: 1792, h: 1024, color: '#ef4444' },
+  { label: '2048 × 2048', w: 2048, h: 2048, color: '#ec4899' },
+];
+
+const formatRelativeTime = (timestamp: number): string => {
+  const diff = Date.now() - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (seconds < 60) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+};
+
 // ─── Main InspectorPanel ──────────────────────────────────────────────────────
 export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSettings, onToggle }) => {
   const { data: session, status: sessionStatus } = useSession();
@@ -357,7 +393,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     isGenerating, startGeneration, completeJob, failJob, jobs,
   } = useGenerationStore();
 
-  const { updateItem, addItem } = useCanvasStore();
+  const { updateItem, addItem, removeSelected, copy, paste } = useCanvasStore();
+  const allItems = useCanvasStore((s) => s.items);
   const { updateAsset, addAsset, addAssetToFolder, getProjectGeneratedPath } = useFileStore();
   const settings = useSettingsStore((s) => s.settings);
   const updateAIProvider = useSettingsStore((s) => s.updateAIProvider);
@@ -371,10 +408,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   const [showNegativePrompt, setShowNegativePrompt] = useState(false);
   const [showNegativeTemplates, setShowNegativeTemplates] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
-  /** Selected Item section: lives in header; collapsible */
-  const [selectedItemOpen, setSelectedItemOpen] = useState(true);
   /** Active header tab */
   const [activeTab, setActiveTab] = useState<'inspector' | 'prompt'>('prompt');
+  /** Multi-select type filter */
+  const [activeTypeFilter, setActiveTypeFilter] = useState<string | null>(null);
+  /** Size panel expanded */
+  const [showSizePanel, setShowSizePanel] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -578,13 +617,6 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   const currentModel = settings.aiProvider?.model || 'imagen-3.0-generate-002';
   const hasApiKey = !!localApiKey;
 
-  const selectedTypeLabel =
-    selectedItem?.type === 'generated'
-      ? 'AI Generated'
-      : selectedItem?.type === 'image'
-        ? 'Imported Image'
-        : 'Placeholder';
-
   return (
     <aside className={styles.inspector} style={{ width }}>
       <div className={styles.header}>
@@ -619,122 +651,309 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         {/* ─── INSPECTOR TAB ─── */}
         {activeTab === 'inspector' && (
           <div className={styles.tabContent}>
-            {selectedItem ? (
-              <div className={styles.selectedInContent}>
-                <button
-                  type="button"
-                  className={styles.sectionHeader}
-                  onClick={() => setSelectedItemOpen((o) => !o)}
-                >
-                  {selectedItemOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                  <Palette size={14} />
-                  <span>Selected Item</span>
-                </button>
-                {selectedItemOpen && (
-                  <>
-                    <div className={styles.selectedTagRow}>
-                      <span className={styles.itemTag}>{selectedTypeLabel}</span>
-                      {selectedItem.generationMeta?.model && (
-                        <span className={styles.itemTagMuted} title="Model">
-                          {selectedItem.generationMeta.model}
-                        </span>
-                      )}
-                      <span className={styles.itemTagName} title={selectedItem.name}>
-                        {selectedItem.name.length > 28 ? `${selectedItem.name.slice(0, 26)}…` : selectedItem.name}
-                      </span>
-                    </div>
-                    <div className={styles.selectedPreview}>
-                      {selectedItem.src ? (
-                        <img
-                          src={selectedItem.src}
-                          alt=""
-                          className={styles.selectedPreviewImg}
-                        />
-                      ) : (
-                        <div className={styles.selectedPreviewPlaceholder}>
-                          <Palette size={24} />
-                          <span>No preview</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.propertyGrid}>
-                      <div className={styles.formGroup}>
-                        <Input
-                          label="Name"
-                          value={selectedItem.name}
-                          onChange={(e) => handleRenameItem(e.target.value)}
-                          placeholder="Item name..."
-                        />
-                      </div>
-
-                      <div className={styles.formRow}>
-                        <div className={styles.formGroup}>
-                          <Input
-                            label="X"
-                            type="number"
-                            value={Math.round(selectedItem.x)}
-                            onChange={(e) => handleUpdatePosition('x', parseInt(e.target.value) || 0)}
-                          />
-                        </div>
-                        <div className={styles.formGroup}>
-                          <Input
-                            label="Y"
-                            type="number"
-                            value={Math.round(selectedItem.y)}
-                            onChange={(e) => handleUpdatePosition('y', parseInt(e.target.value) || 0)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className={styles.property}>
-                        <span className={styles.propertyLabel}>Position</span>
-                        <span className={styles.propertyValue}>
-                          {Math.round(selectedItem.x)}, {Math.round(selectedItem.y)}
-                        </span>
-                      </div>
-                      <div className={styles.property}>
-                        <span className={styles.propertyLabel}>Size</span>
-                        <span className={styles.propertyValue}>
-                          {Math.round(selectedItem.width * selectedItem.scale)} ×{' '}
-                          {Math.round(selectedItem.height * selectedItem.scale)}
-                        </span>
-                      </div>
-                      {selectedItem.rotation !== 0 && (
-                        <div className={styles.property}>
-                          <span className={styles.propertyLabel}>Rotation</span>
-                          <span className={styles.propertyValue}>{selectedItem.rotation}°</span>
-                        </div>
-                      )}
-                      {selectedItem.assetId && (
-                        <div className={styles.property}>
-                          <span className={styles.propertyLabel}>Cloud ID</span>
-                          <span className={styles.propertyValue} style={{ fontSize: '0.625rem', opacity: 0.6 }}>
-                            {selectedItem.assetId.slice(0, 14)}…
-                          </span>
-                        </div>
-                      )}
-                      {(selectedItem.prompt || selectedItem.generationMeta?.prompt) && (
-                        <div className={styles.property}>
-                          <span className={styles.propertyLabel}>Prompt</span>
-                          <span className={styles.propertyValue}>
-                            {selectedItem.generationMeta?.prompt || selectedItem.prompt}
-                          </span>
-                        </div>
-                      )}
-                      <div className={styles.property}>
-                        <span className={styles.propertyLabel}>Type</span>
-                        <span className={styles.propertyValue}>{selectedTypeLabel}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
+            {/* Empty state */}
+            {selectedItems.length === 0 && (
               <div className={styles.emptyInspector}>
                 <Palette size={28} />
                 <p>Select an item on the canvas to inspect its properties.</p>
               </div>
             )}
+
+            {/* ── Single item view ── */}
+            {selectedItems.length === 1 && selectedItem && (() => {
+              const tagCfg = TAG_CONFIG[selectedItem.type] || TAG_CONFIG.placeholder;
+              const promptText = selectedItem.generationMeta?.prompt || selectedItem.prompt;
+              const meta = selectedItem.generationMeta;
+              const parentIds = meta?.parentIds ?? [];
+              const childIds = meta?.childIds ?? [];
+              const variations = meta?.variations ?? [];
+              const versionCount = meta?.imageVersion ?? 1;
+              const parentItems = allItems.filter((i) => parentIds.includes(i.id) || (selectedItem.parentAssetId && i.assetId === selectedItem.parentAssetId));
+              const childItems = allItems.filter((i) => childIds.includes(i.id) || i.parentAssetId === selectedItem.assetId);
+              const curW = Math.round(selectedItem.width * selectedItem.scale);
+              const curH = Math.round(selectedItem.height * selectedItem.scale);
+              const curSizeLabel = `${curW} × ${curH}`;
+
+              return (
+                <div className={styles.selectedInContent}>
+                  <div className={styles.nameInputRow}>
+                    <Input
+                      label="Name"
+                      value={selectedItem.name}
+                      onChange={(e) => handleRenameItem(e.target.value)}
+                      placeholder="Item name..."
+                    />
+                  </div>
+
+                  <div className={styles.selectedPreview}>
+                    {selectedItem.src ? (
+                      <img src={selectedItem.src} alt="" className={styles.selectedPreviewImg} />
+                    ) : (
+                      <div className={styles.selectedPreviewPlaceholder}>
+                        <Palette size={24} />
+                        <span>No preview</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={styles.propertyGrid}>
+                    <div className={styles.positionRow}>
+                      <div className={styles.formGroup}>
+                        <Input
+                          label="X"
+                          type="number"
+                          value={Math.round(selectedItem.x)}
+                          onChange={(e) => handleUpdatePosition('x', parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div className={styles.formGroup}>
+                        <Input
+                          label="Y"
+                          type="number"
+                          value={Math.round(selectedItem.y)}
+                          onChange={(e) => handleUpdatePosition('y', parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div className={styles.formGroup}>
+                        <Input
+                          label="Z"
+                          type="number"
+                          value={selectedItem.zIndex}
+                          onChange={(e) => updateItem(selectedItem.id, { zIndex: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* ── Size (expandable) ── */}
+                    <button
+                      className={styles.sizeButton}
+                      onClick={() => setShowSizePanel(!showSizePanel)}
+                    >
+                      <span className={styles.propertyLabel}>Size</span>
+                      <span className={styles.propertyValue}>{curSizeLabel}</span>
+                      {showSizePanel ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                    </button>
+                    {showSizePanel && (
+                      <div className={styles.sizePanel}>
+                        {SIZE_PRESETS.map((preset) => {
+                          const isActive = curW === preset.w && curH === preset.h;
+                          return (
+                            <button
+                              key={preset.label}
+                              className={`${styles.sizeOption} ${isActive ? styles.sizeOptionActive : ''}`}
+                              style={{ ['--size-color' as string]: preset.color }}
+                              onClick={() => {
+                                updateItem(selectedItem.id, { width: preset.w, height: preset.h, scale: 1 });
+                              }}
+                            >
+                              <span
+                                className={styles.sizeOptionDot}
+                                style={{ background: preset.color }}
+                              />
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                        {variations.length > 0 && (
+                          <>
+                            <div className={styles.sizeDivider} />
+                            <div className={styles.sizeSectionLabel}>Existing variations</div>
+                            {variations.map((v) => (
+                              <div key={v.id} className={styles.sizeOption} style={{ cursor: 'default' }}>
+                                <span className={styles.sizeOptionDot} style={{ background: 'var(--text-muted)' }} />
+                                {v.label}
+                              </div>
+                            ))}
+                          </>
+                        )}
+                        <button
+                          className={styles.sizeAddButton}
+                          onClick={() => {
+                            const newW = curW;
+                            const newH = curH;
+                            const newVariation = { id: `var-${Date.now()}`, label: `${newW}×${newH} variant` };
+                            const updatedVariations = [...variations, newVariation];
+                            updateItem(selectedItem.id, {
+                              generationMeta: { ...(meta || { prompt: '', model: '', seed: 0, width: newW, height: newH, generatedAt: Date.now() }), variations: updatedVariations },
+                            });
+                            log('canvas_resize', `Added size variation ${newW}×${newH}`);
+                          }}
+                        >
+                          <Plus size={10} />
+                          Add current size as variation
+                        </button>
+                      </div>
+                    )}
+
+                    {selectedItem.rotation !== 0 && (
+                      <div className={styles.property}>
+                        <span className={styles.propertyLabel}>Rotation</span>
+                        <span className={styles.propertyValue}>{selectedItem.rotation}°</span>
+                      </div>
+                    )}
+
+                    {promptText && (
+                      <div
+                        className={styles.promptDisplay}
+                        style={{ borderLeftColor: tagCfg.color }}
+                      >
+                        {promptText}
+                      </div>
+                    )}
+
+                    {/* ── Metadata: Versions, Parents, Children ── */}
+                    <div className={styles.metaRow}>
+                      <div className={`${styles.metaChip} ${versionCount > 1 ? '' : styles.metaChipMuted}`}>
+                        <GitBranch size={10} />
+                        <span>v{versionCount}</span>
+                        {variations.length > 0 && (
+                          <span className={styles.metaChipBadge}>{variations.length} var</span>
+                        )}
+                      </div>
+                      <div className={`${styles.metaChip} ${parentItems.length > 0 ? '' : styles.metaChipMuted}`}>
+                        <Users size={10} />
+                        <span>{parentItems.length > 0 ? `${parentItems.length} parent${parentItems.length > 1 ? 's' : ''}` : 'No parent'}</span>
+                      </div>
+                      <div className={`${styles.metaChip} ${childItems.length > 0 ? '' : styles.metaChipMuted}`}>
+                        <Layers size={10} />
+                        <span>{childItems.length > 0 ? `${childItems.length} child${childItems.length > 1 ? 'ren' : ''}` : 'No children'}</span>
+                      </div>
+                    </div>
+
+                    {/* ── Footer: tag + timestamps ── */}
+                    <div className={styles.inspectorFooter}>
+                      <span
+                        className={styles.itemTag}
+                        style={{ background: tagCfg.bg, color: tagCfg.color, borderColor: tagCfg.border }}
+                      >
+                        {tagCfg.label}
+                      </span>
+                      {selectedItem.generationMeta?.model && (
+                        <span className={styles.itemTagMuted} title="Model">
+                          {selectedItem.generationMeta.model}
+                        </span>
+                      )}
+                      <span className={styles.footerTimestamp}>
+                        {selectedItem.createdAt != null && (
+                          <>{new Date(selectedItem.createdAt).toLocaleDateString()}</>
+                        )}
+                        {selectedItem.updatedAt != null && (
+                          <> · edited {formatRelativeTime(selectedItem.updatedAt)}</>
+                        )}
+                        {selectedItem.createdAt != null && !selectedItem.updatedAt && (
+                          <> · {formatRelativeTime(selectedItem.createdAt)}</>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── Multi-selection view ── */}
+            {selectedItems.length > 1 && (() => {
+              const typeCounts = selectedItems.reduce<Record<string, number>>((acc, item) => {
+                acc[item.type] = (acc[item.type] || 0) + 1;
+                return acc;
+              }, {});
+              const filtered = activeTypeFilter
+                ? selectedItems.filter((i) => i.type === activeTypeFilter)
+                : selectedItems;
+              const minX = Math.min(...filtered.map((i) => i.x));
+              const minY = Math.min(...filtered.map((i) => i.y));
+              const maxX = Math.max(...filtered.map((i) => i.x + i.width * i.scale));
+              const maxY = Math.max(...filtered.map((i) => i.y + i.height * i.scale));
+              const avgX = Math.round(filtered.reduce((s, i) => s + i.x, 0) / filtered.length);
+              const avgY = Math.round(filtered.reduce((s, i) => s + i.y, 0) / filtered.length);
+
+              return (
+                <div className={styles.selectedInContent}>
+                  <div className={styles.multiSelectHeader}>
+                    {selectedItems.length} items selected
+                  </div>
+
+                  <div className={styles.filterChips}>
+                    {Object.entries(typeCounts).map(([type, count]) => {
+                      const cfg = TAG_CONFIG[type] || TAG_CONFIG.placeholder;
+                      const isActive = activeTypeFilter === null || activeTypeFilter === type;
+                      return (
+                        <button
+                          key={type}
+                          className={`${styles.filterChip} ${!isActive ? styles.filterChipInactive : ''}`}
+                          style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}
+                          onClick={() => setActiveTypeFilter(activeTypeFilter === type ? null : type)}
+                        >
+                          {cfg.label} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className={styles.multiStats}>
+                    <div className={styles.statRow}>
+                      <span>Total items</span>
+                      <span className={styles.statValue}>{filtered.length}</span>
+                    </div>
+                    <div className={styles.statRow}>
+                      <span>Types</span>
+                      <span className={styles.statValue}>
+                        {Object.entries(typeCounts).map(([t, c]) => `${TAG_CONFIG[t]?.label || t} (${c})`).join(', ')}
+                      </span>
+                    </div>
+                    <div className={styles.statRow}>
+                      <span>Bounding box</span>
+                      <span className={styles.statValue}>
+                        {Math.round(maxX - minX)} × {Math.round(maxY - minY)}
+                      </span>
+                    </div>
+                    <div className={styles.statRow}>
+                      <span>Avg. position</span>
+                      <span className={styles.statValue}>{avgX}, {avgY}</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.thumbnailStrip}>
+                    {selectedItems.map((item) =>
+                      item.src ? (
+                        <img
+                          key={item.id}
+                          src={item.src}
+                          alt={item.name}
+                          className={styles.thumbnailMini}
+                          title={item.name}
+                        />
+                      ) : (
+                        <div
+                          key={item.id}
+                          className={styles.thumbnailMini}
+                          title={item.name}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-tertiary)' }}
+                        >
+                          <Palette size={16} />
+                        </div>
+                      ),
+                    )}
+                  </div>
+
+                  <div className={styles.bulkActions}>
+                    <button className={styles.bulkAction} onClick={() => removeSelected()}>
+                      <Trash2 size={10} /> Delete
+                    </button>
+                    <button className={styles.bulkAction} onClick={() => { copy(); paste(); }}>
+                      <Copy size={10} /> Duplicate
+                    </button>
+                    <button
+                      className={styles.bulkAction}
+                      onClick={() => {
+                        selectedItems.forEach((item) => updateItem(item.id, { locked: !item.locked }));
+                      }}
+                    >
+                      <Lock size={10} /> {selectedItems.every((i) => i.locked) ? 'Unlock' : 'Lock'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Version History */}
             {projectId && isAuthenticated && (

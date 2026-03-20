@@ -11,17 +11,35 @@
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.5rem;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.toolbarScroll {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  touch-action: pan-x;
+}
+
+.toolbarScroll::-webkit-scrollbar {
+  display: none;
 }
 
 .toolbarGroup {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 .toolbarDivider {
@@ -33,6 +51,7 @@
 
 .toolbarSpacer {
   flex: 1;
+  min-width: 4px;
 }
 
 .zoomLevel {
@@ -44,9 +63,11 @@
 }
 
 .itemCount {
-  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0 0.5rem;
   font-size: 0.75rem;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .canvas {
@@ -101,7 +122,7 @@
   opacity: 0.8;
 }
 
-/* Tag row — counter-scaled via inline style so tags stay readable at any zoom */
+/* Tag row (legacy) */
 .tagRow {
   position: absolute;
   top: -32px;
@@ -116,7 +137,6 @@
   white-space: nowrap;
 }
 
-/* Filename tag */
 .filenameTag {
   padding: 4px 10px;
   background: rgba(26, 26, 31, 0.95);
@@ -145,7 +165,6 @@
   border-color: var(--border-strong);
 }
 
-/* Prompt + version tags */
 .promptTag,
 .versionTag {
   padding: 4px 8px;
@@ -172,7 +191,6 @@
   border-color: var(--accent-primary);
 }
 
-/* Prompt overlay */
 .promptOverlay {
   position: absolute;
   top: -140px;
@@ -202,7 +220,6 @@
   overflow: auto;
 }
 
-/* Version overlay */
 .versionOverlay {
   position: absolute;
   top: -160px;
@@ -278,35 +295,188 @@
   padding: 8px 0;
 }
 
-/* Tab bar sits inside the item (top: 0) so it isn’t clipped by canvas overflow:hidden */
+/* ═══════════════════════════════════════════════════════════════
+   NODE ORB — color-coded circle at top-left corner of each node
+   ═══════════════════════════════════════════════════════════════ */
+
+.nodeOrb {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  z-index: 15;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(10, 10, 15, 0.8);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.35s ease;
+  box-shadow: 0 0 8px var(--orb-color, rgba(0, 212, 170, 0.5)),
+              0 0 2px var(--orb-color, rgba(0, 212, 170, 0.3));
+}
+
+.nodeOrb svg {
+  width: 10px;
+  height: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nodeOrb:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 14px var(--orb-color, rgba(0, 212, 170, 0.7)),
+              0 0 4px var(--orb-color, rgba(0, 212, 170, 0.5));
+}
+
+.nodeOrbExpanded {
+  box-shadow: 0 0 20px var(--orb-color, rgba(0, 212, 170, 0.8)),
+              0 0 6px var(--orb-color, rgba(0, 212, 170, 0.5)),
+              0 0 40px var(--orb-color, rgba(0, 212, 170, 0.2));
+}
+
+.nodeOrbExpanded svg {
+  transform: rotate(180deg);
+}
+
+@keyframes orbSpin {
+  0%   { transform: rotate(0deg) scale(1.15); }
+  50%  { transform: rotate(180deg) scale(1.35); }
+  100% { transform: rotate(360deg) scale(1.15); }
+}
+
+.nodeOrbSpin {
+  animation: orbSpin 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Node frame glow for highest z-index */
+.nodeFrameHighZ {
+  box-shadow: 0 0 0 2px var(--orb-color, var(--accent-primary)),
+              0 0 12px var(--orb-color, rgba(0, 212, 170, 0.15));
+  border-radius: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EXPANDED TABS — vertical fan-out from the orb along left edge
+   ═══════════════════════════════════════════════════════════════ */
+
+.nodeTabsExpanded {
+  position: absolute;
+  top: 14px;
+  left: -6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 14;
+  pointer-events: auto;
+  min-width: var(--expanded-min-w, 200px);
+  max-width: var(--expanded-max-w, 380px);
+  width: max-content;
+}
+
+.expandedTab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--orb-color, var(--accent-primary));
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s,
+              transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 0.25s ease;
+  background: rgba(14, 14, 18, 0.96);
+  color: var(--text-muted);
+  border-radius: 0 6px 6px 0;
+  backdrop-filter: blur(12px);
+  transform-origin: left center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.expandedTab:nth-child(1) { animation: tabFanIn 0.3s 0.05s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.expandedTab:nth-child(2) { animation: tabFanIn 0.3s 0.10s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.expandedTab:nth-child(3) { animation: tabFanIn 0.3s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.expandedTab:nth-child(4) { animation: tabFanIn 0.3s 0.20s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.expandedTab:nth-child(5) { animation: tabFanIn 0.3s 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes tabFanIn {
+  0%   { opacity: 0; transform: translateX(-12px) scale(0.85); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.expandedTabActive {
+  background: rgba(0, 212, 170, 0.10);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  border-left-color: var(--accent-primary);
+}
+
+.expandedTab:hover:not(.expandedTabActive) {
+  background: rgba(26, 26, 31, 0.98);
+  color: var(--text-secondary);
+  transform: translateX(3px);
+}
+
+.expandedTabIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+}
+
+.expandedTabActive .expandedTabIcon {
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NODE TABS — horizontal strip with responsive width constraints
+   ═══════════════════════════════════════════════════════════════ */
+
 .nodeTabs {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 14px;
   display: flex;
   align-items: stretch;
   gap: 0;
   z-index: 13;
   pointer-events: auto;
   white-space: nowrap;
+  max-width: var(--tabs-max-w, calc(100% - 16px));
+  min-width: var(--tabs-min-w, 120px);
+  overflow: hidden;
 }
 
 .nodeTab {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  font-size: 0.625rem;
+  padding: 4px 8px;
+  font-size: 0.5625rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border: 1px solid var(--border-color);
   border-bottom: none;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.15s, color 0.15s, max-width 0.3s ease;
   background: rgba(18, 18, 21, 0.92);
   color: var(--text-muted);
+  min-width: 0;
+  max-width: var(--tab-max-w, 180px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 
 .nodeTab:first-child {
@@ -321,6 +491,7 @@
   background: rgba(0, 212, 170, 0.12);
   color: var(--accent-primary);
   border-color: var(--accent-primary);
+  flex-shrink: 0;
 }
 
 .nodeTab:hover:not(.nodeTabActive) {
@@ -328,13 +499,16 @@
   color: var(--text-secondary);
 }
 
-/* Tab panel sits below the tab strip (~28px) */
+/* ═══════════════════════════════════════════════════════════════
+   TAB PANEL — content overlay with selectable text
+   ═══════════════════════════════════════════════════════════════ */
+
 .nodeTabPanel {
   position: absolute;
   top: 28px;
   left: 0;
   right: 0;
-  max-height: calc(50% - 14px);
+  max-height: calc(60% - 14px);
   overflow-y: auto;
   padding: 8px 10px;
   background: rgba(14, 14, 18, 0.96);
@@ -344,6 +518,32 @@
   line-height: 1.5;
   color: var(--text-secondary);
   backdrop-filter: blur(8px);
+  user-select: text;
+  cursor: text;
+}
+
+.nodeTabPanelExpanded {
+  position: absolute;
+  left: calc(var(--expanded-min-w, 200px) - 6px);
+  top: 14px;
+  min-width: 220px;
+  max-width: var(--expanded-max-w, 380px);
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  padding: 10px 14px;
+  background: rgba(14, 14, 18, 0.97);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--orb-color, var(--accent-primary));
+  border-radius: 0 8px 8px 0;
+  z-index: 14;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  user-select: text;
+  cursor: text;
+  animation: tabFanIn 0.25s 0.1s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .nodeTabPanel p {
@@ -361,6 +561,8 @@
 .nodeTabPanelValue {
   color: var(--text-primary);
   word-break: break-word;
+  user-select: text;
+  cursor: text;
 }
 
 .nodeTabPanelRow {
@@ -379,6 +581,31 @@
   color: var(--text-muted);
   font-style: italic;
   font-size: 0.625rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE BREAKPOINTS for node UI
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .nodeTabs   { --tabs-max-w: 280px; --tab-max-w: 100px; }
+  .nodeTabsExpanded   { --expanded-min-w: 180px; --expanded-max-w: 280px; }
+  .nodeTabPanelExpanded { max-width: 260px; }
+}
+
+@media (max-width: 768px) {
+  .nodeTabs   { --tabs-max-w: 200px; --tab-max-w: 70px; }
+  .nodeTabsExpanded   { --expanded-min-w: 150px; --expanded-max-w: 220px; }
+  .nodeTabPanelExpanded { max-width: 200px; max-height: min(240px, 40vh); }
+  .nodeOrb { width: 16px; height: 16px; top: -8px; left: -8px; }
+  .nodeOrb svg { width: 8px; height: 8px; }
+  .expandedTab { padding: 4px 8px; font-size: 0.5625rem; }
+}
+
+@media (min-width: 1920px) {
+  .nodeTabs   { --tabs-max-w: 600px; --tab-max-w: 220px; }
+  .nodeTabsExpanded   { --expanded-min-w: 260px; --expanded-max-w: 480px; }
+  .nodeTabPanelExpanded { max-width: 460px; max-height: min(400px, 55vh); }
 }
 
 /* Editable filename input */
@@ -450,7 +677,6 @@
   white-space: nowrap;
 }
 
-/* Prompt card — styled note for prompt assets on canvas */
 .promptCard {
   width: 100%;
   height: 100%;
@@ -491,19 +717,16 @@
   z-index: 10;
 }
 
-/* Corner handles — 8×8 */
 .handleNW { width: 8px; height: 8px; top: -4px; left: -4px; cursor: nw-resize; }
 .handleNE { width: 8px; height: 8px; top: -4px; right: -4px; cursor: ne-resize; }
 .handleSE { width: 8px; height: 8px; bottom: -4px; right: -4px; cursor: se-resize; }
 .handleSW { width: 8px; height: 8px; bottom: -4px; left: -4px; cursor: sw-resize; }
 
-/* Edge handles — 6×6, centered on edges */
 .handleN { width: 6px; height: 6px; top: -3px; left: calc(50% - 3px); cursor: n-resize; }
 .handleS { width: 6px; height: 6px; bottom: -3px; left: calc(50% - 3px); cursor: s-resize; }
 .handleE { width: 6px; height: 6px; right: -3px; top: calc(50% - 3px); cursor: e-resize; }
 .handleW { width: 6px; height: 6px; left: -3px; top: calc(50% - 3px); cursor: w-resize; }
 
-/* Lock indicator */
 .lockIndicator {
   position: absolute;
   top: 4px;
@@ -518,7 +741,6 @@
   color: var(--text-muted);
 }
 
-/* Link indicators */
 .linkDot {
   position: absolute;
   bottom: 6px;
@@ -536,9 +758,7 @@
   box-shadow: var(--shadow-sm);
 }
 
-.linkDotLeft {
-  left: 6px;
-}
+.linkDotLeft { left: 6px; }
 
 .linkDotRight {
   right: 6px;
@@ -546,7 +766,6 @@
   color: var(--accent-primary);
 }
 
-/* Empty state */
 .emptyState {
   position: absolute;
   top: 50%;
@@ -561,23 +780,10 @@
   pointer-events: none;
 }
 
-.emptyState svg {
-  opacity: 0.3;
-}
+.emptyState svg { opacity: 0.3; }
+.emptyState h3 { font-size: 1.25rem; font-weight: 500; color: var(--text-secondary); }
+.emptyState p { font-size: 0.875rem; max-width: 300px; line-height: 1.5; }
 
-.emptyState h3 {
-  font-size: 1.25rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.emptyState p {
-  font-size: 0.875rem;
-  max-width: 300px;
-  line-height: 1.5;
-}
-
-/* Drop indicator */
 .dropIndicator {
   position: absolute;
   inset: 1rem;
@@ -601,10 +807,54 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.marqueeRect {
+  position: absolute;
+  border: 2px solid rgba(0, 200, 130, 0.8);
+  background: rgba(0, 200, 130, 0.08);
+  pointer-events: none;
+  z-index: 9999;
+  border-radius: 2px;
+  box-shadow: 0 0 12px rgba(0, 200, 130, 0.15),
+              inset 0 0 20px rgba(0, 200, 130, 0.04);
+}
+
+.marqueeBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 200, 130, 0.85);
+  color: #0a0a0f;
+  font-size: 0.625rem;
+  font-weight: 700;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Lasso active state indicator — white inset glow on the button */
+.toolButtonActive {
+  position: relative;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.9) !important;
+}
+
+.toolButtonActive::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 2px;
+  background: #fff;
+  border-radius: 1px;
 }

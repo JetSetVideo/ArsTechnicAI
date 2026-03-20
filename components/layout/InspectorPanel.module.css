@@ -141,7 +141,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 0 var(--panel-padding, 0.75rem) 8px;
+  padding: 8px var(--panel-padding, 0.75rem) 8px;
 }
 
 .itemTag {
@@ -860,4 +860,322 @@
   letter-spacing: 0.05em;
   color: var(--text-muted);
   margin-bottom: 4px;
+}
+
+/* ── Colored item tags ───────────────────────────────────── */
+.itemTagGenerated {
+  background: rgba(0, 212, 170, 0.12);
+  color: #00d4aa;
+  border-color: rgba(0, 212, 170, 0.4);
+}
+
+.itemTagImported {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.itemTagPlaceholder {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+/* ── Compact 3-col position row ──────────────────────────── */
+.positionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-2, 0.5rem);
+}
+
+.positionRow .formGroup {
+  margin-bottom: 0;
+}
+
+/* ── Prominent prompt display ────────────────────────────── */
+.promptDisplay {
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent-primary);
+  background: var(--bg-primary);
+  border-radius: 0 6px 6px 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  word-break: break-word;
+  margin: 4px 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+/* ── Multi-selection summary ─────────────────────────────── */
+.multiSelectHeader {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0.5rem var(--panel-padding, 0.75rem) 8px;
+}
+
+.filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 var(--panel-padding, 0.75rem) 8px;
+}
+
+.filterChip {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.filterChipInactive {
+  opacity: 0.5;
+}
+
+.thumbnailStrip {
+  display: flex;
+  gap: 4px;
+  padding: 0 var(--panel-padding, 0.75rem) 8px;
+  overflow-x: auto;
+}
+
+.thumbnailMini {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.thumbnailMini.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.multiStats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 var(--panel-padding, 0.75rem) 8px;
+}
+
+.statRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.statValue {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.bulkActions {
+  display: flex;
+  gap: 6px;
+  padding: 8px var(--panel-padding, 0.75rem);
+  border-top: 1px solid var(--border-color);
+}
+
+.bulkAction {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+}
+
+.bulkAction:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+
+/* ── Name input row (single-item) ────────────────────────── */
+.nameInputRow {
+  padding: 0 var(--panel-padding, 0.75rem) 8px;
+}
+
+/* ── Created-at timestamp ────────────────────────────────── */
+.createdAt {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  padding: 4px 0;
+  text-align: right;
+}
+
+/* ── Size expandable button ──────────────────────────────── */
+.sizeButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  width: 100%;
+  padding: var(--space-1, 0.25rem) 0;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.1s;
+  text-align: left;
+}
+
+.sizeButton:hover {
+  background: var(--bg-primary);
+}
+
+.sizeButton .propertyLabel {
+  flex: 0 0 auto;
+}
+
+.sizeButton .propertyValue {
+  flex: 1;
+}
+
+.sizePanel {
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sizeOption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  text-align: left;
+  width: 100%;
+}
+
+.sizeOption:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.sizeOptionActive {
+  background: var(--accent-primary-alpha);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.sizeOptionDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sizeDivider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 0;
+}
+
+.sizeSectionLabel {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 2px 6px;
+}
+
+.sizeAddButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent-primary);
+  font-size: 0.625rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.1s, border-color 0.1s;
+  width: 100%;
+  text-align: left;
+}
+
+.sizeAddButton:hover {
+  background: var(--accent-primary-alpha);
+  border-color: var(--accent-primary);
+}
+
+/* ── Metadata chips row (versions, parents, children) ────── */
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.metaChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.metaChipMuted {
+  opacity: 0.45;
+  color: var(--text-muted);
+}
+
+.metaChipBadge {
+  font-size: 0.5rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--accent-primary-alpha);
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+/* ── Inspector footer (tag + timestamps at bottom) ───────── */
+.inspectorFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--border-color);
+}
+
+.footerTimestamp {
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
 }

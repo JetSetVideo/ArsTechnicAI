@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import {
   ZoomIn,
   ZoomOut,
@@ -16,6 +16,14 @@ import {
   MessageSquareText,
   Cpu,
   GitBranch,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  Image as ImageIcon,
+  Sparkles,
+  BoxSelect,
+  MousePointer2,
+  Hand,
 } from 'lucide-react';
 import { useCanvasStore, useFileStore, useLogStore, useSettingsStore, useNodeStore } from '@/stores';
 import { Button } from '../ui/Button';
@@ -63,8 +71,17 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const { settings } = useSettingsStore();
   const log = useLogStore((s) => s.log);
 
+  type CanvasTool = 'pointer' | 'lasso' | 'hand';
+  const [activeTool, setActiveTool] = useState<CanvasTool>('pointer');
   const [isDragging, setIsDragging] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+
+  type LassoPhase = 'idle' | 'drawing';
+  const [lassoPhase, setLassoPhase] = useState<LassoPhase>('idle');
+  const [marqueeStart, setMarqueeStart] = useState({ x: 0, y: 0 });
+  const [marqueeEnd, setMarqueeEnd] = useState({ x: 0, y: 0 });
+  const lassoJustFinishedRef = useRef(false);
+
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(settings.showGrid);
@@ -76,9 +93,26 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  // Tab state for generated image nodes: map of itemId -> activeTab
-  type NodeTabId = 'prompt' | 'info' | 'versions';
+  // Tab state for all canvas nodes: map of itemId -> activeTab
+  type NodeTabId = 'name' | 'prompt' | 'info' | 'versions';
   const [activeNodeTabs, setActiveNodeTabs] = useState<Record<string, NodeTabId | null>>({});
+  // Orb expanded state: map of itemId -> boolean
+  const [orbExpanded, setOrbExpanded] = useState<Record<string, boolean>>({});
+  // Orb spin animation key
+  const [orbSpinKey, setOrbSpinKey] = useState<Record<string, number>>({});
+
+  const NODE_COLORS: Record<string, string> = {
+    generated: '#00d4aa',
+    image: '#a855f7',
+    placeholder: '#f59e0b',
+  };
+
+  const getOrbColor = (type: string) => NODE_COLORS[type] ?? '#00d4aa';
+
+  const maxZIndex = useMemo(
+    () => Math.max(0, ...items.map((i) => i.zIndex)),
+    [items],
+  );
 
   const toggleNodeTab = useCallback((itemId: string, tab: NodeTabId) => {
     setActiveNodeTabs((prev) => ({
@@ -86,6 +120,26 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       [itemId]: prev[itemId] === tab ? null : tab,
     }));
   }, []);
+
+  const toggleOrb = useCallback((itemId: string) => {
+    setOrbExpanded((prev) => {
+      const next = { ...prev, [itemId]: !prev[itemId] };
+      if (!prev[itemId]) {
+        setActiveNodeTabs((t) => ({ ...t, [itemId]: null }));
+      }
+      return next;
+    });
+    setOrbSpinKey((prev) => ({ ...prev, [itemId]: (prev[itemId] ?? 0) + 1 }));
+  }, []);
+
+  const computeTabsMaxWidth = useCallback(
+    (itemW: number) => {
+      const screenW = typeof window !== 'undefined' ? window.innerWidth : 1920;
+      const nodeVisualW = itemW * viewport.zoom;
+      return Math.max(120, Math.min(nodeVisualW * 0.95, screenW * 0.35, 600));
+    },
+    [viewport.zoom],
+  );
 
   // Handle double-click on filename tag to start editing
   const handleTagDoubleClick = useCallback((e: React.MouseEvent, item: CanvasItem) => {
@@ -142,26 +196,44 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const [resizingItemId, setResizingItemId] = useState<string | null>(null);
   const resizeOrigin = useRef<{ mouseX: number; mouseY: number; item: CanvasItem } | null>(null);
 
-  // Keyboard shortcuts
+  const spaceHeldRef = useRef(false);
+  const toolBeforeSpaceRef = useRef<CanvasTool>('pointer');
+
+  const switchTool = useCallback((tool: CanvasTool) => {
+    setActiveTool(tool);
+    setLassoPhase('idle');
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      if (e.key === ' ' && !e.repeat && !spaceHeldRef.current) {
+        e.preventDefault();
+        spaceHeldRef.current = true;
+        toolBeforeSpaceRef.current = activeTool;
+        switchTool('hand');
+        return;
+      }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedIds.length > 0) {
           removeSelected();
           log('canvas_remove', `Removed ${selectedIds.length} item(s)`);
         }
-        // Also remove selected nodes if any
         const selectedNodeIds = useNodeStore.getState().selectedIds;
         if (selectedNodeIds.length > 0) {
           selectedNodeIds.forEach(id => useNodeStore.getState().removeNode(id));
         }
       } else if (e.key === 'Escape') {
-        clearSelection();
-        useNodeStore.getState().clearSelection();
-        useNodeStore.getState().cancelConnection();
+        if (lassoPhase === 'drawing') {
+          setLassoPhase('idle');
+        } else {
+          clearSelection();
+          useNodeStore.getState().clearSelection();
+          useNodeStore.getState().cancelConnection();
+        }
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
         copy();
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
@@ -176,6 +248,12 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
         undo();
+      } else if (e.key === 'l' || e.key === 'L') {
+        switchTool(activeTool === 'lasso' ? 'pointer' : 'lasso');
+      } else if (e.key === 'v' || e.key === 'V') {
+        switchTool('pointer');
+      } else if (e.key === 'h' || e.key === 'H') {
+        switchTool('hand');
       } else if (e.key === '+' || e.key === '=') {
         zoomIn();
       } else if (e.key === '-') {
@@ -185,9 +263,20 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ' && spaceHeldRef.current) {
+        spaceHeldRef.current = false;
+        switchTool(toolBeforeSpaceRef.current);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedIds, removeSelected, clearSelection, copy, paste, zoomIn, zoomOut, resetViewport, undo, redo, log]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedIds, removeSelected, clearSelection, copy, paste, zoomIn, zoomOut, resetViewport, undo, redo, log, activeTool, lassoPhase, switchTool]);
 
   // Handle drop from explorer
   const handleDrop = useCallback(
@@ -262,14 +351,49 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains(styles.canvasContent)) {
+      if (lassoJustFinishedRef.current) return;
+
+      const target = e.target as HTMLElement;
+      const isBackground = target === canvasRef.current || target.classList.contains(styles.canvasContent);
+      if (!isBackground) return;
+
+      if (activeTool === 'lasso') {
+        if (lassoPhase === 'idle') {
+          setMarqueeStart({ x: e.clientX, y: e.clientY });
+          setMarqueeEnd({ x: e.clientX, y: e.clientY });
+          setLassoPhase('drawing');
+        } else if (lassoPhase === 'drawing') {
+          const rect = canvasRef.current?.getBoundingClientRect();
+          if (rect) {
+            const sx = (Math.min(marqueeStart.x, e.clientX) - rect.left - viewport.x) / viewport.zoom;
+            const sy = (Math.min(marqueeStart.y, e.clientY) - rect.top - viewport.y) / viewport.zoom;
+            const ex = (Math.max(marqueeStart.x, e.clientX) - rect.left - viewport.x) / viewport.zoom;
+            const ey = (Math.max(marqueeStart.y, e.clientY) - rect.top - viewport.y) / viewport.zoom;
+            const newSelected = items.filter((item) => {
+              const iw = item.width * item.scale;
+              const ih = item.height * item.scale;
+              return item.x + iw > sx && item.x < ex && item.y + ih > sy && item.y < ey;
+            }).map((item) => item.id);
+            useCanvasStore.setState({ selectedIds: newSelected });
+            if (newSelected.length > 0) {
+              log('canvas_move', `Selected ${newSelected.length} item(s) via lasso`);
+            }
+          }
+          setLassoPhase('idle');
+          lassoJustFinishedRef.current = true;
+          setTimeout(() => { lassoJustFinishedRef.current = false; }, 100);
+        }
+        return;
+      }
+
+      if (activeTool === 'pointer') {
         clearSelection();
         useNodeStore.getState().clearSelection();
         setPromptOverlayItemId(null);
         setVersionOverlayItemId(null);
       }
     },
-    [clearSelection]
+    [clearSelection, activeTool, lassoPhase, marqueeStart, viewport, items, log]
   );
 
   // Item drag start — take snapshot for undo
@@ -350,6 +474,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           height: newH,
           scale: 1,
         });
+      } else if (lassoPhase === 'drawing') {
+        setMarqueeEnd({ x: e.clientX, y: e.clientY });
       } else if (isPanning) {
         setViewport({
           x: viewport.x + e.movementX,
@@ -357,7 +483,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         });
       }
     },
-    [dragItemId, dragStart, viewport, isPanning, updateItem, resizingItemId, resizingHandle]
+    [dragItemId, dragStart, viewport, isPanning, lassoPhase, updateItem, resizingItemId, resizingHandle, setViewport]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -378,8 +504,18 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     if (e.button === 1) {
       e.preventDefault();
       setIsPanning(true);
+      return;
     }
-  }, []);
+    if (e.button !== 0) return;
+
+    const target = e.target as HTMLElement;
+    const isBackground = target === canvasRef.current || target.classList.contains(styles.canvasContent);
+    if (!isBackground) return;
+
+    if (activeTool === 'hand') {
+      setIsPanning(true);
+    }
+  }, [activeTool]);
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -493,7 +629,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     });
   }, [updateItem, snapshot]);
 
-  // Cursor based on operation
   const getCursor = () => {
     if (resizingHandle) {
       const map: Record<ResizeHandle, string> = {
@@ -505,6 +640,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     }
     if (isPanning) return 'grabbing';
     if (dragItemId) return 'grabbing';
+    if (activeTool === 'lasso') return 'crosshair';
+    if (activeTool === 'hand') return 'grab';
     return 'default';
   };
 
@@ -512,84 +649,148 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const svgW = 10000;
   const svgH = 10000;
 
+  const toolbarScrollRef = useRef<HTMLDivElement>(null);
+  const toolbarDragRef = useRef<{ isDragging: boolean; startX: number; scrollLeft: number }>({
+    isDragging: false, startX: 0, scrollLeft: 0,
+  });
+
+  const handleToolbarPointerDown = useCallback((e: React.PointerEvent) => {
+    const el = toolbarScrollRef.current;
+    if (!el) return;
+    if ((e.target as HTMLElement).closest('button')) return;
+    toolbarDragRef.current = { isDragging: true, startX: e.clientX, scrollLeft: el.scrollLeft };
+    el.setPointerCapture(e.pointerId);
+  }, []);
+
+  const handleToolbarPointerMove = useCallback((e: React.PointerEvent) => {
+    const d = toolbarDragRef.current;
+    if (!d.isDragging) return;
+    const el = toolbarScrollRef.current;
+    if (!el) return;
+    el.scrollLeft = d.scrollLeft - (e.clientX - d.startX);
+  }, []);
+
+  const handleToolbarPointerUp = useCallback(() => {
+    toolbarDragRef.current.isDragging = false;
+  }, []);
+
   return (
     <div className={styles.canvasWrapper}>
       {/* Toolbar */}
       <div className={styles.toolbar}>
-        <div className={styles.toolbarGroup}>
-          <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo()} title="Undo (⌘Z)">
-            <Undo2 size={16} />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo()} title="Redo (⌘⇧Z)">
-            <Redo2 size={16} />
-          </Button>
-        </div>
+        <div
+          ref={toolbarScrollRef}
+          className={styles.toolbarScroll}
+          onPointerDown={handleToolbarPointerDown}
+          onPointerMove={handleToolbarPointerMove}
+          onPointerUp={handleToolbarPointerUp}
+          onPointerCancel={handleToolbarPointerUp}
+        >
+          <div className={styles.toolbarGroup}>
+            <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo()} title="Undo (⌘Z)">
+              <Undo2 size={16} />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo()} title="Redo (⌘⇧Z)">
+              <Redo2 size={16} />
+            </Button>
+          </div>
 
-        <div className={styles.toolbarDivider} />
+          <div className={styles.toolbarDivider} />
 
-        <div className={styles.toolbarGroup}>
-          <Button variant="ghost" size="sm" onClick={zoomOut} title="Zoom Out (-)">
-            <ZoomOut size={16} />
-          </Button>
-          <span className={styles.zoomLevel}>{Math.round(viewport.zoom * 100)}%</span>
-          <Button variant="ghost" size="sm" onClick={zoomIn} title="Zoom In (+)">
-            <ZoomIn size={16} />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={resetViewport} title="Reset View (0)">
-            <Maximize size={16} />
-          </Button>
-        </div>
+          <div className={styles.toolbarGroup}>
+            <Button
+              variant={activeTool === 'pointer' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => switchTool('pointer')}
+              title="Pointer (V)"
+            >
+              <MousePointer2 size={16} />
+            </Button>
+            <Button
+              variant={activeTool === 'lasso' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => switchTool(activeTool === 'lasso' ? 'pointer' : 'lasso')}
+              title="Lasso Select (L)"
+              className={activeTool === 'lasso' ? styles.toolButtonActive : undefined}
+            >
+              <BoxSelect size={16} />
+            </Button>
+            <Button
+              variant={activeTool === 'hand' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => switchTool(activeTool === 'hand' ? 'pointer' : 'hand')}
+              title="Hand / Pan (H)"
+            >
+              <Hand size={16} />
+            </Button>
+          </div>
 
-        <div className={styles.toolbarDivider} />
+          <div className={styles.toolbarDivider} />
 
-        <div className={styles.toolbarGroup}>
-          <Button
-            variant={showGrid ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setShowGrid(!showGrid)}
-            title="Toggle Grid"
-          >
-            <Grid3X3 size={16} />
-          </Button>
-        </div>
+          <div className={styles.toolbarGroup}>
+            <Button variant="ghost" size="sm" onClick={zoomOut} title="Zoom Out (-)">
+              <ZoomOut size={16} />
+            </Button>
+            <span className={styles.zoomLevel}>{Math.round(viewport.zoom * 100)}%</span>
+            <Button variant="ghost" size="sm" onClick={zoomIn} title="Zoom In (+)">
+              <ZoomIn size={16} />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={resetViewport} title="Reset View (0)">
+              <Maximize size={16} />
+            </Button>
+          </div>
 
-        {selectedIds.length > 0 && (
-          <>
-            <div className={styles.toolbarDivider} />
-            <div className={styles.toolbarGroup}>
-              <Button variant="ghost" size="sm" onClick={handleRotateCCW} title="Rotate CCW">
-                <RotateCcw size={16} />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleRotateCW} title="Rotate CW">
-                <RotateCw size={16} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { copy(); paste(); }}
-                title="Duplicate"
-              >
-                <Copy size={16} />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={removeSelected} title="Delete (⌫)">
-                <Trash2 size={16} />
-              </Button>
-            </div>
-          </>
-        )}
+          <div className={styles.toolbarDivider} />
 
-        <div className={styles.toolbarSpacer} />
+          <div className={styles.toolbarGroup}>
+            <Button
+              variant={showGrid ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setShowGrid(!showGrid)}
+              title="Toggle Grid"
+            >
+              <Grid3X3 size={16} />
+            </Button>
+          </div>
 
-        <div className={styles.toolbarGroup}>
-          <Button
-            variant={showGrid ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={handleExport}
-            disabled={items.length === 0}
-            title="Export as PNG"
-          >
-            <Download size={16} />
-          </Button>
+          {selectedIds.length > 0 && (
+            <>
+              <div className={styles.toolbarDivider} />
+              <div className={styles.toolbarGroup}>
+                <Button variant="ghost" size="sm" onClick={handleRotateCCW} title="Rotate CCW">
+                  <RotateCcw size={16} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleRotateCW} title="Rotate CW">
+                  <RotateCw size={16} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { copy(); paste(); }}
+                  title="Duplicate"
+                >
+                  <Copy size={16} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={removeSelected} title="Delete (⌫)">
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            </>
+          )}
+
+          <div className={styles.toolbarSpacer} />
+
+          <div className={styles.toolbarGroup}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleExport}
+              disabled={items.length === 0}
+              title="Export as PNG"
+            >
+              <Download size={16} />
+            </Button>
+          </div>
         </div>
 
         <div className={styles.itemCount}>
@@ -637,12 +838,17 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             const isGenerated = item.type === 'generated';
             const meta = item.generationMeta;
             const activeTab = activeNodeTabs[item.id] ?? null;
+            const isOrbOpen = orbExpanded[item.id] ?? false;
+            const orbColor = getOrbColor(item.type);
+            const isHighestZ = item.zIndex === maxZIndex && items.length > 1;
+            const tabsMaxW = computeTabsMaxWidth(item.width * item.scale);
+            const orbSpinClass = orbSpinKey[item.id] ? styles.nodeOrbSpin : '';
 
             return (
               <div
                 key={item.id}
                 data-canvas-item-id={item.id}
-                className={`${styles.canvasItem} ${selectedIds.includes(item.id) ? styles.selected : ''} ${item.locked ? styles.locked : ''}`}
+                className={`${styles.canvasItem} ${selectedIds.includes(item.id) ? styles.selected : ''} ${item.locked ? styles.locked : ''} ${isHighestZ ? styles.nodeFrameHighZ : ''}`}
                 style={{
                   left: item.x,
                   top: item.y,
@@ -651,74 +857,123 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   transform: `rotate(${item.rotation}deg)`,
                   zIndex: item.zIndex,
                   opacity: item.visible ? 1 : 0.3,
+                  ['--orb-color' as string]: orbColor,
                 }}
                 onMouseDown={(e) => handleItemMouseDown(e, item)}
               >
-                {/* Tabbed header for all items */}
+                {/* ── Node Orb ── */}
                 <div
-                  className={styles.nodeTabs}
-                  style={{ transform: `scale(${1 / viewport.zoom})`, transformOrigin: 'bottom left' }}
+                  key={`orb-${orbSpinKey[item.id] ?? 0}`}
+                  className={`${styles.nodeOrb} ${isOrbOpen ? styles.nodeOrbExpanded : ''} ${orbSpinClass}`}
+                  style={{
+                    background: orbColor,
+                    transform: `scale(${1 / viewport.zoom})`,
+                    transformOrigin: 'center center',
+                  }}
+                  onClick={(e) => { e.stopPropagation(); toggleOrb(item.id); }}
                   onMouseDown={(e) => e.stopPropagation()}
+                  title={isOrbOpen ? 'Collapse details' : 'Expand details'}
                 >
-                  {/* Editable name tag */}
-                  {editingItemId === item.id ? (
-                    <input
-                      ref={editInputRef}
-                      className={styles.filenameEditInput}
-                      style={{ position: 'static', top: 'unset', left: 'unset' }}
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      onKeyDown={handleEditKeyDown}
-                      onBlur={handleSaveName}
-                    />
-                  ) : (
-                    <div
-                      className={`${styles.nodeTab} ${!activeTab ? styles.nodeTabActive : ''}`}
-                      onDoubleClick={(e) => handleTagDoubleClick(e, item)}
-                      title={item.name}
-                    >
-                      {item.name.length > 24 ? item.name.slice(0, 22) + '…' : item.name}
-                    </div>
-                  )}
-                  {/* Type tag */}
-                  {!isGenerated && (
-                    <div className={styles.nodeTab} title={item.type}>
-                      {item.type === 'image' ? 'Image' : 'Placeholder'}
-                    </div>
-                  )}
-                  {isGenerated && (
-                    <>
-                      <div
-                        className={`${styles.nodeTab} ${activeTab === 'prompt' ? styles.nodeTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'prompt')}
-                        title="Prompt"
-                      >
-                        <MessageSquareText size={10} /> Prompt
-                      </div>
-                      <div
-                        className={`${styles.nodeTab} ${activeTab === 'info' ? styles.nodeTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'info')}
-                        title="Generation Info"
-                      >
-                        <Cpu size={10} /> Info
-                      </div>
-                      <div
-                        className={`${styles.nodeTab} ${activeTab === 'versions' ? styles.nodeTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'versions')}
-                        title="Versions & Lineage"
-                      >
-                        <GitBranch size={10} /> Versions
-                      </div>
-                    </>
-                  )}
+                  {isOrbOpen ? <ChevronUp /> : <ChevronDown />}
                 </div>
 
-                {/* Tab panel content overlaid on the image */}
-                {isGenerated && activeTab && (
+                {/* ── Expanded vertical tabs (from orb) ── */}
+                {isOrbOpen && (
                   <div
-                    className={styles.nodeTabPanel}
+                    className={styles.nodeTabsExpanded}
+                    style={{
+                      transform: `scale(${1 / viewport.zoom})`,
+                      transformOrigin: 'top left',
+                      ['--orb-color' as string]: orbColor,
+                    }}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
+                    <div
+                      className={`${styles.expandedTab} ${activeTab === 'name' ? styles.expandedTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'name')}
+                    >
+                      <span className={styles.expandedTabIcon}>
+                        {isGenerated ? <Sparkles size={11} /> : <ImageIcon size={11} />}
+                      </span>
+                      {item.name}
+                    </div>
+                    <div
+                      className={`${styles.expandedTab} ${activeTab === 'prompt' ? styles.expandedTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'prompt')}
+                    >
+                      <span className={styles.expandedTabIcon}><MessageSquareText size={11} /></span>
+                      Prompt
+                    </div>
+                    <div
+                      className={`${styles.expandedTab} ${activeTab === 'info' ? styles.expandedTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'info')}
+                    >
+                      <span className={styles.expandedTabIcon}><Cpu size={11} /></span>
+                      Info
+                    </div>
+                    <div
+                      className={`${styles.expandedTab} ${activeTab === 'versions' ? styles.expandedTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'versions')}
+                    >
+                      <span className={styles.expandedTabIcon}><GitBranch size={11} /></span>
+                      Versions
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Expanded panel content ── */}
+                {isOrbOpen && activeTab && (
+                  <div
+                    className={styles.nodeTabPanelExpanded}
+                    style={{
+                      transform: `scale(${1 / viewport.zoom})`,
+                      transformOrigin: 'top left',
+                      ['--orb-color' as string]: orbColor,
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {activeTab === 'name' && (
+                      <>
+                        <div className={styles.nodeTabPanelLabel}>Name</div>
+                        {editingItemId === item.id ? (
+                          <input
+                            ref={editInputRef}
+                            className={styles.filenameEditInput}
+                            style={{ position: 'static', width: '100%', maxWidth: '100%' }}
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onKeyDown={handleEditKeyDown}
+                            onBlur={handleSaveName}
+                          />
+                        ) : (
+                          <div
+                            className={styles.nodeTabPanelValue}
+                            onDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                            style={{ cursor: 'text' }}
+                          >
+                            {item.name}
+                          </div>
+                        )}
+                        <div className={styles.nodeTabPanelRow} style={{ marginTop: 6 }}>
+                          <span className={styles.nodeTabPanelLabel}>Type</span>
+                          <span className={styles.nodeTabPanelValue}>{isGenerated ? 'AI Generated' : item.type === 'image' ? 'Imported Image' : 'Placeholder'}</span>
+                        </div>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Size</span>
+                          <span className={styles.nodeTabPanelValue}>{Math.round(item.width * item.scale)} × {Math.round(item.height * item.scale)}</span>
+                        </div>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Position</span>
+                          <span className={styles.nodeTabPanelValue}>{Math.round(item.x)}, {Math.round(item.y)}</span>
+                        </div>
+                        {item.assetId && (
+                          <div className={styles.nodeTabPanelRow}>
+                            <span className={styles.nodeTabPanelLabel}>Asset ID</span>
+                            <span className={styles.nodeTabPanelValue} style={{ fontSize: '0.5625rem', opacity: 0.6 }}>{item.assetId.slice(0, 14)}…</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                     {activeTab === 'prompt' && (
                       <>
                         <div className={styles.nodeTabPanelLabel}>Prompt</div>
@@ -733,7 +988,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                         )}
                       </>
                     )}
-
                     {activeTab === 'info' && (
                       <>
                         <div className={styles.nodeTabPanelRow}>
@@ -768,7 +1022,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                         </div>
                       </>
                     )}
-
                     {activeTab === 'versions' && (
                       <>
                         <div className={styles.nodeTabPanelRow}>
@@ -795,6 +1048,95 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                           <div className={styles.nodeTabPanelEmpty}>No variations yet</div>
                         )}
                       </>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Compact horizontal tabs (when orb is collapsed) ── */}
+                {!isOrbOpen && (
+                  <div
+                    className={styles.nodeTabs}
+                    style={{
+                      transform: `scale(${1 / viewport.zoom})`,
+                      transformOrigin: 'bottom left',
+                      ['--tabs-max-w' as string]: `${tabsMaxW}px`,
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {editingItemId === item.id ? (
+                      <input
+                        ref={editInputRef}
+                        className={styles.filenameEditInput}
+                        style={{ position: 'static', top: 'unset', left: 'unset' }}
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onKeyDown={handleEditKeyDown}
+                        onBlur={handleSaveName}
+                      />
+                    ) : (
+                      <div
+                        className={`${styles.nodeTab} ${!activeTab ? styles.nodeTabActive : ''}`}
+                        onDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                        title={item.name}
+                      >
+                        {item.name.length > 24 ? item.name.slice(0, 22) + '…' : item.name}
+                      </div>
+                    )}
+                    <div
+                      className={`${styles.nodeTab} ${activeTab === 'prompt' ? styles.nodeTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'prompt')}
+                      title="Prompt"
+                    >
+                      <MessageSquareText size={9} /> Prompt
+                    </div>
+                    <div
+                      className={`${styles.nodeTab} ${activeTab === 'info' ? styles.nodeTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'info')}
+                      title="Info"
+                    >
+                      <Cpu size={9} /> Info
+                    </div>
+                    <div
+                      className={`${styles.nodeTab} ${activeTab === 'versions' ? styles.nodeTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'versions')}
+                      title="Versions"
+                    >
+                      <GitBranch size={9} /> Ver
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Compact tab panel (when orb is collapsed) ── */}
+                {!isOrbOpen && activeTab && (
+                  <div
+                    className={styles.nodeTabPanel}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {activeTab === 'prompt' && (
+                      <>
+                        <div className={styles.nodeTabPanelLabel}>Prompt</div>
+                        <div className={styles.nodeTabPanelValue}>
+                          {meta?.prompt || item.prompt || '—'}
+                        </div>
+                      </>
+                    )}
+                    {activeTab === 'info' && (
+                      <>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Model</span>
+                          <span className={styles.nodeTabPanelValue}>{meta?.model || '—'}</span>
+                        </div>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Size</span>
+                          <span className={styles.nodeTabPanelValue}>{item.width} × {item.height}</span>
+                        </div>
+                      </>
+                    )}
+                    {activeTab === 'versions' && (
+                      <div className={styles.nodeTabPanelRow}>
+                        <span className={styles.nodeTabPanelLabel}>Version</span>
+                        <span className={styles.nodeTabPanelValue}>v{meta?.imageVersion ?? 1}</span>
+                      </div>
                     )}
                   </div>
                 )}
@@ -858,6 +1200,35 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             </p>
           </div>
         )}
+
+        {lassoPhase === 'drawing' && (() => {
+          const rect = canvasRef.current?.getBoundingClientRect();
+          const rLeft = rect?.left ?? 0;
+          const rTop = rect?.top ?? 0;
+          const mLeft = Math.min(marqueeStart.x, marqueeEnd.x) - rLeft;
+          const mTop = Math.min(marqueeStart.y, marqueeEnd.y) - rTop;
+          const mW = Math.abs(marqueeEnd.x - marqueeStart.x);
+          const mH = Math.abs(marqueeEnd.y - marqueeStart.y);
+          let previewCount = 0;
+          if (rect && mW > 4 && mH > 4) {
+            const sx = (Math.min(marqueeStart.x, marqueeEnd.x) - rLeft - viewport.x) / viewport.zoom;
+            const sy = (Math.min(marqueeStart.y, marqueeEnd.y) - rTop - viewport.y) / viewport.zoom;
+            const ex = (Math.max(marqueeStart.x, marqueeEnd.x) - rLeft - viewport.x) / viewport.zoom;
+            const ey = (Math.max(marqueeStart.y, marqueeEnd.y) - rTop - viewport.y) / viewport.zoom;
+            previewCount = items.filter((item) => {
+              const iw = item.width * item.scale;
+              const ih = item.height * item.scale;
+              return item.x + iw > sx && item.x < ex && item.y + ih > sy && item.y < ey;
+            }).length;
+          }
+          return (
+            <div className={styles.marqueeRect} style={{ left: mLeft, top: mTop, width: mW, height: mH }}>
+              {previewCount > 0 && (
+                <span className={styles.marqueeBadge}>{previewCount}</span>
+              )}
+            </div>
+          );
+        })()}
 
         {isDragging && (
           <div className={styles.dropIndicator}>
