@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { setCanvasRestoring } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useProjectsStore } from '@/stores/projectsStore';
 import { useUserStore } from '@/stores/userStore';
@@ -34,6 +35,16 @@ export function saveProjectWorkspaceState(projectId: string, projectName: string
   if (!projectId || typeof window === 'undefined') return;
   try {
     const { items, viewport } = useCanvasStore.getState();
+    // Guard: don't overwrite existing saved state with empty canvas
+    if (items.length === 0) {
+      const existing = localStorage.getItem(canvasStateKey(projectId));
+      if (existing) {
+        try {
+          const parsed = JSON.parse(existing);
+          if (Array.isArray(parsed.items) && parsed.items.length > 0) return;
+        } catch { /* corrupt data, ok to overwrite */ }
+      }
+    }
     const payload = { items, viewport, savedAt: Date.now() };
     localStorage.setItem(canvasStateKey(projectId), JSON.stringify(payload));
   } catch {
@@ -51,6 +62,8 @@ export function saveProjectWorkspaceState(projectId: string, projectName: string
 export async function loadProjectWorkspaceState(projectId: string, _projectName: string): Promise<boolean> {
   if (!projectId || typeof window === 'undefined') return false;
 
+  setCanvasRestoring(true);
+
   // Try localStorage first (fast path, same browser)
   try {
     const raw = localStorage.getItem(canvasStateKey(projectId));
@@ -61,6 +74,7 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
       if (Array.isArray(items) && items.length > 0) {
         canvas.clearCanvas();
         for (const item of items) canvas.addItem(item);
+        setCanvasRestoring(false);
         return true;
       }
     }
@@ -68,13 +82,57 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
     // Corrupt data is non-fatal
   }
 
+  // Fall back to disk files (.ars-data/canvas-{id}.json)
+  try {
+    const diskRes = await fetch(`/api/workspace/load?projectId=${encodeURIComponent(projectId)}`);
+    if (diskRes.ok) {
+      const diskData = await diskRes.json();
+      const diskCanvas = diskData?.canvas;
+      if (diskCanvas?.items?.length) {
+        const canvasStore = useCanvasStore.getState();
+        if (diskCanvas.viewport) canvasStore.setViewport(diskCanvas.viewport);
+        canvasStore.clearCanvas();
+        for (const item of diskCanvas.items) {
+          const restoredMeta: GenerationMeta | undefined =
+            item.generationMeta && typeof item.generationMeta === 'object'
+              ? (item.generationMeta as GenerationMeta)
+              : item.nodeData && typeof item.nodeData === 'object'
+                ? (item.nodeData as GenerationMeta)
+                : undefined;
+          canvasStore.addItem({
+            type: ((item.type as string)?.toLowerCase?.() ?? 'image') as 'image' | 'generated' | 'placeholder',
+            x: item.x ?? 0,
+            y: item.y ?? 0,
+            width: item.width ?? 512,
+            height: item.height ?? 512,
+            rotation: item.rotation ?? 0,
+            scale: item.scale ?? 1,
+            locked: item.locked ?? false,
+            visible: item.visible ?? true,
+            src: item.src ?? item.dataUrl ?? '',
+            name: item.name ?? 'Untitled',
+            prompt: item.prompt ?? undefined,
+            assetId: item.assetId ?? undefined,
+            generationMeta: restoredMeta,
+          });
+        }
+        rebuildFileTreeFromItems(diskCanvas.items);
+        saveProjectWorkspaceState(projectId, _projectName);
+        setCanvasRestoring(false);
+        return true;
+      }
+    }
+  } catch {
+    // Disk load failure is non-fatal
+  }
+
   // Fall back to loading from DB (cross-browser / fresh session)
   try {
     const canvasRes = await fetch(`/api/projects/${projectId}/canvas`);
-    if (!canvasRes.ok) return false;
+    if (!canvasRes.ok) { setCanvasRestoring(false); return false; }
 
     const { data: canvas } = await canvasRes.json();
-    if (!canvas) return false;
+    if (!canvas) { setCanvasRestoring(false); return false; }
 
     const canvasStore = useCanvasStore.getState();
 
@@ -112,42 +170,47 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
         });
       }
 
-      // Rebuild file tree for generated items
-      const fileStore = useFileStore.getState();
-      const generatedPath = fileStore.getProjectGeneratedPath();
-      for (const item of canvas.items) {
-        if (item.type?.toLowerCase() === 'generated' && item.name) {
-          fileStore.addAssetToFolder(
-            {
-              id: item.assetId || item.id || Date.now().toString(),
-              name: item.name,
-              type: 'image',
-              path: `${generatedPath}/${item.name}`,
-              createdAt: Date.now(),
-              modifiedAt: Date.now(),
-              thumbnail: item.dataUrl || item.src || '',
-              metadata: {
-                width: item.width,
-                height: item.height,
-                prompt: item.prompt,
-                model: item.nodeData?.model,
-                seed: item.nodeData?.seed,
-              },
-            },
-            generatedPath,
-          );
-        }
-      }
-
-      // Cache to localStorage for fast future loads
+      rebuildFileTreeFromItems(canvas.items);
       saveProjectWorkspaceState(projectId, _projectName);
+      setCanvasRestoring(false);
       return true;
     }
   } catch {
     // DB load failure is non-fatal
   }
 
+  setCanvasRestoring(false);
   return false;
+}
+
+function rebuildFileTreeFromItems(items: Array<Record<string, unknown>>) {
+  const fileStore = useFileStore.getState();
+  const generatedPath = fileStore.getProjectGeneratedPath();
+  for (const item of items) {
+    const type = ((item.type as string) ?? '').toLowerCase();
+    if (type === 'generated' && item.name) {
+      const meta = (item.nodeData ?? item.generationMeta) as Record<string, unknown> | undefined;
+      fileStore.addAssetToFolder(
+        {
+          id: (item.assetId as string) || (item.id as string) || Date.now().toString(),
+          name: item.name as string,
+          type: 'image',
+          path: `${generatedPath}/${item.name}`,
+          createdAt: Date.now(),
+          modifiedAt: Date.now(),
+          thumbnail: (item.dataUrl as string) || (item.src as string) || '',
+          metadata: {
+            width: item.width as number,
+            height: item.height as number,
+            prompt: (item.prompt ?? meta?.prompt) as string,
+            model: meta?.model as string,
+            seed: meta?.seed as number,
+          },
+        },
+        generatedPath,
+      );
+    }
+  }
 }
 
 export function clearAllWorkspaceData(): void {

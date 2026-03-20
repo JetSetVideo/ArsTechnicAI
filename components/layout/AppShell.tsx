@@ -69,8 +69,36 @@ export const AppShell: React.FC = () => {
       void saveToDisk();
     }, 15000);
 
+    const handleBeforeUnload = () => {
+      saveProjectWorkspaceState(currentProject.id, currentProject.name);
+      // Use sendBeacon for reliable save on page unload
+      try {
+        const { useCanvasStore } = require('@/stores/canvasStore');
+        const { useSettingsStore } = require('@/stores/settingsStore');
+        const { useProjectsStore } = require('@/stores/projectsStore');
+        const { useFileStore } = require('@/stores/fileStore');
+        const { items, viewport } = useCanvasStore.getState();
+        const settings = useSettingsStore.getState().settings;
+        const projects = useProjectsStore.getState().projects;
+        const fileState = useFileStore.getState().exportProjectFileState(currentProject.name);
+        if (items.length > 0) {
+          navigator.sendBeacon('/api/workspace/save', JSON.stringify({
+            projectId: currentProject.id,
+            projectName: currentProject.name,
+            canvas: { viewport, items: items.map((item: any) => ({ ...item, dataUrl: item.src })) },
+            fileState: { projectPath: fileState.projectPath, selectedPath: fileState.selectedPath, expandedPaths: fileState.expandedPaths, projectAssets: fileState.projectAssets },
+            settings,
+            projects: projects.map((p: any) => ({ id: p.id, name: p.name, createdAt: p.createdAt, modifiedAt: p.modifiedAt, assetCount: p.assetCount, tags: p.tags, isFavorite: p.isFavorite, thumbnail: p.thumbnail })),
+          }));
+        }
+      } catch { /* best effort */ }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
       clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       void saveProjectWorkspaceState(currentProject.id, currentProject.name);
       void saveToDisk();
     };

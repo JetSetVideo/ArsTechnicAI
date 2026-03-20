@@ -15,20 +15,114 @@
   padding: 0;
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
-  max-height: min(52vh, 420px);
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
 .headerTitleRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-2, 0.5rem) var(--panel-padding, 0.75rem);
+  padding: 0 var(--panel-padding, 0.75rem) 0 0;
   flex-shrink: 0;
 }
 
-/* Selected item block — lives under the Inspector title */
+/* ── Tab bar ─────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  flex: 1;
+}
+
+.tabButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--font-xs, 0.6875rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+  position: relative;
+  white-space: nowrap;
+}
+
+.tabButton::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 2px;
+  background: transparent;
+  border-radius: 2px 2px 0 0;
+  transition: background 0.15s ease;
+}
+
+.tabButton:hover {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.tabButtonActive {
+  color: var(--accent-primary);
+}
+
+.tabButtonActive::after {
+  background: var(--accent-primary);
+}
+
+/* ── Tab content wrapper ────────────────────────────────── */
+.tabContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Selected item block — now inside tab content */
+.selectedInContent {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.selectedInContent .sectionHeader {
+  background: transparent;
+}
+
+.selectedInContent .propertyGrid {
+  padding: 0 var(--panel-padding, 0.75rem) var(--panel-padding, 0.75rem);
+}
+
+/* Empty state for inspector tab */
+.emptyInspector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.emptyInspector svg {
+  opacity: 0.3;
+}
+
+.emptyInspector p {
+  font-size: var(--font-sm, 0.75rem);
+  line-height: 1.5;
+  max-width: 220px;
+}
+
+/* Keep backward compat for selectedInHeader (unused now but safe) */
 .selectedInHeader {
   border-top: 1px solid var(--border-color);
   background: var(--bg-tertiary);
@@ -714,4 +808,56 @@
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
+}
+
+/* ── Agent Personas ──────────────────────────────────────── */
+.agentBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--space-2, 0.5rem);
+}
+
+.agentChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.agentChip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+}
+
+.agentChipActive {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-primary-alpha);
+}
+
+.agentChipActive:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.agentLabel {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
 }

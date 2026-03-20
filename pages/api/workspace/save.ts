@@ -10,7 +10,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { canvas, fileState, settings, projectId, projectName } = req.body ?? {};
+  // Support sendBeacon (text/plain content type) by parsing string body
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch { return res.status(400).json({ error: 'Invalid JSON' }); }
+  }
+
+  const { canvas, fileState, settings, projectId, projectName } = body ?? {};
 
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -39,11 +45,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Save projects list
-    if (req.body.projects) {
+    if (body.projects) {
       const projectsFile = path.join(DATA_DIR, 'projects.json');
       await fs.writeFile(projectsFile, JSON.stringify({
         savedAt: Date.now(),
-        projects: req.body.projects,
+        projects: body.projects,
       }, null, 2), 'utf-8');
     }
 

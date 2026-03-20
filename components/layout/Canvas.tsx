@@ -654,56 +654,64 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                 }}
                 onMouseDown={(e) => handleItemMouseDown(e, item)}
               >
-                {/* Tabbed header for generated images */}
-                {isGenerated && (
-                  <div
-                    className={styles.nodeTabs}
-                    style={{ transform: `scale(${1 / viewport.zoom})`, transformOrigin: 'bottom left' }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    {/* Editable name tag */}
-                    {editingItemId === item.id ? (
-                      <input
-                        ref={editInputRef}
-                        className={styles.filenameEditInput}
-                        style={{ position: 'static', top: 'unset', left: 'unset' }}
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onKeyDown={handleEditKeyDown}
-                        onBlur={handleSaveName}
-                      />
-                    ) : (
+                {/* Tabbed header for all items */}
+                <div
+                  className={styles.nodeTabs}
+                  style={{ transform: `scale(${1 / viewport.zoom})`, transformOrigin: 'bottom left' }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  {/* Editable name tag */}
+                  {editingItemId === item.id ? (
+                    <input
+                      ref={editInputRef}
+                      className={styles.filenameEditInput}
+                      style={{ position: 'static', top: 'unset', left: 'unset' }}
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onKeyDown={handleEditKeyDown}
+                      onBlur={handleSaveName}
+                    />
+                  ) : (
+                    <div
+                      className={`${styles.nodeTab} ${!activeTab ? styles.nodeTabActive : ''}`}
+                      onDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                      title={item.name}
+                    >
+                      {item.name.length > 24 ? item.name.slice(0, 22) + '…' : item.name}
+                    </div>
+                  )}
+                  {/* Type tag */}
+                  {!isGenerated && (
+                    <div className={styles.nodeTab} title={item.type}>
+                      {item.type === 'image' ? 'Image' : 'Placeholder'}
+                    </div>
+                  )}
+                  {isGenerated && (
+                    <>
                       <div
-                        className={`${styles.nodeTab} ${!activeTab ? styles.nodeTabActive : ''}`}
-                        onDoubleClick={(e) => handleTagDoubleClick(e, item)}
-                        title={item.name}
+                        className={`${styles.nodeTab} ${activeTab === 'prompt' ? styles.nodeTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'prompt')}
+                        title="Prompt"
                       >
-                        {item.name.length > 24 ? item.name.slice(0, 22) + '…' : item.name}
+                        <MessageSquareText size={10} /> Prompt
                       </div>
-                    )}
-                    <div
-                      className={`${styles.nodeTab} ${activeTab === 'prompt' ? styles.nodeTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'prompt')}
-                      title="Prompt"
-                    >
-                      <MessageSquareText size={10} /> Prompt
-                    </div>
-                    <div
-                      className={`${styles.nodeTab} ${activeTab === 'info' ? styles.nodeTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'info')}
-                      title="Generation Info"
-                    >
-                      <Cpu size={10} /> Info
-                    </div>
-                    <div
-                      className={`${styles.nodeTab} ${activeTab === 'versions' ? styles.nodeTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'versions')}
-                      title="Versions & Lineage"
-                    >
-                      <GitBranch size={10} /> Versions
-                    </div>
-                  </div>
-                )}
+                      <div
+                        className={`${styles.nodeTab} ${activeTab === 'info' ? styles.nodeTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'info')}
+                        title="Generation Info"
+                      >
+                        <Cpu size={10} /> Info
+                      </div>
+                      <div
+                        className={`${styles.nodeTab} ${activeTab === 'versions' ? styles.nodeTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'versions')}
+                        title="Versions & Lineage"
+                      >
+                        <GitBranch size={10} /> Versions
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 {/* Tab panel content overlaid on the image */}
                 {isGenerated && activeTab && (

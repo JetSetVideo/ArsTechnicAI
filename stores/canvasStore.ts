@@ -3,6 +3,33 @@ import { v4 as uuidv4 } from 'uuid';
 import type { CanvasItem, CanvasViewport, Asset } from '@/types';
 
 const MAX_HISTORY = 50;
+const DEBOUNCE_MS = 2000;
+
+let _persistTimer: ReturnType<typeof setTimeout> | null = null;
+let _isRestoring = false;
+
+export function setCanvasRestoring(val: boolean) {
+  _isRestoring = val;
+}
+
+function schedulePersist() {
+  if (_isRestoring || typeof window === 'undefined') return;
+  if (_persistTimer) clearTimeout(_persistTimer);
+  _persistTimer = setTimeout(() => {
+    _persistTimer = null;
+    try {
+      const pStore =
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        require('@/stores/projectStore').useProjectStore.getState();
+      const projectId: string | undefined = pStore.projectId;
+      if (!projectId) return;
+      const { items, viewport } = useCanvasStore.getState();
+      if (items.length === 0) return;
+      const key = `ars:canvas-states:${projectId}`;
+      localStorage.setItem(key, JSON.stringify({ items, viewport, savedAt: Date.now() }));
+    } catch { /* non-fatal */ }
+  }, DEBOUNCE_MS);
+}
 
 interface CanvasState {
   items: CanvasItem[];
@@ -75,6 +102,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       future: [items, ...future].slice(0, MAX_HISTORY),
       selectedIds: [],
     });
+    schedulePersist();
   },
 
   redo: () => {
@@ -87,6 +115,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       future: future.slice(1),
       selectedIds: [],
     });
+    schedulePersist();
   },
 
   canUndo: () => get().past.length > 0,
@@ -102,6 +131,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       zIndex: maxZ + 1,
     };
     set((state) => ({ items: [...state.items, item] }));
+    schedulePersist();
     return item;
   },
 
@@ -144,6 +174,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       items: state.items.filter((i) => i.id !== id),
       selectedIds: state.selectedIds.filter((sid) => sid !== id),
     }));
+    schedulePersist();
   },
 
   removeSelected: () => {
@@ -153,12 +184,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       items: state.items.filter((i) => !selectedIds.includes(i.id)),
       selectedIds: [],
     }));
+    schedulePersist();
   },
 
   updateItem: (id, updates) => {
     set((state) => ({
       items: state.items.map((i) => (i.id === id ? { ...i, ...updates } : i)),
     }));
+    schedulePersist();
   },
 
   duplicateItem: (id) => {
