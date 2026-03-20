@@ -24,9 +24,10 @@ import {
   useLogStore,
   useFileStore,
   useProjectStore,
+  useToastStore,
 } from '@/stores';
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
-import type { GenerationResult } from '@/types';
+import type { GenerationResult, GenerationMeta } from '@/types';
 import styles from './InspectorPanel.module.css';
 
 interface InspectorPanelProps {
@@ -251,8 +252,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   } = useGenerationStore();
 
   const { updateItem, addItem } = useCanvasStore();
-  const { updateAsset, addAsset } = useFileStore();
-  const settings = useSettingsStore((s) => s);
+  const { updateAsset, addAsset, addAssetToFolder, getProjectGeneratedPath } = useFileStore();
+  const settings = useSettingsStore((s) => s.settings);
   const updateAIProvider = useSettingsStore((s) => s.updateAIProvider);
   const log = useLogStore((s) => s.log);
   const selectedItems = useCanvasStore((s) => s.getSelectedItems());
@@ -285,25 +286,33 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     }
   }, [settings.aiProvider?.apiKey]);
 
+  const toast = useToastStore();
+
   const handleGenerate = useCallback(async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim()) {
+      toast.warning('Prompt Required', 'Please describe the image you want to generate.');
+      return;
+    }
 
     if (localApiKey !== settings.aiProvider?.apiKey) {
       updateAIProvider({ apiKey: localApiKey });
     }
 
     if (!localApiKey) {
-      alert('Please enter your API key in the settings below');
+      toast.error('API Key Required', 'Please enter your API key in Settings (API Keys tab).');
       return;
     }
 
-    log('generation_start', `Started generating: "${prompt.slice(0, 50)}…"`, { prompt, width: genWidth, height: genHeight });
+    const currentModel = settings.aiProvider?.model ?? 'imagen-3.0-generate-002';
 
-    const job = startGeneration({ prompt, negativePrompt, width: genWidth, height: genHeight, model: settings.aiProvider?.model ?? 'imagen-3.0-generate-002' });
+    log('generation_start', `Started generating: "${prompt.slice(0, 50)}…"`, { prompt, width: genWidth, height: genHeight });
+    toast.info('Generation Started', `Creating: "${prompt.slice(0, 50)}${prompt.length > 50 ? '…' : ''}"`, 3000);
+
+    const job = startGeneration({ prompt, negativePrompt, width: genWidth, height: genHeight, model: currentModel });
 
     try {
       const body: Record<string, unknown> = {
-        prompt, negativePrompt, width: genWidth, height: genHeight, apiKey: localApiKey,
+        prompt, negativePrompt, width: genWidth, height: genHeight, apiKey: localApiKey, model: currentModel,
       };
       if (isAuthenticated && projectId) body.projectId = projectId;
 
@@ -320,16 +329,20 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
 
       const result = await response.json();
 
+      const genSeed = result.seed || Math.floor(Math.random() * 1000000);
+      const genId = uuidv4();
+      const now = Date.now();
+
       const generationResult: GenerationResult = {
-        id: uuidv4(),
+        id: genId,
         prompt,
         imageUrl: result.imageUrl || '',
         dataUrl: result.dataUrl,
         width: genWidth,
         height: genHeight,
-        model: settings.aiProvider?.model ?? 'imagen-3.0-generate-002',
-        seed: result.seed || Math.floor(Math.random() * 1000000),
-        createdAt: Date.now(),
+        model: currentModel,
+        seed: genSeed,
+        createdAt: now,
       };
 
       completeJob(job.id, generationResult);
@@ -337,6 +350,21 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const promptSlug = prompt.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
       const filename = `gen_${promptSlug}_${timestamp}.png`;
+
+      const generationMeta: GenerationMeta = {
+        prompt,
+        negativePrompt: negativePrompt || undefined,
+        model: currentModel,
+        seed: genSeed,
+        width: genWidth,
+        height: genHeight,
+        generatedAt: now,
+        filePath: result.filePath || `/generated/${filename}`,
+        parentIds: [],
+        childIds: [],
+        imageVersion: 1,
+        variations: [],
+      };
 
       addItem({
         type: 'generated',
@@ -352,23 +380,59 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         prompt,
         name: filename,
         assetId: result.assetId,
+        generationMeta,
       });
 
-      addAsset({
-        id: result.assetId ?? uuidv4(),
-        name: filename,
-        type: 'image',
-        path: `/generated/${filename}`,
-        createdAt: Date.now(),
-        modifiedAt: Date.now(),
-        thumbnail: result.dataUrl || result.imageUrl,
-        metadata: { width: genWidth, height: genHeight, prompt, model: settings.aiProvider?.model ?? '', seed: generationResult.seed },
-      });
+      const assetId = result.assetId ?? genId;
+      const generatedFolderPath = getProjectGeneratedPath();
+
+      addAssetToFolder(
+        {
+          id: assetId,
+          name: filename,
+          type: 'image',
+          path: `${generatedFolderPath}/${filename}`,
+          createdAt: now,
+          modifiedAt: now,
+          thumbnail: result.dataUrl || result.imageUrl,
+          metadata: {
+            width: genWidth,
+            height: genHeight,
+            prompt,
+            model: currentModel,
+            seed: genSeed,
+          },
+        },
+        generatedFolderPath,
+      );
+
+      // Persist generation metadata to JSON
+      fetch('/api/generations/save-meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: genId,
+          prompt,
+          negativePrompt: negativePrompt || undefined,
+          model: currentModel,
+          seed: genSeed,
+          width: genWidth,
+          height: genHeight,
+          generatedAt: now,
+          filePath: result.filePath || `/generated/${filename}`,
+          parentIds: [],
+          childIds: [],
+          imageVersion: 1,
+          variations: [],
+        }),
+      }).catch(() => {});
 
       if (projectId) markDirty();
 
       const cloudSaved = isAuthenticated && !!result.assetId;
-      log('generation_complete', `Generated: ${filename}${cloudSaved ? ' (saved to cloud)' : ''}`, { prompt, filename, seed: generationResult.seed, assetId: result.assetId });
+      log('generation_complete', `Generated: ${filename}${cloudSaved ? ' (saved to cloud)' : ''}`, { prompt, filename, seed: genSeed, assetId: result.assetId });
+
+      toast.success('Image Generated', `Saved as ${filename}`, 5000);
 
       if (settings.autoSavePrompts) {
         log('prompt_save', `Saved prompt: "${prompt.slice(0, 30)}…"`, { prompt });
@@ -377,8 +441,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
       const message = error instanceof Error ? error.message : 'Unknown error';
       failJob(job.id, message);
       log('generation_fail', `Generation failed: ${message}`, { error: message });
+      toast.error('Generation Failed', message, 8000);
     }
-  }, [prompt, negativePrompt, genWidth, genHeight, localApiKey, settings, isAuthenticated, projectId, startGeneration, completeJob, failJob, addItem, addAsset, updateAIProvider, markDirty, log]);
+  }, [prompt, negativePrompt, genWidth, genHeight, localApiKey, settings, isAuthenticated, projectId, startGeneration, completeJob, failJob, addItem, addAssetToFolder, getProjectGeneratedPath, updateAIProvider, markDirty, log, toast]);
 
   const handleUpdatePosition = useCallback(
     (axis: 'x' | 'y', value: number) => {

@@ -13,6 +13,9 @@ import {
   RotateCcw,
   RotateCw,
   Lock,
+  MessageSquareText,
+  Cpu,
+  GitBranch,
 } from 'lucide-react';
 import { useCanvasStore, useFileStore, useLogStore, useSettingsStore, useNodeStore } from '@/stores';
 import { Button } from '../ui/Button';
@@ -72,6 +75,17 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Tab state for generated image nodes: map of itemId -> activeTab
+  type NodeTabId = 'prompt' | 'info' | 'versions';
+  const [activeNodeTabs, setActiveNodeTabs] = useState<Record<string, NodeTabId | null>>({});
+
+  const toggleNodeTab = useCallback((itemId: string, tab: NodeTabId) => {
+    setActiveNodeTabs((prev) => ({
+      ...prev,
+      [itemId]: prev[itemId] === tab ? null : tab,
+    }));
+  }, []);
 
   // Handle double-click on filename tag to start editing
   const handleTagDoubleClick = useCallback((e: React.MouseEvent, item: CanvasItem) => {
@@ -619,55 +633,198 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           </svg>
 
           {/* Canvas Items */}
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className={`${styles.canvasItem} ${selectedIds.includes(item.id) ? styles.selected : ''} ${item.locked ? styles.locked : ''}`}
-              style={{
-                left: item.x,
-                top: item.y,
-                width: item.width * item.scale,
-                height: item.height * item.scale,
-                transform: `rotate(${item.rotation}deg)`,
-                zIndex: item.zIndex,
-                opacity: item.visible ? 1 : 0.3,
-              }}
-              onMouseDown={(e) => handleItemMouseDown(e, item)}
-            >
-              {item.src ? (
-                <img
-                  src={item.src}
-                  alt={item.name}
-                  className={styles.itemImage}
-                  draggable={false}
-                />
-              ) : (
-                <div className={styles.placeholder}>
-                  <Layers size={32} />
-                  <span>{item.name}</span>
-                </div>
-              )}
+          {items.map((item) => {
+            const isGenerated = item.type === 'generated';
+            const meta = item.generationMeta;
+            const activeTab = activeNodeTabs[item.id] ?? null;
 
-              {/* Resize + selection handles */}
-              {selectedIds.includes(item.id) && !item.locked && (
-                <>
-                  {(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as ResizeHandle[]).map((h) => (
+            return (
+              <div
+                key={item.id}
+                className={`${styles.canvasItem} ${selectedIds.includes(item.id) ? styles.selected : ''} ${item.locked ? styles.locked : ''}`}
+                style={{
+                  left: item.x,
+                  top: item.y,
+                  width: item.width * item.scale,
+                  height: item.height * item.scale,
+                  transform: `rotate(${item.rotation}deg)`,
+                  zIndex: item.zIndex,
+                  opacity: item.visible ? 1 : 0.3,
+                }}
+                onMouseDown={(e) => handleItemMouseDown(e, item)}
+              >
+                {/* Tabbed header for generated images */}
+                {isGenerated && (
+                  <div
+                    className={styles.nodeTabs}
+                    style={{ transform: `scale(${1 / viewport.zoom})`, transformOrigin: 'bottom left' }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {/* Editable name tag */}
+                    {editingItemId === item.id ? (
+                      <input
+                        ref={editInputRef}
+                        className={styles.filenameEditInput}
+                        style={{ position: 'static', top: 'unset', left: 'unset' }}
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onKeyDown={handleEditKeyDown}
+                        onBlur={handleSaveName}
+                      />
+                    ) : (
+                      <div
+                        className={`${styles.nodeTab} ${!activeTab ? styles.nodeTabActive : ''}`}
+                        onDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                        title={item.name}
+                      >
+                        {item.name.length > 24 ? item.name.slice(0, 22) + '…' : item.name}
+                      </div>
+                    )}
                     <div
-                      key={h}
-                      className={`${styles.handle} ${styles[`handle${h.toUpperCase().replace('-', '')}`]}`}
-                      onMouseDown={(e) => handleResizeMouseDown(e, item, h)}
-                    />
-                  ))}
-                </>
-              )}
+                      className={`${styles.nodeTab} ${activeTab === 'prompt' ? styles.nodeTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'prompt')}
+                      title="Prompt"
+                    >
+                      <MessageSquareText size={10} /> Prompt
+                    </div>
+                    <div
+                      className={`${styles.nodeTab} ${activeTab === 'info' ? styles.nodeTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'info')}
+                      title="Generation Info"
+                    >
+                      <Cpu size={10} /> Info
+                    </div>
+                    <div
+                      className={`${styles.nodeTab} ${activeTab === 'versions' ? styles.nodeTabActive : ''}`}
+                      onClick={() => toggleNodeTab(item.id, 'versions')}
+                      title="Versions & Lineage"
+                    >
+                      <GitBranch size={10} /> Versions
+                    </div>
+                  </div>
+                )}
 
-              {item.locked && (
-                <div className={styles.lockIndicator}>
-                  <Lock size={12} />
-                </div>
-              )}
-            </div>
-          ))}
+                {/* Tab panel content overlaid on the image */}
+                {isGenerated && activeTab && (
+                  <div
+                    className={styles.nodeTabPanel}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {activeTab === 'prompt' && (
+                      <>
+                        <div className={styles.nodeTabPanelLabel}>Prompt</div>
+                        <div className={styles.nodeTabPanelValue}>
+                          {meta?.prompt || item.prompt || '—'}
+                        </div>
+                        {meta?.negativePrompt && (
+                          <>
+                            <div className={styles.nodeTabPanelLabel} style={{ marginTop: 6 }}>Negative Prompt</div>
+                            <div className={styles.nodeTabPanelValue}>{meta.negativePrompt}</div>
+                          </>
+                        )}
+                      </>
+                    )}
+
+                    {activeTab === 'info' && (
+                      <>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Model</span>
+                          <span className={styles.nodeTabPanelValue}>{meta?.model || '—'}</span>
+                        </div>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Seed</span>
+                          <span className={styles.nodeTabPanelValue}>{meta?.seed ?? '—'}</span>
+                        </div>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Size</span>
+                          <span className={styles.nodeTabPanelValue}>{meta?.width || item.width} × {meta?.height || item.height}</span>
+                        </div>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Generated at</span>
+                          <span className={styles.nodeTabPanelValue}>
+                            {meta?.generatedAt ? new Date(meta.generatedAt).toLocaleString() : '—'}
+                          </span>
+                        </div>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Parents</span>
+                          <span className={styles.nodeTabPanelValue}>
+                            {meta?.parentIds?.length ? meta.parentIds.length : 'None (original)'}
+                          </span>
+                        </div>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Children</span>
+                          <span className={styles.nodeTabPanelValue}>
+                            {meta?.childIds?.length ? meta.childIds.length : 'None'}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
+                    {activeTab === 'versions' && (
+                      <>
+                        <div className={styles.nodeTabPanelRow}>
+                          <span className={styles.nodeTabPanelLabel}>Image Version</span>
+                          <span className={styles.nodeTabPanelValue}>v{meta?.imageVersion ?? 1}</span>
+                        </div>
+                        {meta?.filePath && (
+                          <div className={styles.nodeTabPanelRow}>
+                            <span className={styles.nodeTabPanelLabel}>File</span>
+                            <span className={styles.nodeTabPanelValue}>{meta.filePath}</span>
+                          </div>
+                        )}
+                        {meta?.variations && meta.variations.length > 0 ? (
+                          <>
+                            <div className={styles.nodeTabPanelLabel} style={{ marginTop: 4 }}>Variations</div>
+                            {meta.variations.map((v) => (
+                              <div key={v.id} className={styles.nodeTabPanelRow}>
+                                <span className={styles.nodeTabPanelValue}>{v.label}</span>
+                                {v.filePath && <span className={styles.nodeTabPanelLabel}>{v.filePath}</span>}
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className={styles.nodeTabPanelEmpty}>No variations yet</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {item.src ? (
+                  <img
+                    src={item.src}
+                    alt={item.name}
+                    className={styles.itemImage}
+                    draggable={false}
+                  />
+                ) : (
+                  <div className={styles.placeholder}>
+                    <Layers size={32} />
+                    <span>{item.name}</span>
+                  </div>
+                )}
+
+                {/* Resize + selection handles */}
+                {selectedIds.includes(item.id) && !item.locked && (
+                  <>
+                    {(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as ResizeHandle[]).map((h) => (
+                      <div
+                        key={h}
+                        className={`${styles.handle} ${styles[`handle${h.toUpperCase().replace('-', '')}`]}`}
+                        onMouseDown={(e) => handleResizeMouseDown(e, item, h)}
+                      />
+                    ))}
+                  </>
+                )}
+
+                {item.locked && (
+                  <div className={styles.lockIndicator}>
+                    <Lock size={12} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {/* Node Cards Layer */}
           {nodes.map((node) => (

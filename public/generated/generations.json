@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generations": [
+    {
+      "id": "4b8e625c-0cec-44bd-8cac-2ec1b2dba50f",
+      "prompt": "A computer with its brand, from the 2001 in the USA view from the front with a screen and keyboard and mouse. A real model.",
+      "model": "imagen-4.0-generate-001",
+      "seed": 760884,
+      "width": 1024,
+      "height": 1024,
+      "generatedAt": 1773974838461,
+      "filePath": "/generated/gen_a-computer-with-its-brand-from_2026-03-20T02-47-18.png",
+      "parentIds": [],
+      "childIds": [],
+      "imageVersion": 1,
+      "variations": []
+    }
+  ],
+  "updatedAt": 1773974838555
+}

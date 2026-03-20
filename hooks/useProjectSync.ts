@@ -7,6 +7,7 @@ import { useUserStore } from '@/stores/userStore';
 import { useFileStore } from '@/stores/fileStore';
 import { STORAGE_KEYS, WORKSPACE_DATA_KEYS_TO_CLEAR } from '@/constants/workspace';
 import { projectPathFromName } from '@/utils/project';
+import type { GenerationMeta } from '@/types';
 
 type VersionTrigger = 'MANUAL' | 'GENERATE' | 'DELETE' | 'AUTO';
 
@@ -29,7 +30,7 @@ function canvasStateKey(projectId: string): string {
   return `${STORAGE_KEYS.canvasStates}:${projectId}`;
 }
 
-export function saveProjectWorkspaceState(projectId: string, _projectName: string): void {
+export function saveProjectWorkspaceState(projectId: string, projectName: string): void {
   if (!projectId || typeof window === 'undefined') return;
   try {
     const { items, viewport } = useCanvasStore.getState();
@@ -38,23 +39,115 @@ export function saveProjectWorkspaceState(projectId: string, _projectName: strin
   } catch {
     // localStorage quota or serialisation errors are non-fatal
   }
+
+  // Also persist per-project file state
+  try {
+    useFileStore.getState().saveProjectFileState(projectId, projectName);
+  } catch {
+    // non-fatal
+  }
 }
 
-export function loadProjectWorkspaceState(projectId: string, _projectName: string): void {
-  if (!projectId || typeof window === 'undefined') return;
+export async function loadProjectWorkspaceState(projectId: string, _projectName: string): Promise<boolean> {
+  if (!projectId || typeof window === 'undefined') return false;
+
+  // Try localStorage first (fast path, same browser)
   try {
     const raw = localStorage.getItem(canvasStateKey(projectId));
-    if (!raw) return;
-    const { items, viewport } = JSON.parse(raw);
-    const canvas = useCanvasStore.getState();
-    if (viewport) canvas.setViewport(viewport);
-    if (Array.isArray(items) && items.length > 0) {
-      canvas.clearCanvas();
-      for (const item of items) canvas.addItem(item);
+    if (raw) {
+      const { items, viewport } = JSON.parse(raw);
+      const canvas = useCanvasStore.getState();
+      if (viewport) canvas.setViewport(viewport);
+      if (Array.isArray(items) && items.length > 0) {
+        canvas.clearCanvas();
+        for (const item of items) canvas.addItem(item);
+        return true;
+      }
     }
   } catch {
-    // Corrupt data is non-fatal — start with a blank canvas
+    // Corrupt data is non-fatal
   }
+
+  // Fall back to loading from DB (cross-browser / fresh session)
+  try {
+    const canvasRes = await fetch(`/api/projects/${projectId}/canvas`);
+    if (!canvasRes.ok) return false;
+
+    const { data: canvas } = await canvasRes.json();
+    if (!canvas) return false;
+
+    const canvasStore = useCanvasStore.getState();
+
+    if (canvas.viewportX != null || canvas.viewportZoom != null) {
+      canvasStore.setViewport({
+        x: canvas.viewportX ?? 0,
+        y: canvas.viewportY ?? 0,
+        zoom: canvas.viewportZoom ?? 1,
+      });
+    }
+
+    if (Array.isArray(canvas.items) && canvas.items.length > 0) {
+      canvasStore.clearCanvas();
+      for (const item of canvas.items) {
+        const restoredMeta: GenerationMeta | undefined =
+          item.nodeData && typeof item.nodeData === 'object'
+            ? (item.nodeData as GenerationMeta)
+            : undefined;
+
+        canvasStore.addItem({
+          type: (item.type?.toLowerCase?.() ?? 'image') as 'image' | 'generated' | 'placeholder',
+          x: item.x ?? 0,
+          y: item.y ?? 0,
+          width: item.width ?? 512,
+          height: item.height ?? 512,
+          rotation: item.rotation ?? 0,
+          scale: item.scale ?? item.scaleX ?? 1,
+          locked: item.locked ?? false,
+          visible: item.visible ?? true,
+          src: item.dataUrl ?? item.src ?? '',
+          name: item.name ?? 'Untitled',
+          prompt: item.prompt ?? undefined,
+          assetId: item.assetId ?? undefined,
+          generationMeta: restoredMeta,
+        });
+      }
+
+      // Rebuild file tree for generated items
+      const fileStore = useFileStore.getState();
+      const generatedPath = fileStore.getProjectGeneratedPath();
+      for (const item of canvas.items) {
+        if (item.type?.toLowerCase() === 'generated' && item.name) {
+          fileStore.addAssetToFolder(
+            {
+              id: item.assetId || item.id || Date.now().toString(),
+              name: item.name,
+              type: 'image',
+              path: `${generatedPath}/${item.name}`,
+              createdAt: Date.now(),
+              modifiedAt: Date.now(),
+              thumbnail: item.dataUrl || item.src || '',
+              metadata: {
+                width: item.width,
+                height: item.height,
+                prompt: item.prompt,
+                model: item.nodeData?.model,
+                seed: item.nodeData?.seed,
+              },
+            },
+            generatedPath,
+          );
+        }
+      }
+
+      // Cache to localStorage for fast future loads
+      saveProjectWorkspaceState(projectId, _projectName);
+      return true;
+    }
+  } catch {
+    // DB load failure is non-fatal
+  }
+
+  return false;
 }
 
 export function clearAllWorkspaceData(): void {
@@ -104,19 +197,22 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
             width: item.width,
             height: item.height,
             rotation: item.rotation,
-            scaleX: item.scale,
-            scaleY: item.scale,
+            scale: item.scale,
             zIndex: item.zIndex,
             visible: item.visible,
             locked: item.locked,
             name: item.name,
-            src: item.src,
-            prompt: item.prompt,
+            dataUrl: item.src ?? null,
+            prompt: item.prompt ?? null,
             assetId: item.assetId ?? null,
+            nodeData: item.generationMeta ? JSON.parse(JSON.stringify(item.generationMeta)) : null,
           })),
           edges: [],
         }),
       });
+
+      // Also save per-project file state
+      useFileStore.getState().saveProjectFileState(projectId, useProjectStore.getState().projectName ?? '');
     } catch {
       // Canvas sync failures are non-fatal
     }
@@ -197,6 +293,11 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
           if (Array.isArray(canvas.items) && canvas.items.length > 0) {
             canvasStore.clearCanvas();
             for (const item of canvas.items) {
+              const restoredMeta: GenerationMeta | undefined =
+                item.nodeData && typeof item.nodeData === 'object'
+                  ? (item.nodeData as GenerationMeta)
+                  : undefined;
+
               canvasStore.addItem({
                 type: (item.type?.toLowerCase?.() ?? 'image') as 'image' | 'generated' | 'placeholder',
                 x: item.x ?? 0,
@@ -204,26 +305,58 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
                 width: item.width ?? 512,
                 height: item.height ?? 512,
                 rotation: item.rotation ?? 0,
-                scale: item.scaleX ?? 1,
+                scale: item.scale ?? item.scaleX ?? 1,
                 locked: item.locked ?? false,
                 visible: item.visible ?? true,
-                src: item.src ?? '',
+                src: item.dataUrl ?? item.src ?? '',
                 name: item.name ?? 'Untitled',
                 prompt: item.prompt ?? undefined,
                 assetId: item.assetId ?? undefined,
+                generationMeta: restoredMeta,
               });
             }
           }
 
-          markDirty();
+          // Also rebuild file tree assets for generated items
+          const fileStore = useFileStore.getState();
+          fileStore.switchToProject(project.name ?? 'Untitled', id);
+          const generatedPath = fileStore.getProjectGeneratedPath();
+          if (Array.isArray(canvas.items)) {
+            for (const item of canvas.items) {
+              if (item.type?.toLowerCase() === 'generated' && item.name) {
+                fileStore.addAssetToFolder(
+                  {
+                    id: item.assetId || item.id || Date.now().toString(),
+                    name: item.name,
+                    type: 'image',
+                    path: `${generatedPath}/${item.name}`,
+                    createdAt: Date.now(),
+                    modifiedAt: Date.now(),
+                    thumbnail: item.dataUrl || item.src || '',
+                    metadata: {
+                      width: item.width,
+                      height: item.height,
+                      prompt: item.prompt,
+                      model: item.nodeData?.model,
+                      seed: item.nodeData?.seed,
+                    },
+                  },
+                  generatedPath,
+                );
+              }
+            }
+          }
         }
       }
+
+      // Cache to localStorage for fast future loads
+      saveProjectWorkspaceState(id, project.name ?? 'Untitled');
 
       return project as Record<string, unknown>;
     } catch {
       return null;
     }
-  }, [markDirty]);
+  }, []);
 
   const openProjectFromDashboard = useCallback((targetId: string) => {
     const dashProject = useProjectsStore.getState().getProject(targetId);

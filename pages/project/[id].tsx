@@ -1,34 +1,33 @@
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { projectPathFromName } from '@/utils/project';
 
-// Dynamic import to avoid SSR issues with stores
 const AppShell = dynamic(
   () => import('@/components/layout/AppShell').then((mod) => mod.AppShell),
   { ssr: false }
 );
 
-// Project loader that handles [id] param
 const ProjectLoader = dynamic(
   () =>
     Promise.resolve(function ProjectLoaderInner() {
       const router = useRouter();
       const projectId = router.query.id as string | undefined;
+      const [loaded, setLoaded] = useState(false);
 
       useEffect(() => {
-        if (!projectId) return;
+        if (!projectId || loaded) return;
 
-        // Load canvas state for the requested project
         const { loadProjectWorkspaceState } = require('@/hooks/useProjectSync');
         const { useProjectsStore } = require('@/stores/projectsStore');
         const { useUserStore } = require('@/stores/userStore');
         const { useFileStore } = require('@/stores/fileStore');
+        const { useProjectStore } = require('@/stores/projectStore');
 
         const dashProject = useProjectsStore.getState().getProject(projectId);
+
         if (dashProject) {
-          // Switch to this project in userStore
           const userState = useUserStore.getState();
           if (userState.currentProject.id !== projectId) {
             useUserStore.setState({
@@ -40,16 +39,41 @@ const ProjectLoader = dynamic(
                 path: projectPathFromName(dashProject.name),
               },
             });
-
-            // Switch file tree to this project while preserving shared folders.
             useFileStore.getState().switchToProject(dashProject.name, dashProject.id);
-            void loadProjectWorkspaceState(projectId, dashProject.name);
           }
+          loadProjectWorkspaceState(projectId, dashProject.name).then(() => setLoaded(true));
         } else {
-          // If project not found in store, maybe redirect to home or show error?
-          // For now, let's assume it might be loaded later or handled by AppShell
+          // Project not in local store — fetch from DB
+          (async () => {
+            try {
+              const res = await fetch(`/api/projects/${projectId}`);
+              if (!res.ok) {
+                router.replace('/');
+                return;
+              }
+              const { data: project } = await res.json();
+              const name = project.name ?? 'Untitled';
+
+              useProjectStore.getState().setProject(projectId, name);
+              useUserStore.setState({
+                currentProject: {
+                  id: projectId,
+                  name,
+                  createdAt: project.createdAt ?? new Date().toISOString(),
+                  modifiedAt: project.updatedAt ?? new Date().toISOString(),
+                  path: projectPathFromName(name),
+                },
+              });
+              useFileStore.getState().switchToProject(name, projectId);
+
+              await loadProjectWorkspaceState(projectId, name);
+              setLoaded(true);
+            } catch {
+              router.replace('/');
+            }
+          })();
         }
-      }, [projectId]);
+      }, [projectId, loaded, router]);
 
       return null;
     }),

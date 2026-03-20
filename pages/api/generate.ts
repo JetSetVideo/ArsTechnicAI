@@ -4,8 +4,41 @@ import { authOptions } from '@/lib/auth/options';
 import { generateSchema } from '@/lib/validation/schemas';
 import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/ai/registry';
-import { saveFile } from '@/lib/storage/local';
 import type { AIProvider } from '@prisma/client';
+import fs from 'fs/promises';
+import path from 'path';
+
+interface GenerateResponse {
+  dataUrl?: string;
+  imageUrl?: string;
+  seed?: number;
+  assetId?: string;
+  jobId?: string;
+  filePath?: string;
+  error?: string;
+  errorCode?: string;
+}
+
+function createError(
+  res: NextApiResponse<GenerateResponse>,
+  status: number,
+  message: string,
+  errorCode?: string
+) {
+  return res.status(status).json({ error: message, errorCode });
+}
+
+async function saveGeneratedFile(
+  base64Data: string,
+  filename: string,
+): Promise<string> {
+  const generatedDir = path.join(process.cwd(), 'public', 'generated');
+  await fs.mkdir(generatedDir, { recursive: true });
+  const buffer = Buffer.from(base64Data, 'base64');
+  const filePath = path.join(generatedDir, filename);
+  await fs.writeFile(filePath, buffer);
+  return `/generated/${filename}`;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -68,7 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     jobId = job.id;
   }
 
-  if (trimmedPrompt.length > 4000) {
+  if (prompt && prompt.trim().length > 4000) {
     return createError(
       res,
       400,
@@ -107,26 +140,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       apiKey,
     });
 
-    // Save asset to DB for authenticated users
+    // Save generated image to disk (always) and DB (authenticated users)
     let assetId: string | undefined;
-    if (session?.user?.id) {
-      // Decode base64 dataUrl and persist to disk
-      let filePath: string | undefined;
-      try {
-        if (result.dataUrl) {
-          const base64Data = result.dataUrl.replace(/^data:image\/\w+;base64,/, '');
-          const buffer = Buffer.from(base64Data, 'base64');
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-          const promptSlug = (prompt || 'generated')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .slice(0, 30);
-          const filename = `gen_${promptSlug}_${timestamp}.png`;
-          filePath = await saveFile(buffer, filename, 'upload');
-        }
-      } catch {
-        // Storage failure is non-fatal; asset record will have no path
+    let filePath: string | undefined;
+
+    try {
+      if (result.dataUrl) {
+        const base64Data = result.dataUrl.replace(/^data:image\/\w+;base64,/, '');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const promptSlug = (prompt || 'generated')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .slice(0, 30);
+        const filename = `gen_${promptSlug}_${timestamp}.png`;
+        filePath = await saveGeneratedFile(base64Data, filename);
       }
+    } catch {
+      // Storage failure is non-fatal
+    }
+
+    if (session?.user?.id) {
 
       const asset = await prisma.asset.create({
         data: {
@@ -168,6 +201,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       seed: result.seed,
       assetId,
       jobId,
+      filePath,
     });
   } catch (error) {
     // Mark job as failed
@@ -275,7 +309,7 @@ function generateVisualPlaceholder(width: number, height: number, seed: number):
 }
 
 async function generatePlaceholder(
-  res: NextApiResponse<GenerateResponse>,
+  res: NextApiResponse,
   width: number,
   height: number,
   prompt: string

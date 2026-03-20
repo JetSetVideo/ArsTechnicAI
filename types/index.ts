@@ -51,6 +51,21 @@ export interface ImageAsset extends Asset {
 // ------------------------------------------------------------
 // Canvas Types
 // ------------------------------------------------------------
+export interface GenerationMeta {
+  prompt: string;
+  negativePrompt?: string;
+  model: string;
+  seed: number;
+  width: number;
+  height: number;
+  generatedAt: Timestamp;
+  filePath?: string;
+  parentIds?: UUID[];
+  childIds?: UUID[];
+  imageVersion?: number;
+  variations?: { id: UUID; label: string; filePath?: string }[];
+}
+
 export interface CanvasItem {
   id: UUID;
   assetId?: UUID;
@@ -72,6 +87,7 @@ export interface CanvasItem {
   version?: string;
   parentAssetId?: UUID;
   createdAt: Timestamp;
+  generationMeta?: GenerationMeta;
 }
 
 export interface CanvasViewport {
