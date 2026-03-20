@@ -415,10 +415,10 @@
 }
 
 .expandedTabActive {
-  background: rgba(0, 212, 170, 0.10);
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  border-left-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--orb-color, #00d4aa) 14%, transparent);
+  color: var(--orb-color, var(--accent-primary));
+  border-color: color-mix(in srgb, var(--orb-color, #00d4aa) 55%, transparent);
+  border-left-color: var(--orb-color, var(--accent-primary));
 }
 
 .expandedTab:hover:not(.expandedTabActive) {
@@ -466,10 +466,10 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border: 1px solid var(--border-color);
+  border: 1px solid color-mix(in srgb, var(--orb-color, #00d4aa) 22%, var(--border-color));
   border-bottom: none;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, max-width 0.3s ease;
+  transition: background 0.15s, color 0.15s, max-width 0.3s ease, border-color 0.15s;
   background: rgba(18, 18, 21, 0.92);
   color: var(--text-muted);
   min-width: 0;
@@ -488,15 +488,16 @@
 }
 
 .nodeTabActive {
-  background: rgba(0, 212, 170, 0.12);
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--orb-color, #00d4aa) 16%, transparent);
+  color: var(--orb-color, var(--accent-primary));
+  border-color: color-mix(in srgb, var(--orb-color, #00d4aa) 50%, transparent);
   flex-shrink: 0;
 }
 
 .nodeTab:hover:not(.nodeTabActive) {
   background: rgba(26, 26, 31, 0.98);
   color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--orb-color, #00d4aa) 30%, var(--border-color));
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -864,8 +865,157 @@
    ═══════════════════════════════════════════════════════════ */
 .videoNode {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
+  min-height: 0;
+}
+
+/* Stacked “deck” behind the cover — edges peek on bottom-right */
+.videoStack {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.videoStackCard {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(145deg, rgba(15, 18, 28, 0.92), rgba(8, 10, 16, 0.88));
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.videoStackCard:nth-of-type(1) {
+  transform: translate(5px, 5px) scale(0.985);
+  opacity: 0.55;
+}
+
+.videoStackCard:nth-of-type(2) {
+  transform: translate(10px, 10px) scale(0.97);
+  opacity: 0.35;
+}
+
+.videoStackCover {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+/* Timeline + keyframes — opens with the orb menu on video nodes */
+.videoTimeBanner {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 6px 8px;
+  margin-top: 2px;
+  max-height: min(42%, 140px);
+  background: linear-gradient(to top, rgba(6, 8, 12, 0.97) 0%, rgba(12, 14, 20, 0.92) 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 6;
+  animation: videoBannerIn 0.22s ease-out both;
+}
+
+@keyframes videoBannerIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.videoTimeRuler {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.videoTimeLabel {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.75);
+  flex-shrink: 0;
+}
+
+.videoTimeTrack {
+  flex: 1;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  position: relative;
+  overflow: hidden;
+}
+
+.videoTimeTrack::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--orb-color, #3b82f6) 85%, transparent),
+    color-mix(in srgb, var(--orb-color, #3b82f6) 25%, transparent)
+  );
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.videoKeyframes {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.videoKeyframeSlot {
+  flex: 0 0 auto;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.videoKeyframeSlot:hover {
+  border-color: color-mix(in srgb, var(--orb-color, #3b82f6) 70%, transparent);
+  transform: translateY(-1px);
+}
+
+.videoKeyframeThumb {
+  display: block;
+  width: 56px;
+  height: 36px;
+  object-fit: cover;
+}
+
+.videoKeyframesPlaceholder {
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 4px 2px 2px;
 }
 
 .videoDuration {

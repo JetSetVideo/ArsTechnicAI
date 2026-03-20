@@ -33,9 +33,62 @@ import { Button } from '../ui/Button';
 import styles from './Canvas.module.css';
 import nodeStyles from './NodeGraph.module.css';
 import { NodeCard, ConnLine } from './NodeComponents';
-import type { CanvasItem, Asset } from '@/types';
+import type { CanvasItem, Asset, GenerationMeta } from '@/types';
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+/** Which secondary tabs have real content (name row is handled separately). */
+function getNodeTabVisibility(item: CanvasItem, meta: GenerationMeta | undefined) {
+  const promptText = (meta?.prompt || item.prompt || '').trim();
+  const neg = (meta?.negativePrompt || '').trim();
+  const hasPrompt = !!(promptText || neg);
+
+  const hasInfo = !!(
+    meta?.model ||
+    meta?.seed != null ||
+    meta?.generatedAt ||
+    (meta?.parentIds && meta.parentIds.length > 0) ||
+    (meta?.childIds && meta.childIds.length > 0) ||
+    item.mediaMeta?.duration != null ||
+    item.mediaMeta?.mimeType ||
+    item.mediaMeta?.codec ||
+    item.mediaMeta?.fps != null ||
+    item.mediaMeta?.bitRate != null ||
+    item.mediaMeta?.channels != null ||
+    item.mediaMeta?.sampleRate != null ||
+    item.type === 'video' ||
+    item.type === 'audio'
+  );
+
+  const hasVersions = !!(
+    (meta?.variations && meta.variations.length > 0) ||
+    (meta?.imageVersion != null && meta.imageVersion > 1) ||
+    meta?.filePath
+  );
+
+  return { hasPrompt, hasInfo, hasVersions };
+}
+
+function resolveActiveNodeTab(
+  raw: 'name' | 'prompt' | 'info' | 'versions' | null | undefined,
+  vis: ReturnType<typeof getNodeTabVisibility>,
+): 'name' | 'prompt' | 'info' | 'versions' | null {
+  if (!raw) return null;
+  if (raw === 'name') return 'name';
+  if (raw === 'prompt' && vis.hasPrompt) return 'prompt';
+  if (raw === 'info' && vis.hasInfo) return 'info';
+  if (raw === 'versions' && vis.hasVersions) return 'versions';
+  return null;
+}
+
+function formatMediaDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return h > 0
+    ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    : `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 interface CanvasProps {
   showTimeline?: boolean;
@@ -843,7 +896,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           {items.map((item) => {
             const isGenerated = item.type === 'generated';
             const meta = item.generationMeta;
-            const activeTab = activeNodeTabs[item.id] ?? null;
+            const rawTab = activeNodeTabs[item.id] ?? null;
+            const tabVis = getNodeTabVisibility(item, meta);
+            const activeTab = resolveActiveNodeTab(rawTab, tabVis);
             const isOrbOpen = orbExpanded[item.id] ?? false;
             const orbColor = getOrbColor(item.type);
             const isHighestZ = item.zIndex === maxZIndex && items.length > 1;
@@ -903,27 +958,33 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                       </span>
                       {item.name}
                     </div>
-                    <div
-                      className={`${styles.expandedTab} ${activeTab === 'prompt' ? styles.expandedTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'prompt')}
-                    >
-                      <span className={styles.expandedTabIcon}><MessageSquareText size={11} /></span>
-                      Prompt
-                    </div>
-                    <div
-                      className={`${styles.expandedTab} ${activeTab === 'info' ? styles.expandedTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'info')}
-                    >
-                      <span className={styles.expandedTabIcon}><Cpu size={11} /></span>
-                      Info
-                    </div>
-                    <div
-                      className={`${styles.expandedTab} ${activeTab === 'versions' ? styles.expandedTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'versions')}
-                    >
-                      <span className={styles.expandedTabIcon}><GitBranch size={11} /></span>
-                      Versions
-                    </div>
+                    {tabVis.hasPrompt && (
+                      <div
+                        className={`${styles.expandedTab} ${activeTab === 'prompt' ? styles.expandedTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'prompt')}
+                      >
+                        <span className={styles.expandedTabIcon}><MessageSquareText size={11} /></span>
+                        Prompt
+                      </div>
+                    )}
+                    {tabVis.hasInfo && (
+                      <div
+                        className={`${styles.expandedTab} ${activeTab === 'info' ? styles.expandedTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'info')}
+                      >
+                        <span className={styles.expandedTabIcon}><Cpu size={11} /></span>
+                        Info
+                      </div>
+                    )}
+                    {tabVis.hasVersions && (
+                      <div
+                        className={`${styles.expandedTab} ${activeTab === 'versions' ? styles.expandedTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'versions')}
+                      >
+                        <span className={styles.expandedTabIcon}><GitBranch size={11} /></span>
+                        Versions
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -962,7 +1023,19 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                         )}
                         <div className={styles.nodeTabPanelRow} style={{ marginTop: 6 }}>
                           <span className={styles.nodeTabPanelLabel}>Type</span>
-                          <span className={styles.nodeTabPanelValue}>{isGenerated ? 'AI Generated' : item.type === 'image' ? 'Imported Image' : 'Placeholder'}</span>
+                          <span className={styles.nodeTabPanelValue}>
+                            {isGenerated
+                              ? 'AI Generated'
+                              : item.type === 'image'
+                                ? 'Imported Image'
+                                : item.type === 'video'
+                                  ? 'Video'
+                                  : item.type === 'audio'
+                                    ? 'Audio'
+                                    : item.type === 'text'
+                                      ? 'Text'
+                                      : 'Placeholder'}
+                          </span>
                         </div>
                         <div className={styles.nodeTabPanelRow}>
                           <span className={styles.nodeTabPanelLabel}>Size</span>
@@ -996,6 +1069,36 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                     )}
                     {activeTab === 'info' && (
                       <>
+                        {item.type === 'video' && (
+                          <>
+                            {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0 && (
+                              <div className={styles.nodeTabPanelRow}>
+                                <span className={styles.nodeTabPanelLabel}>Duration</span>
+                                <span className={styles.nodeTabPanelValue}>
+                                  {formatMediaDuration(item.mediaMeta.duration)}
+                                </span>
+                              </div>
+                            )}
+                            {item.mediaMeta?.mimeType && (
+                              <div className={styles.nodeTabPanelRow}>
+                                <span className={styles.nodeTabPanelLabel}>MIME</span>
+                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.mimeType}</span>
+                              </div>
+                            )}
+                            {item.mediaMeta?.codec && (
+                              <div className={styles.nodeTabPanelRow}>
+                                <span className={styles.nodeTabPanelLabel}>Codec</span>
+                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.codec}</span>
+                              </div>
+                            )}
+                            {item.mediaMeta?.fps != null && (
+                              <div className={styles.nodeTabPanelRow}>
+                                <span className={styles.nodeTabPanelLabel}>FPS</span>
+                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.fps}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
                         <div className={styles.nodeTabPanelRow}>
                           <span className={styles.nodeTabPanelLabel}>Model</span>
                           <span className={styles.nodeTabPanelValue}>{meta?.model || '—'}</span>
@@ -1059,7 +1162,11 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                 )}
 
                 {/* ── Compact horizontal tabs (when orb is collapsed) ── */}
-                {!isOrbOpen && (
+                {!isOrbOpen && (() => {
+                  const showNameTab = !!(item.name.trim() || editingItemId === item.id);
+                  const showSecondary = tabVis.hasPrompt || tabVis.hasInfo || tabVis.hasVersions;
+                  if (!showNameTab && !showSecondary) return null;
+                  return (
                   <div
                     className={styles.nodeTabs}
                     style={{
@@ -1069,48 +1176,57 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
-                    {editingItemId === item.id ? (
-                      <input
-                        ref={editInputRef}
-                        className={styles.filenameEditInput}
-                        style={{ position: 'static', top: 'unset', left: 'unset' }}
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onKeyDown={handleEditKeyDown}
-                        onBlur={handleSaveName}
-                      />
-                    ) : (
+                    {showNameTab && (
+                      editingItemId === item.id ? (
+                        <input
+                          ref={editInputRef}
+                          className={styles.filenameEditInput}
+                          style={{ position: 'static', top: 'unset', left: 'unset' }}
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyDown={handleEditKeyDown}
+                          onBlur={handleSaveName}
+                        />
+                      ) : (
+                        <div
+                          className={`${styles.nodeTab} ${!activeTab ? styles.nodeTabActive : ''}`}
+                          onDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                          title={item.name}
+                        >
+                          {item.name.length > 24 ? item.name.slice(0, 22) + '…' : item.name}
+                        </div>
+                      )
+                    )}
+                    {tabVis.hasPrompt && (
                       <div
-                        className={`${styles.nodeTab} ${!activeTab ? styles.nodeTabActive : ''}`}
-                        onDoubleClick={(e) => handleTagDoubleClick(e, item)}
-                        title={item.name}
+                        className={`${styles.nodeTab} ${activeTab === 'prompt' ? styles.nodeTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'prompt')}
+                        title="Prompt"
                       >
-                        {item.name.length > 24 ? item.name.slice(0, 22) + '…' : item.name}
+                        <MessageSquareText size={9} /> Prompt
                       </div>
                     )}
-                    <div
-                      className={`${styles.nodeTab} ${activeTab === 'prompt' ? styles.nodeTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'prompt')}
-                      title="Prompt"
-                    >
-                      <MessageSquareText size={9} /> Prompt
-                    </div>
-                    <div
-                      className={`${styles.nodeTab} ${activeTab === 'info' ? styles.nodeTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'info')}
-                      title="Info"
-                    >
-                      <Cpu size={9} /> Info
-                    </div>
-                    <div
-                      className={`${styles.nodeTab} ${activeTab === 'versions' ? styles.nodeTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'versions')}
-                      title="Versions"
-                    >
-                      <GitBranch size={9} /> Ver
-                    </div>
+                    {tabVis.hasInfo && (
+                      <div
+                        className={`${styles.nodeTab} ${activeTab === 'info' ? styles.nodeTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'info')}
+                        title="Info"
+                      >
+                        <Cpu size={9} /> Info
+                      </div>
+                    )}
+                    {tabVis.hasVersions && (
+                      <div
+                        className={`${styles.nodeTab} ${activeTab === 'versions' ? styles.nodeTabActive : ''}`}
+                        onClick={() => toggleNodeTab(item.id, 'versions')}
+                        title="Versions"
+                      >
+                        <GitBranch size={9} /> Ver
+                      </div>
+                    )}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* ── Compact tab panel (when orb is collapsed) ── */}
                 {!isOrbOpen && activeTab && (
@@ -1128,6 +1244,30 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                     )}
                     {activeTab === 'info' && (
                       <>
+                        {item.type === 'video' && (
+                          <>
+                            {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0 && (
+                              <div className={styles.nodeTabPanelRow}>
+                                <span className={styles.nodeTabPanelLabel}>Duration</span>
+                                <span className={styles.nodeTabPanelValue}>
+                                  {formatMediaDuration(item.mediaMeta.duration)}
+                                </span>
+                              </div>
+                            )}
+                            {item.mediaMeta?.mimeType && (
+                              <div className={styles.nodeTabPanelRow}>
+                                <span className={styles.nodeTabPanelLabel}>MIME</span>
+                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.mimeType}</span>
+                              </div>
+                            )}
+                            {item.mediaMeta?.codec && (
+                              <div className={styles.nodeTabPanelRow}>
+                                <span className={styles.nodeTabPanelLabel}>Codec</span>
+                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.codec}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
                         <div className={styles.nodeTabPanelRow}>
                           <span className={styles.nodeTabPanelLabel}>Model</span>
                           <span className={styles.nodeTabPanelValue}>{meta?.model || '—'}</span>
@@ -1150,32 +1290,53 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                 {/* ── Media rendering ── */}
                 {item.type === 'video' && item.src && (
                   <div className={styles.videoNode}>
-                    <img
-                      src={item.src}
-                      alt={item.name}
-                      className={styles.itemImage}
-                      draggable={false}
-                    />
-                    {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0 && (
-                      <span className={styles.videoDuration}>
-                        {(() => {
-                          const d = item.mediaMeta.duration;
-                          const h = Math.floor(d / 3600);
-                          const m = Math.floor((d % 3600) / 60);
-                          const s = Math.floor(d % 60);
-                          return h > 0
-                            ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-                            : `${m}:${s.toString().padStart(2, '0')}`;
-                        })()}
-                      </span>
-                    )}
-                    <div className={styles.videoTypeBadge}><Film size={10} /> VIDEO</div>
-                    {/* Filmstrip layer */}
-                    {item.mediaMeta?.filmstripFrames && item.mediaMeta.filmstripFrames.length > 0 && (
-                      <div className={styles.videoFilmstrip}>
-                        {item.mediaMeta.filmstripFrames.map((frame, i) => (
-                          <img key={i} src={frame} alt="" className={styles.filmstripThumb} draggable={false} />
-                        ))}
+                    <div className={styles.videoStack}>
+                      <div className={styles.videoStackCard} aria-hidden />
+                      <div className={styles.videoStackCard} aria-hidden />
+                      <div className={styles.videoStackCover}>
+                        <img
+                          src={item.src}
+                          alt={item.name}
+                          className={styles.itemImage}
+                          draggable={false}
+                        />
+                        {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0 && (
+                          <span className={styles.videoDuration}>
+                            {formatMediaDuration(item.mediaMeta.duration)}
+                          </span>
+                        )}
+                        <div className={styles.videoTypeBadge}><Film size={10} /> VIDEO</div>
+                      </div>
+                    </div>
+                    {isOrbOpen && (
+                      <div className={styles.videoTimeBanner}>
+                        <div className={styles.videoTimeRuler}>
+                          <span className={styles.videoTimeLabel}>0:00</span>
+                          <div className={styles.videoTimeTrack} />
+                          <span className={styles.videoTimeLabel}>
+                            {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0
+                              ? formatMediaDuration(item.mediaMeta.duration)
+                              : '—'}
+                          </span>
+                        </div>
+                        {item.mediaMeta?.filmstripFrames && item.mediaMeta.filmstripFrames.length > 0 ? (
+                          <div className={styles.videoKeyframes}>
+                            {item.mediaMeta.filmstripFrames.map((frame, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                className={styles.videoKeyframeSlot}
+                                title={`Frame ${i + 1}`}
+                              >
+                                <img src={frame} alt="" className={styles.videoKeyframeThumb} draggable={false} />
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className={styles.videoKeyframesPlaceholder}>
+                            Open the asset menu to browse key images when a filmstrip is available for this video.
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
