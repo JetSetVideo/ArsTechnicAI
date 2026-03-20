@@ -107,28 +107,41 @@
   color: var(--accent-primary);
 }
 
-.expandButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.expandButton:hover {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-}
-
 .expandPlaceholder {
   width: 16px;
   flex-shrink: 0;
+}
+
+/* Single control for folders: icon = expand/collapse (no separate chevron) */
+.folderIconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent-tertiary, #f59e0b);
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+  flex-shrink: 0;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.folderIconButton:hover {
+  background: var(--bg-elevated);
+  color: var(--accent-tertiary, #f59e0b);
+  filter: brightness(1.08);
+}
+
+.folderIconButton:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.folderIconButton svg {
+  width: 16px;
+  height: 16px;
 }
 
 .icon {
@@ -142,12 +155,6 @@
 .icon svg {
   width: 16px;
   height: 16px;
-}
-
-/* Folder icons */
-.treeItemRow:has(.icon svg[data-lucide="folder"]) .icon,
-.treeItemRow:has(.icon svg[data-lucide="folder-open"]) .icon {
-  color: var(--accent-tertiary, #f59e0b);
 }
 
 /* Image icons */

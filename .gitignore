@@ -40,6 +40,10 @@ deno.lock
 # Storage
 storage/
 
+# Local workspace data (user-specific, rebuilt from disk scan)
+.ars-data/
+.ars-settings.json
+
 # Prisma
 prisma/migrations/
 

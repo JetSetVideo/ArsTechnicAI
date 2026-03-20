@@ -14,7 +14,8 @@ import {
 import { useSession } from 'next-auth/react';
 import { SearchBar } from '../ui/SearchBar';
 import { useLogStore, useCanvasStore, useProjectStore, useNodeStore } from '@/stores';
-import { useProjectSync } from '@/hooks/useProjectSync';
+import { useProjectSync, saveProjectWorkspaceState } from '@/hooks/useProjectSync';
+import { saveToDisk } from '@/hooks/useDiskSave';
 import styles from './TopBar.module.css';
 import type { WorkspaceMode, SearchScope } from '@/types';
 
@@ -106,52 +107,50 @@ export const TopBar: React.FC<TopBarProps> = ({
   );
 
   const handleSave = useCallback(async () => {
-    if (!isAuthenticated) {
-      log('project_save', 'Must be signed in to save to the cloud');
-      return;
+    setActionLoading(true);
+
+    // Always save to localStorage + disk (works offline, no auth needed)
+    try {
+      saveProjectWorkspaceState(projectId || '', projectName);
+      await saveToDisk();
+      log('project_save', `Saved locally: ${projectName}`);
+    } catch {
+      log('project_save', 'Local save failed');
     }
 
-    if (!projectId) {
-      // Create project first, then save version
-      setActionLoading(true);
+    // Cloud save requires authentication
+    if (isAuthenticated) {
       try {
-        const res = await fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: projectName }),
-        });
-        if (res.ok) {
-          const { data } = await res.json();
-          setProject(data.id, data.name);
-          onProjectNameChange(data.name);
-          await saveVersion('MANUAL', 'Initial save');
-          log('project_save', `Created & saved project: ${data.name}`);
+        if (!projectId) {
+          const res = await fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: projectName }),
+          });
+          if (res.ok) {
+            const { data } = await res.json();
+            setProject(data.id, data.name);
+            onProjectNameChange(data.name);
+            await saveVersion('MANUAL', 'Initial save');
+            log('project_save', `Created & saved to cloud: ${data.name}`);
+          }
+        } else {
+          await Promise.all([
+            fetch(`/api/projects/${projectId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: projectName }),
+            }),
+            saveVersion('MANUAL', 'Manual save'),
+          ]);
+          log('project_save', `Saved to cloud: ${projectName}`);
         }
       } catch {
-        log('project_save', 'Failed to create project');
-      } finally {
-        setActionLoading(false);
+        log('project_save', 'Cloud save failed (local save OK)');
       }
-      return;
     }
 
-    // Patch name + create version snapshot
-    setActionLoading(true);
-    try {
-      await Promise.all([
-        fetch(`/api/projects/${projectId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: projectName }),
-        }),
-        saveVersion('MANUAL', 'Manual save'),
-      ]);
-      log('project_save', `Saved project: ${projectName}`);
-    } catch {
-      log('project_save', 'Save failed');
-    } finally {
-      setActionLoading(false);
-    }
+    setActionLoading(false);
   }, [projectId, projectName, isAuthenticated, saveVersion, log, onProjectNameChange, setProject]);
 
   const handleNameBlur = () => {

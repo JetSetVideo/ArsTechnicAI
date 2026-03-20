@@ -6,8 +6,6 @@ import {
   FileText,
   Film,
   Music,
-  ChevronRight,
-  ChevronDown,
   Upload,
   Cloud,
   CloudOff,
@@ -93,15 +91,25 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
         role="treeitem"
         aria-selected={isSelected}
       >
+        <span className={styles.expandPlaceholder} aria-hidden />
+
         {node.type === 'folder' ? (
-          <button className={styles.expandButton} onClick={(e) => { e.stopPropagation(); onToggle(node.path); }}>
-            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <button
+            type="button"
+            className={styles.folderIconButton}
+            title={isExpanded ? 'Collapse folder' : 'Expand folder'}
+            aria-expanded={isExpanded}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(node);
+              onToggle(node.path);
+            }}
+          >
+            {getFileIcon({ ...node, expanded: isExpanded })}
           </button>
         ) : (
-          <span className={styles.expandPlaceholder} />
+          <span className={styles.icon}>{getFileIcon({ ...node, expanded: isExpanded })}</span>
         )}
-
-        <span className={styles.icon}>{getFileIcon({ ...node, expanded: isExpanded })}</span>
         {editingPath === node.path ? (
           <input
             className={styles.renameInput}
@@ -170,8 +178,7 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({ node
 
   const handleSelect = useCallback((n: FileNode) => {
     selectPath(n.path);
-    if (n.type === 'folder') toggleExpanded(n.path);
-  }, [selectPath, toggleExpanded]);
+  }, [selectPath]);
 
   const handleDragStart = useCallback((e: React.DragEvent, n: FileNode) => {
     if (n.asset) {

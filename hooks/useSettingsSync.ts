@@ -51,38 +51,46 @@ export function useSettingsSync() {
     }
   }, [status]);
 
-  // Push changes to DB (debounced 2s)
+  // Push changes to DB (debounced 2s) + always save to disk
   useEffect(() => {
-    if (!session?.user) return;
-    const key = JSON.stringify({
+    const settingsPayload = {
       theme: settings.theme,
       showGrid: settings.showGrid,
       snapToGrid: settings.snapToGrid,
       gridSize: settings.gridSize,
       autoSavePrompts: settings.autoSavePrompts,
       defaultModel: settings.aiProvider?.model,
-    });
+    };
 
+    const key = JSON.stringify(settingsPayload);
     if (key === lastSyncedRef.current) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       lastSyncedRef.current = key;
+
+      // Always save to disk (works without auth)
       try {
-        await fetch('/api/users/me/settings', {
-          method: 'PUT',
+        await fetch('/api/workspace/save', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            theme: settings.theme,
-            showGrid: settings.showGrid,
-            snapToGrid: settings.snapToGrid,
-            gridSize: settings.gridSize,
-            autoSavePrompts: settings.autoSavePrompts,
-            defaultModel: settings.aiProvider?.model,
-          }),
+          body: JSON.stringify({ settings }),
         });
       } catch {
-        // Non-fatal
+        // Disk save non-fatal
+      }
+
+      // Push to DB if authenticated
+      if (session?.user) {
+        try {
+          await fetch('/api/users/me/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settingsPayload),
+          });
+        } catch {
+          // DB sync non-fatal
+        }
       }
     }, 2000);
 

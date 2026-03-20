@@ -13,6 +13,8 @@ import { useUserStore } from '@/stores/userStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useProjectSync, saveProjectWorkspaceState, loadProjectWorkspaceState } from '@/hooks/useProjectSync';
 import { useSettingsSync } from '@/hooks/useSettingsSync';
+import { useDiskReconciliation } from '@/hooks/useDiskReconciliation';
+import { saveToDisk } from '@/hooks/useDiskSave';
 import { PanelLeft, PanelRight } from 'lucide-react';
 import styles from './AppShell.module.css';
 import type { WorkspaceMode, WorkspaceLayout } from '@/types';
@@ -47,28 +49,30 @@ export const AppShell: React.FC = () => {
   // Sync editor projects ↔ dashboard projects
   useProjectSync();
 
+  // Reconcile from disk files on fresh start (fills gaps localStorage may have lost)
+  useDiskReconciliation();
+
   // Initialize user info and device capabilities on mount
   useEffect(() => {
     refreshDeviceInfo();
     
-    // Log device info for debugging
     console.log('[AppShell] Device info gathered:', deviceInfo);
     
-    // Initialize file structure with current project and hydrate saved workspace.
     setCurrentProject(currentProject.name, currentProject.id);
     void loadProjectWorkspaceState(currentProject.id, currentProject.name);
   }, [currentProject.id, currentProject.name, refreshDeviceInfo, setCurrentProject]);
 
-  // Auto-save canvas state periodically and on unmount
+  // Auto-save to localStorage (fast) + disk (durable) periodically and on unmount
   useEffect(() => {
     const interval = setInterval(() => {
       void saveProjectWorkspaceState(currentProject.id, currentProject.name);
-    }, 15000); // Save every 15 seconds
+      void saveToDisk();
+    }, 15000);
 
     return () => {
       clearInterval(interval);
-      // Save on unmount (navigating away from editor)
       void saveProjectWorkspaceState(currentProject.id, currentProject.name);
+      void saveToDisk();
     };
   }, [currentProject.id, currentProject.name]);
 
