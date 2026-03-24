@@ -41,6 +41,7 @@ import {
 } from '@/stores';
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
 import type { GenerationResult, GenerationMeta } from '@/types';
+import { saveProjectWorkspaceState } from '@/hooks/useProjectSync';
 import styles from './InspectorPanel.module.css';
 
 interface InspectorPanelProps {
@@ -420,13 +421,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
 
   const { updateItem, addItem, removeSelected, copy, paste } = useCanvasStore();
   const allItems = useCanvasStore((s) => s.items);
-  const { updateAsset, addAsset, addAssetToFolder, getProjectGeneratedPath, getAsset } = useFileStore();
+  const { updateAsset, addAssetToFolder, getProjectGeneratedPath, getAsset } = useFileStore();
   const settings = useSettingsStore((s) => s.settings);
   const updateAIProvider = useSettingsStore((s) => s.updateAIProvider);
   const log = useLogStore((s) => s.log);
   const selectedItems = useCanvasStore((s) => s.getSelectedItems());
   const selectedItem = selectedItems[0];
-  const { projectId, markDirty } = useProjectStore();
+  const { projectId, projectName, markDirty } = useProjectStore();
 
   const [localApiKey, setLocalApiKey] = useState(settings.aiProvider?.apiKey || '');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -525,6 +526,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
       const promptSlug = prompt.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
       const filename = `gen_${promptSlug}_${timestamp}.png`;
 
+      const variationSizes = [{ width: genWidth, height: genHeight, label: `${genWidth}x${genHeight}` }];
       const generationMeta: GenerationMeta = {
         prompt,
         negativePrompt: negativePrompt || undefined,
@@ -537,10 +539,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         parentIds: [],
         childIds: [],
         imageVersion: 1,
-        variations: [],
+        variations: variationSizes.map((v, idx) => ({
+          id: `size-${idx + 1}`,
+          label: v.label,
+          filePath: result.filePath || `/generated/${filename}`,
+        })),
       };
 
-      addItem({
+      const canvasItem = addItem({
         type: 'generated',
         x: 100 + Math.random() * 200,
         y: 100 + Math.random() * 200,
@@ -575,12 +581,17 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
             prompt,
             model: currentModel,
             seed: genSeed,
+            source: 'generated',
+            projectIds: projectId ? [projectId] : [],
+            variationIds: generationMeta.variations?.map((v) => v.id) || [],
+            childAssetIds: [],
+            usageCount: 0,
           },
         },
         generatedFolderPath,
       );
 
-      // Persist generation metadata to JSON
+      // Persist generation metadata to JSON (upsert)
       fetch('/api/generations/save-meta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -594,14 +605,35 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
           height: genHeight,
           generatedAt: now,
           filePath: result.filePath || `/generated/${filename}`,
-          parentIds: [],
-          childIds: [],
-          imageVersion: 1,
-          variations: [],
+          parentIds: generationMeta.parentIds || [],
+          childIds: generationMeta.childIds || [],
+          imageVersion: generationMeta.imageVersion || 1,
+          imageVersionLabel: `v${generationMeta.imageVersion || 1}`,
+          variations: generationMeta.variations || [],
+          variationSizes,
+          canvasItemId: canvasItem.id,
+          position: { x: canvasItem.x, y: canvasItem.y },
+          layer: {
+            zIndex: canvasItem.zIndex,
+            scale: canvasItem.scale,
+            rotation: canvasItem.rotation,
+            visible: canvasItem.visible,
+            locked: canvasItem.locked,
+            opacity: 1,
+          },
+          layerAssociations: {
+            parentCanvasItemIds: generationMeta.parentIds || [],
+            childCanvasItemIds: generationMeta.childIds || [],
+          },
+          projectId: projectId || undefined,
+          projectName: projectName || undefined,
         }),
       }).catch(() => {});
 
-      if (projectId) markDirty();
+      if (projectId) {
+        markDirty();
+        saveProjectWorkspaceState(projectId, projectName || 'Untitled');
+      }
 
       const cloudSaved = isAuthenticated && !!result.assetId;
       log('generation_complete', `Generated: ${filename}${cloudSaved ? ' (saved to cloud)' : ''}`, { prompt, filename, seed: genSeed, assetId: result.assetId });
@@ -617,7 +649,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
       log('generation_fail', `Generation failed: ${message}`, { error: message });
       toast.error('Generation Failed', message, 8000);
     }
-  }, [prompt, negativePrompt, genWidth, genHeight, localApiKey, settings, isAuthenticated, projectId, startGeneration, completeJob, failJob, addItem, addAssetToFolder, getProjectGeneratedPath, updateAIProvider, markDirty, log, toast]);
+  }, [prompt, negativePrompt, genWidth, genHeight, localApiKey, settings, isAuthenticated, projectId, projectName, startGeneration, completeJob, failJob, addItem, addAssetToFolder, getProjectGeneratedPath, updateAIProvider, markDirty, log, toast]);
 
   const handleUpdatePosition = useCallback(
     (axis: 'x' | 'y', value: number) => {

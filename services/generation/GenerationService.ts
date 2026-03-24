@@ -24,6 +24,7 @@ import { useSettingsStore, getRecommendedModelFallbacks } from '@/stores/setting
 import { useUserStore } from '@/stores/userStore';
 import { useProjectsStore } from '@/stores/projectsStore';
 import { useProductionStore } from '@/stores/productionStore';
+import { saveProjectWorkspaceState } from '@/hooks/useProjectSync';
 import type { AssetMetadata, GenerationResult, CanvasItem } from '@/types';
 
 function appendChildAssetId(meta: AssetMetadata | undefined, childId: string): string[] {
@@ -289,6 +290,51 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
         });
       }
     }
+
+    const variationSizes = [{ width, height, label: `${width}x${height}` }];
+    fetch('/api/generations/save-meta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: genResult.id,
+        prompt,
+        negativePrompt: negativePrompt || undefined,
+        model: settings.aiProvider.model,
+        seed,
+        width,
+        height,
+        generatedAt: genResult.createdAt,
+        filePath: `${generatedFolderPath}/${filename}`,
+        parentIds: parentAssetId ? [parentAssetId] : [],
+        childIds: [],
+        imageVersion: 1,
+        imageVersionLabel: `v${versionLabel}`,
+        variations: [
+          { id: versionLabel, label: versionLabel, width, height, filePath: `${generatedFolderPath}/${filename}` },
+        ],
+        variationSizes,
+        canvasItemId: canvasItem.id,
+        position: { x: canvasItem.x, y: canvasItem.y },
+        layer: {
+          zIndex: canvasItem.zIndex,
+          scale: canvasItem.scale,
+          rotation: canvasItem.rotation,
+          visible: canvasItem.visible,
+          locked: canvasItem.locked,
+          opacity: 1,
+        },
+        layerAssociations: {
+          parentCanvasItemIds: parentAssetId ? [parentAssetId] : [],
+          childCanvasItemIds: [],
+        },
+        projectId: currentProject.id,
+        projectName: currentProject.name,
+      }),
+    }).catch(() => {
+      // Non-critical; generation still succeeds if metadata write fails
+    });
+
+    saveProjectWorkspaceState(currentProject.id, currentProject.name);
 
     useProjectsStore.getState().updateProject(currentProject.id, { thumbnail: imageSrc });
     recordRun(currentProject, prompt, negativePrompt, settings, job.id, 'completed', width, height, assetId, seed);

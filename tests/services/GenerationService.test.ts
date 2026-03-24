@@ -100,6 +100,7 @@ describe('GenerationService – generateImage', () => {
         seed: 42,
       }),
     });
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
     const result = await generateImage({
       prompt: 'A beautiful sunset over mountains',
@@ -110,7 +111,7 @@ describe('GenerationService – generateImage', () => {
 
     expect(result.success).toBe(true);
     expect(result.assetId).toBeDefined();
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.prompt).toBe('A beautiful sunset over mountains');
@@ -200,6 +201,7 @@ describe('GenerationService – generateImage', () => {
         seed: 99,
       }),
     });
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
     const toastSpy = vi.spyOn(useToastStore.getState(), 'success');
     await generateImage({
@@ -220,6 +222,7 @@ describe('GenerationService – generateImage', () => {
         seed: 7,
       }),
     });
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
     const logSpy = vi.spyOn(useLogStore.getState(), 'log');
     await generateImage({

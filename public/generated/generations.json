@@ -14,7 +14,21 @@
       "childIds": [],
       "imageVersion": 1,
       "variations": []
+    },
+    {
+      "id": "7b8286a8-5a14-47ab-8ae6-fc9300cb60bb",
+      "prompt": "une jolie femme avec un smartphone dans une rue parisienne de jour qui prend en photo un nid de poule dans la route ",
+      "model": "imagen-4.0-generate-001",
+      "seed": 141265,
+      "width": 1024,
+      "height": 1024,
+      "generatedAt": 1774366096147,
+      "filePath": "/generated/gen_une-jolie-femme-avec-un-smartp_2026-03-24T15-28-16.png",
+      "parentIds": [],
+      "childIds": [],
+      "imageVersion": 1,
+      "variations": []
     }
   ],
-  "updatedAt": 1773974838555
+  "updatedAt": 1774366096310
 }

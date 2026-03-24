@@ -15,7 +15,15 @@ export interface GenerationRecord {
   parentIds?: string[];
   childIds?: string[];
   imageVersion: number;
-  variations?: { id: string; label: string; filePath?: string }[];
+  imageVersionLabel?: string;
+  variations?: { id: string; label: string; width?: number; height?: number; filePath?: string }[];
+  variationSizes?: { width: number; height: number; label: string }[];
+  canvasItemId?: string;
+  position?: { x: number; y: number };
+  layer?: { zIndex?: number; scale?: number; rotation?: number; visible?: boolean; locked?: boolean; opacity?: number };
+  layerAssociations?: { parentCanvasItemIds?: string[]; childCanvasItemIds?: string[] };
+  projectId?: string;
+  projectName?: string;
 }
 
 interface MetaFile {
