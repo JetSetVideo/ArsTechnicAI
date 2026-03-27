@@ -55,6 +55,10 @@ export interface AssetMetadata {
   childAssetIds?: UUID[];
   source?: 'imported' | 'generated' | 'duplicated' | 'modified';
   lastUsedAt?: Timestamp;
+  templateId?: UUID;
+  templateCategory?: string;
+  templateUsageCount?: number;
+  templateDownloads?: number;
 }
 
 export interface ImageAsset extends Asset {
@@ -85,7 +89,7 @@ export interface GenerationMeta {
 export interface CanvasItem {
   id: UUID;
   assetId?: UUID;
-  type: 'image' | 'generated' | 'placeholder' | 'video' | 'audio' | 'text';
+  type: 'image' | 'generated' | 'placeholder' | 'video' | 'audio' | 'text' | 'template';
   x: number;
   y: number;
   width: number;

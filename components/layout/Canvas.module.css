@@ -1109,3 +1109,66 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Template node ────────────────────────────────────────── */
+.templateNode {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.1) 0%, rgba(234, 179, 8, 0.04) 100%);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 4px;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.templateNodeBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #eab308;
+  opacity: 0.9;
+}
+
+.templateNodeName {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.templateNodeBody {
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  font-style: italic;
+  word-break: break-word;
+  flex: 1;
+  overflow: hidden;
+}
+
+.templateNodeVars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.templateNodeVar {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  color: #eab308;
+  font-size: 0.5rem;
+  font-family: monospace;
+  font-weight: 600;
+}

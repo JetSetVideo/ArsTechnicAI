@@ -1,4 +1,4 @@
-import { useState, useMemo, useDeferredValue, useCallback, useRef } from 'react';
+import { useState, useMemo, useDeferredValue, useCallback, useRef, useEffect } from 'react';
 import {
   Clock,
   Image as ImageIcon,
@@ -17,6 +17,8 @@ import {
   FolderOpen,
   Eye,
   Copy,
+  Download,
+  Flame,
 } from 'lucide-react';
 import { useFileStore } from '../../stores/fileStore';
 import { useUserStore } from '../../stores/userStore';
@@ -79,17 +81,25 @@ const SOURCE_LABELS: Record<string, string> = {
   modified: 'Modified',
 };
 
+interface PromptTemplate {
+  id: string;
+  name: string;
+  category?: string;
+}
+
 export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
   const assets = useFileStore((s) => s.assets);
   const importLocalFiles = useFileStore((s) => s.importLocalFiles);
   const recentProjects = useUserStore((s) => s.recentProjects);
   const currentProject = useUserStore((s) => s.currentProject);
-  const [filterType, setFilterType] = useState<AssetType | 'all'>('all');
+  const [filterType, setFilterType] = useState<AssetType | 'all' | 'templates'>('all');
   const [sortBy, setSortBy] = useState<'modifiedAt' | 'createdAt' | 'name' | 'size'>('modifiedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allProjects = useMemo(() => {
@@ -102,10 +112,20 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
   const allAssets = useMemo(() => Array.from(assets.values()), [assets]);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
+  useEffect(() => {
+    setTemplatesLoading(true);
+    fetch('/api/prompts/templates?pageSize=200')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setTemplates(d?.data ?? []))
+      .catch(() => setTemplates([]))
+      .finally(() => setTemplatesLoading(false));
+  }, []);
+
   const counts = useMemo(() => {
-    const c = { all: allAssets.length, image: 0, video: 0, audio: 0, text: 0 };
+    const c = { all: allAssets.length, image: 0, video: 0, audio: 0, text: 0, templates: 0 };
     allAssets.forEach((a) => {
       if (a.type in c) c[a.type as keyof typeof c]++;
+      if (a.type === 'prompt' && a.metadata?.templateId) c.templates++;
     });
     return c;
   }, [allAssets]);
@@ -113,8 +133,11 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
   const filteredAssets = useMemo(() => {
     let result = allAssets;
 
-    if (filterType !== 'all') {
+    if (filterType !== 'all' && filterType !== 'templates') {
       result = result.filter((a) => a.type === filterType);
+    }
+    if (filterType === 'templates') {
+      result = result.filter((a) => a.type === 'prompt' && !!a.metadata?.templateId);
     }
 
     const query = deferredSearchQuery.trim().toLowerCase();
@@ -149,6 +172,23 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
 
     return result;
   }, [allAssets, filterType, deferredSearchQuery, sortBy, sortOrder]);
+
+  const templateMetrics = useMemo(() => {
+    const templateAssets = allAssets.filter((a) => a.type === 'prompt' && a.metadata?.templateId);
+    return templates
+      .map((t) => {
+        const linked = templateAssets.find((a) => a.metadata?.templateId === t.id);
+        return {
+          id: t.id,
+          name: t.name,
+          category: t.category || 'general',
+          popularity: linked?.metadata?.templateUsageCount ?? linked?.metadata?.usageCount ?? 0,
+          downloads: linked?.metadata?.templateDownloads ?? 0,
+        };
+      })
+      .sort((a, b) => b.popularity - a.popularity || b.downloads - a.downloads)
+      .slice(0, 8);
+  }, [templates, allAssets]);
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -261,6 +301,12 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
         >
           <FileText size={14} /> Text <span className={styles.filterCount}>{counts.text}</span>
         </button>
+        <button
+          className={`${styles.filterButton} ${filterType === 'templates' ? styles.filterActive : ''}`}
+          onClick={() => setFilterType('templates')}
+        >
+          <FileText size={14} /> Templates <span className={styles.filterCount}>{counts.templates}</span>
+        </button>
 
         <label className={styles.filterSelectLabel}>
           Sort
@@ -285,6 +331,31 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
         </label>
       </div>
 
+      <div className={styles.templateLeaderboard}>
+        <div className={styles.templateLeaderboardHeader}>
+          <strong>Template Library</strong>
+          <span>{templatesLoading ? 'loading…' : `${templateMetrics.length} tracked`}</span>
+        </div>
+        {templateMetrics.length === 0 ? (
+          <div className={styles.templateLeaderboardEmpty}>No template stats yet. Create templates from the editor.</div>
+        ) : (
+          <div className={styles.templateLeaderboardList}>
+            {templateMetrics.map((tpl) => (
+              <div key={tpl.id} className={styles.templateLeaderboardRow}>
+                <div className={styles.templateLeaderboardMain}>
+                  <span className={styles.templateLeaderboardName}>{tpl.name}</span>
+                  <span className={styles.templateLeaderboardCategory}>{tpl.category}</span>
+                </div>
+                <div className={styles.templateLeaderboardStats}>
+                  <span title="Popularity"><Flame size={11} /> {tpl.popularity}</span>
+                  <span title="Downloads"><Download size={11} /> {tpl.downloads}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className={styles.grid}>
         <button
           className={styles.importCard}
@@ -302,7 +373,8 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
 
         {filteredAssets.map((asset) => {
           const meta = asset.metadata;
-          const typeColor = TYPE_COLORS[asset.type] || '#6b7280';
+          const isTemplate = asset.type === 'prompt' && !!asset.metadata?.templateId;
+          const typeColor = isTemplate ? '#ec4899' : (TYPE_COLORS[asset.type] || '#6b7280');
           const usageCount = meta?.usageCount || 0;
           const variationCount = meta?.variationIds?.length || 0;
           const childCount = meta?.childAssetIds?.length || 0;
@@ -328,7 +400,7 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
                 )}
 
                 <span className={styles.typeBadge} style={{ background: typeColor }}>
-                  {asset.type.toUpperCase()}
+                  {isTemplate ? 'TEMPLATE' : asset.type.toUpperCase()}
                 </span>
 
                 {fileSize > 0 && (
@@ -384,6 +456,16 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
                   >
                     <Layers size={11} /> {childCount}
                   </span>
+                  {isTemplate && (
+                    <>
+                      <span className={`${styles.statItem} ${(meta?.templateUsageCount || 0) > 0 ? styles.statActive : ''}`} title="Template popularity">
+                        <Flame size={11} /> {meta?.templateUsageCount || 0}
+                      </span>
+                      <span className={`${styles.statItem} ${(meta?.templateDownloads || 0) > 0 ? styles.statActive : ''}`} title="Template downloads">
+                        <Download size={11} /> {meta?.templateDownloads || 0}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 {/* Projects row */}

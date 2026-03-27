@@ -113,6 +113,82 @@
   padding: var(--space-1) 0;
 }
 
+.templateLeaderboard {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  padding: var(--space-2) var(--space-3);
+}
+
+.templateLeaderboardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+}
+
+.templateLeaderboardEmpty {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+}
+
+.templateLeaderboardList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.templateLeaderboardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.templateLeaderboardMain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.templateLeaderboardName {
+  font-size: var(--font-xs);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.templateLeaderboardCategory {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #ec4899;
+  background: rgba(236, 72, 153, 0.14);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+.templateLeaderboardStats {
+  display: inline-flex;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.templateLeaderboardStats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 /* ── Grid ─────────────────────────────────────────── */
 .grid {
   display: grid;

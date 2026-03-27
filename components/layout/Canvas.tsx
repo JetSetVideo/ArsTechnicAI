@@ -164,6 +164,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     audio: '#f59e0b',
     text: '#10b981',
     placeholder: '#6b7280',
+    template: '#eab308',
   };
 
   const getOrbColor = (type: string) => NODE_COLORS[type] ?? '#00d4aa';
@@ -1034,7 +1035,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                                     ? 'Audio'
                                     : item.type === 'text'
                                       ? 'Text'
-                                      : 'Placeholder'}
+                                      : item.type === 'template'
+                                        ? 'Prompt Template'
+                                        : 'Placeholder'}
                           </span>
                         </div>
                         <div className={styles.nodeTabPanelRow}>
@@ -1369,7 +1372,28 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   </div>
                 )}
 
-                {item.type !== 'video' && item.type !== 'audio' && item.src && (
+                {item.type === 'template' && (
+                  <div className={styles.templateNode}>
+                    <div className={styles.templateNodeBadge}>
+                      <BookOpen size={9} /> TEMPLATE
+                    </div>
+                    <div className={styles.templateNodeName}>{item.name}</div>
+                    {item.prompt && (
+                      <div className={styles.templateNodeBody}>
+                        {item.prompt.slice(0, 140)}{item.prompt.length > 140 ? '…' : ''}
+                      </div>
+                    )}
+                    {item.prompt && (
+                      <div className={styles.templateNodeVars}>
+                        {[...new Set((item.prompt.match(/\{\{([^}]+)\}\}/g) ?? []).map((m) => m.slice(2, -2)))].map((v) => (
+                          <span key={v} className={styles.templateNodeVar}>{v}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {item.type !== 'video' && item.type !== 'audio' && item.type !== 'template' && item.src && (
                   <img
                     src={item.src}
                     alt={item.name}
@@ -1378,7 +1402,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   />
                 )}
 
-                {!item.src && item.type !== 'audio' && (
+                {!item.src && item.type !== 'audio' && item.type !== 'template' && (
                   <div className={styles.placeholder}>
                     <Layers size={32} />
                     <span>{item.name}</span>
