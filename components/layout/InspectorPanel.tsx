@@ -42,6 +42,7 @@ import {
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
 import type { GenerationResult, GenerationMeta } from '@/types';
 import { saveProjectWorkspaceState } from '@/hooks/useProjectSync';
+import { saveToDisk } from '@/hooks/useDiskSave';
 import styles from './InspectorPanel.module.css';
 
 interface InspectorPanelProps {
@@ -613,6 +614,7 @@ const TemplateStudio: React.FC<{
   const updateAsset = useFileStore((s) => s.updateAsset);
   const getAsset = useFileStore((s) => s.getAsset);
   const addItem = useCanvasStore((s) => s.addItem);
+  const toast = useToastStore();
 
   useEffect(() => {
     if (!isAuthenticated) { setTemplates([]); return; }
@@ -645,13 +647,24 @@ const TemplateStudio: React.FC<{
   }, []);
 
   const handleSave = async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      toast.error('Sign in required', 'Saving templates needs an active session.');
+      return;
+    }
     const name = brief.name.trim();
     const templateText = assembledText.trim();
-    if (!name || !templateText) return;
+    if (!name || !templateText) {
+      toast.warning('Incomplete template', 'Add a name and prompt text before saving.');
+      return;
+    }
     setSaving(true);
     try {
       const variables = Object.fromEntries(detectedVars.map((v) => [v, ''])) as Record<string, string>;
+
+      let templateId = '';
+      let created: PromptTemplate | null = null;
+      let dbOk = false;
+
       const res = await fetch('/api/prompts/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -664,36 +677,109 @@ const TemplateStudio: React.FC<{
           isGlobal: brief.isGlobal,
         }),
       });
-      if (!res.ok) return;
-      const json = await res.json();
-      const created: PromptTemplate = json?.data ?? json;
-      if (!created?.id) return;
 
-      setTemplates((prev) => [created, ...prev]);
-      const slug = created.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || created.id;
-      const assetId = `tmpl-${created.id}`;
+      if (res.ok) {
+        const json = await res.json();
+        const row: PromptTemplate = json?.data ?? json;
+        if (row?.id) {
+          created = row;
+          templateId = row.id;
+          dbOk = true;
+        } else {
+          templateId = `local-${uuidv4()}`;
+          toast.warning(
+            'Library sync issue',
+            'Server returned no template id. The JSON file will still be saved.',
+            6000
+          );
+        }
+      } else {
+        const errJson = await res.json().catch(() => null);
+        const msg = errJson?.error?.message || res.statusText || `HTTP ${res.status}`;
+        console.warn('[TemplateStudio] Database save failed:', msg);
+        templateId = `local-${uuidv4()}`;
+        toast.warning(
+          'Library sync unavailable',
+          'Template will still be saved as a JSON file on disk. Database: ' + msg,
+          7000
+        );
+      }
 
-      addAssetToFolder({
-        id: assetId,
-        name: `${slug}.template.json`,
-        type: 'prompt',
-        path: `/prompts/${slug}.template.json`,
-        createdAt: Date.now(),
-        modifiedAt: Date.now(),
-        metadata: {
-          prompt: created.template,
-          mimeType: 'application/json',
-          source: 'generated',
-          usageCount: 0,
-          projectIds: [],
-          variationIds: [],
-          childAssetIds: [],
-          templateId: created.id,
-          templateCategory: created.category || 'general',
-          templateUsageCount: 0,
-          templateDownloads: 0,
+      if (!templateId) templateId = `local-${uuidv4()}`;
+
+      const slugFromName = (n: string) =>
+        n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'template';
+      let slug = slugFromName(created?.name || name);
+      if (!dbOk) {
+        slug = `${slug}-${templateId.replace(/\W/g, '').slice(-8)}`;
+      }
+
+      const fileRes = await fetch('/api/prompts/save-template-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: templateId,
+          name: created?.name || name,
+          slug,
+          category: brief.category || 'general',
+          description: brief.description.trim() || undefined,
+          template: templateText,
+          variables,
+          sceneBrief: { ...brief },
+          isGlobal: brief.isGlobal,
+        }),
+      });
+
+      if (!fileRes.ok) {
+        const errJson = await fileRes.json().catch(() => null);
+        const msg = errJson?.error?.message || fileRes.statusText || 'Could not write template file';
+        toast.error('Save failed', msg);
+        return;
+      }
+
+      const filePayload = await fileRes.json();
+      const savedFileName: string = filePayload?.data?.fileName ?? `${slug}.template.json`;
+
+      const listEntry: PromptTemplate =
+        created ?? {
+          id: templateId,
+          name,
+          category: brief.category || 'general',
+          description: brief.description.trim() || undefined,
+          template: templateText,
+          variables,
+        };
+
+      setTemplates((prev) => {
+        const without = prev.filter((t) => t.id !== listEntry.id);
+        return [listEntry, ...without];
+      });
+
+      const assetId = `tmpl-${templateId}`;
+      addAssetToFolder(
+        {
+          id: assetId,
+          name: savedFileName,
+          type: 'prompt',
+          path: `/prompts/${savedFileName}`,
+          createdAt: Date.now(),
+          modifiedAt: Date.now(),
+          metadata: {
+            prompt: templateText,
+            mimeType: 'application/json',
+            source: 'generated',
+            usageCount: 0,
+            projectIds: [],
+            variationIds: [],
+            childAssetIds: [],
+            templateId,
+            templateCategory: listEntry.category || 'general',
+            templateUsageCount: 0,
+            templateDownloads: 0,
+          },
         },
-      }, '/prompts');
+        '/prompts'
+      );
 
       addItem({
         type: 'template',
@@ -705,15 +791,25 @@ const TemplateStudio: React.FC<{
         scale: 1,
         locked: false,
         visible: true,
-        name: created.name,
-        prompt: created.template,
+        name: listEntry.name,
+        prompt: listEntry.template,
         assetId,
       });
+
+      await saveToDisk().catch(() => {});
+
+      toast.success(
+        'Template saved',
+        dbOk
+          ? `${savedFileName} — on disk under .ars-data/prompts and in your library.`
+          : `${savedFileName} saved under .ars-data/prompts. Connect the database to sync the template list.`,
+        6500
+      );
 
       setBrief(DEFAULT_BRIEF);
       setBriefStep('who');
       setShowTemplateEdit(false);
-      setExpandedId(created.id);
+      setExpandedId(listEntry.id);
       setView('list');
     } finally {
       setSaving(false);

@@ -262,6 +262,23 @@ export const promptTemplateSchema = z.object({
   isGlobal: z.boolean().optional(),
 });
 
+/** Persists scene-brief / template JSON next to workspace data (`.ars-data/prompts`). */
+export const savePromptTemplateFileSchema = z.object({
+  id: z.string().min(1).max(128),
+  name: z.string().min(1).max(200),
+  slug: z
+    .string()
+    .min(1)
+    .max(120)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, digits, and single hyphens'),
+  category: z.string().max(100).optional(),
+  description: z.string().max(2000).optional(),
+  template: z.string().min(1),
+  variables: z.record(z.unknown()).optional(),
+  sceneBrief: z.record(z.unknown()).optional(),
+  isGlobal: z.boolean().optional(),
+});
+
 export const vocabLibrarySchema = z.object({
   name: z.string().min(1).max(200),
   category: z.string().min(1),
