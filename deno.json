@@ -1,15 +1,18 @@
 {
   "nodeModulesDir": "auto",
   "tasks": {
-    "install": "deno install --allow-scripts",
-    "postinstall": "deno run -A npm:prisma generate && deno run -A scripts/patch-nextjs.ts",
-    "dev": "deno run -A npm:prisma generate && deno run -A scripts/patch-nextjs.ts && deno run -A npm:next@14.2.15 dev -p 3002",
+    "install": "deno install --allow-scripts && deno run -A npm:prisma generate && deno run -A scripts/patch-nextjs.ts",
+    "dev": "deno run -A npm:next@14.2.15 dev -p 3002",
     "build": "deno run -A npm:next@14.2.15 build",
     "start": "deno run -A npm:next@14.2.15 start -p 3002",
     "lint": "deno run -A npm:next@14.2.15 lint",
     "prisma:generate": "deno run -A npm:prisma generate",
     "prisma:migrate": "deno run -A npm:prisma migrate dev",
     "prisma:push": "deno run -A npm:prisma db push",
-    "prisma:seed": "./node_modules/.bin/tsx prisma/seed.ts"
+    "prisma:seed": "deno run -A npm:tsx prisma/seed.ts",
+    "prisma:studio": "deno run -A npm:prisma studio",
+    "setup": "deno task install",
+    "setup:db": "deno task prisma:push && deno task prisma:generate",
+    "type-check": "deno run -A npm:tsc --noEmit"
   }
 }
