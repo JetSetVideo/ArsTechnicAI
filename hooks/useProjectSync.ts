@@ -53,7 +53,6 @@ export function saveProjectWorkspaceState(projectId: string, projectName: string
     // localStorage quota or serialisation errors are non-fatal
   }
 
-  // Also persist per-project file state
   try {
     useFileStore.getState().saveProjectFileState(projectId, projectName);
   } catch {
@@ -249,7 +248,6 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
 
   const { markSynced, markDirty } = useProjectStore();
 
-  // Sync the in-memory canvas to the DB canvas endpoint
   const syncCanvas = useCallback(async () => {
     if (!projectId || !session?.user) return;
 
@@ -286,7 +284,6 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
         }),
       });
 
-      // Also save per-project file state
       useFileStore.getState().saveProjectFileState(projectId, useProjectStore.getState().projectName ?? '');
     } catch {
       // Canvas sync failures are non-fatal
@@ -301,7 +298,6 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
       setIsSaving(true);
 
       try {
-        // Sync canvas to DB first so the snapshot captures current state
         await syncCanvas();
 
         const res = await fetch(`/api/projects/${projectId}/versions`, {
@@ -324,7 +320,6 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
     [projectId, session?.user, syncCanvas, markSynced]
   );
 
-  // Autosave every 30s when authenticated and project is open
   useEffect(() => {
     if (!projectId || !session?.user) return;
 
@@ -335,7 +330,6 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
     return () => clearInterval(id);
   }, [projectId, session?.user, saveVersion]);
 
-  // Load project metadata + canvas from DB and populate stores
   const loadProjectFromDb = useCallback(async (id: string) => {
     try {
       const [projectRes, canvasRes] = await Promise.all([
@@ -346,16 +340,13 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
       if (!projectRes.ok) return null;
       const { data: project } = await projectRes.json();
 
-      // Populate projectStore
       useProjectStore.getState().setProject(id, project.name ?? 'Untitled');
 
-      // Populate canvasStore if canvas data exists
       if (canvasRes.ok) {
         const { data: canvas } = await canvasRes.json();
         if (canvas) {
           const canvasStore = useCanvasStore.getState();
 
-          // Restore viewport
           if (canvas.viewportX != null || canvas.viewportZoom != null) {
             canvasStore.setViewport({
               x: canvas.viewportX ?? 0,
@@ -364,7 +355,6 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
             });
           }
 
-          // Restore items (only if canvas has persisted items)
           if (Array.isArray(canvas.items) && canvas.items.length > 0) {
             canvasStore.clearCanvas();
             for (const item of canvas.items) {
@@ -392,7 +382,6 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
             }
           }
 
-          // Also rebuild file tree assets for generated items
           const fileStore = useFileStore.getState();
           fileStore.switchToProject(project.name ?? 'Untitled', id);
           const generatedPath = fileStore.getProjectGeneratedPath();
@@ -424,7 +413,6 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
         }
       }
 
-      // Cache to localStorage for fast future loads
       saveProjectWorkspaceState(id, project.name ?? 'Untitled');
 
       return project as Record<string, unknown>;

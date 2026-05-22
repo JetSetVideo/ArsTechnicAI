@@ -3,3 +3,5 @@ export { Input, Textarea } from './Input';
 export { SearchBar } from './SearchBar';
 export { ConnectionStatus } from './ConnectionStatus';
 export { AuthModal } from './AuthModal';
+export { AuthButton } from './AuthButton';
+export { ToastContainer } from './Toast';

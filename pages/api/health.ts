@@ -40,7 +40,7 @@ export default async function handler(_req: NextApiRequest, res: NextApiResponse
 
   const allOk = services.every((s) => s.status === 'ok');
   const allDown = services.every((s) => s.status === 'error');
-  const status = allOk ? 'ok' : allDown ? 'error' : 'degraded';
+  const status: HealthResponse['status'] = allOk ? 'ok' : allDown ? 'error' : 'degraded';
 
   return res.status(allOk ? 200 : 503).json({
     status,
