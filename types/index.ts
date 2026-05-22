@@ -200,11 +200,25 @@ export interface ActionLogEntry {
 // ------------------------------------------------------------
 // Settings Types
 // ------------------------------------------------------------
+export type AIProviderID =
+  | 'GOOGLE_IMAGEN'
+  | 'OPENAI_DALLE'
+  | 'STABILITY'
+  | 'FAL'
+  | 'REPLICATE'
+  | 'MIDJOURNEY'
+  | 'CUSTOM';
+
 export interface AIProviderSettings {
-  provider: 'nanobanana' | 'midjourney' | 'stability' | 'openai' | 'custom';
-  apiKey: string;
+  // Legacy single-provider fields (kept for migration compatibility)
+  provider?: string;
+  apiKey?: string;
   endpoint?: string;
-  model: string;
+  model?: string;
+  // New multi-provider fields
+  activeProvider: AIProviderID;
+  activeModel: string;
+  apiKeys: Partial<Record<AIProviderID, string>>;
   defaultWidth: number;
   defaultHeight: number;
   defaultSteps: number;

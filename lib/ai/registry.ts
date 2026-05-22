@@ -3,6 +3,8 @@ import { BaseProvider } from './base-provider';
 import { GoogleImagenProvider } from './providers/google-imagen';
 import { OpenAIDalleProvider } from './providers/openai-dalle';
 import { StabilityProvider } from './providers/stability';
+import { FalProvider } from './providers/fal';
+import { ReplicateProvider } from './providers/replicate';
 
 const providers = new Map<AIProvider, BaseProvider>();
 
@@ -14,6 +16,8 @@ function register(provider: BaseProvider) {
 register(new GoogleImagenProvider());
 register(new OpenAIDalleProvider());
 register(new StabilityProvider());
+register(new FalProvider());
+register(new ReplicateProvider());
 
 export function getProvider(name: AIProvider): BaseProvider | undefined {
   return providers.get(name);

@@ -16,6 +16,15 @@ export function getRecommendedModelFallbacks(currentModel: string): string[] {
   return [...ordered];
 }
 
+// Default model per provider
+export const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  GOOGLE_IMAGEN: 'imagen-3.0-generate-002',
+  OPENAI_DALLE: 'dall-e-3',
+  STABILITY: 'sd3.5-large',
+  FAL: 'fal-ai/flux/schnell',
+  REPLICATE: 'black-forest-labs/flux-schnell',
+};
+
 interface SettingsState {
   settings: AppSettings;
   updateSettings: (partial: Partial<AppSettings>) => void;
@@ -35,14 +44,12 @@ const defaultAppearance: AppearanceSettings = {
 
 // Default AI provider settings - extracted for reuse in migration
 const defaultAIProvider: AIProviderSettings = {
-  provider: 'nanobanana',
-  apiKey: '',
-  endpoint: 'https://generativelanguage.googleapis.com/v1beta',
-  // Gemini API Imagen model (see https://ai.google.dev/gemini-api/docs/imagen)
-  model: 'imagen-3.0-generate-002',
+  activeProvider: 'GOOGLE_IMAGEN',
+  activeModel: 'imagen-3.0-generate-002',
+  apiKeys: {},
   defaultWidth: 1024,
   defaultHeight: 1024,
-  defaultSteps: 50,
+  defaultSteps: 28,
   defaultGuidanceScale: 7.5,
 };
 
@@ -129,22 +136,39 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: STORAGE_KEYS.settings,
       // Version for migrations
-      version: 1,
+      version: 2,
       // Deep merge stored state with defaults to handle missing properties
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<SettingsState> | undefined;
         if (!persisted || !persisted.settings) {
           return currentState;
         }
-        
-        const mergedAiProvider = {
-          ...defaultAIProvider,
-          ...(persisted.settings.aiProvider ?? {}),
-        };
-        // Migration: older builds used a non-working Imagen model id.
-        if (mergedAiProvider.model === 'imagen-3.0-generate-001') {
-          mergedAiProvider.model = defaultAIProvider.model;
+
+        const oldAI = persisted.settings.aiProvider as Record<string, unknown> | undefined ?? {};
+
+        // Migrate from legacy single-key format (v1) to per-provider keys (v2)
+        let mergedAiProvider = { ...defaultAIProvider, ...oldAI } as AIProviderSettings;
+        if (!mergedAiProvider.activeProvider) {
+          // Old format had `provider` (string) and `apiKey` (string)
+          const legacyProvider = (oldAI.provider as string) ?? '';
+          const legacyKey = (oldAI.apiKey as string) ?? '';
+          const providerMap: Record<string, string> = {
+            nanobanana: 'GOOGLE_IMAGEN',
+            openai: 'OPENAI_DALLE',
+            stability: 'STABILITY',
+            midjourney: 'MIDJOURNEY',
+            custom: 'CUSTOM',
+          };
+          const mapped = providerMap[legacyProvider] ?? 'GOOGLE_IMAGEN';
+          mergedAiProvider = {
+            ...defaultAIProvider,
+            activeProvider: mapped as AIProviderSettings['activeProvider'],
+            activeModel: (oldAI.model as string) || PROVIDER_DEFAULT_MODELS[mapped] || 'imagen-3.0-generate-002',
+            apiKeys: legacyKey ? { [mapped]: legacyKey } as AIProviderSettings['apiKeys'] : {},
+          };
         }
+        // Ensure apiKeys object always exists
+        if (!mergedAiProvider.apiKeys) mergedAiProvider.apiKeys = {};
 
         // Deep merge settings with defaults
         return {
@@ -152,14 +176,11 @@ export const useSettingsStore = create<SettingsState>()(
           settings: {
             ...defaultSettings,
             ...persisted.settings,
-            // Ensure nested objects are properly merged with defaults
             appearance: {
               ...defaultAppearance,
               ...(persisted.settings.appearance ?? {}),
             },
-            aiProvider: {
-              ...mergedAiProvider,
-            },
+            aiProvider: mergedAiProvider,
           },
         };
       },
