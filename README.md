@@ -408,16 +408,21 @@ Data layer (optional — only needed for Modes 2 and 3)
 - [x] Cross-device canvas sync — images embedded as base64 in DB
 - [x] Health banner + automatic reconnect detection
 - [x] Deno 2 as primary runtime
+- [x] **Phase 0: Foundations** — Module registry (81 stubs), typed ports, format profiles, project bundles, blueprint store, Prisma schema extensions
 
 ### In progress
-- [ ] Real-time multi-user collaboration (WebSocket / Liveblocks)
-- [ ] Video timeline editing with FFmpeg
-- [ ] Comic panel layout mode
+- [ ] **Phase 1: Read Everything** — Universal file import with metadata extraction for all media types
+- [ ] **Phase 2: Image Edit Modules** — Non-destructive image editing pipeline
+- [ ] **Phase 3: Video Engine** — ffmpeg.wasm + fluent-ffmpeg, real timeline playback
+- [ ] **Phase 4: Audio Engine** — TTS, music, multi-track mixing
+- [ ] **Phase 5: 3D + Gaussian Splat** — Three.js viewport, camera animation
+- [ ] **Phase 6: Intelligence Modules** — Storyboards, character consistency, auto-tag
+- [ ] **Phase 7: Blueprints + Agents** — Reusable pipelines, autonomous agents
+- [ ] **Phase 8: Automations + Social Posting** — Hands-free creation and posting
 
 ### Planned
-- [ ] Figma-style live cursor sharing
+- [ ] Real-time multi-user collaboration (WebSocket / Liveblocks)
 - [ ] Asset CDN — serve uploaded files from S3 or Cloudflare R2
-- [ ] Export to PDF, video, ZIP
 - [ ] Team workspaces with role-based access
 - [ ] Plugin API for custom AI providers
 - [ ] Mobile / tablet touch support

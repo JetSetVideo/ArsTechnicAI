@@ -6,6 +6,9 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useProjectsStore } from '@/stores/projectsStore';
 import { saveProjectWorkspaceState } from './useProjectSync';
 import type { GenerationMeta, Asset } from '@/types';
+import type { Blueprint } from '@/types/blueprint';
+
+import { useBlueprintStore } from '@/stores/blueprintStore';
 
 interface DiskAssetMeta {
   id?: string;
@@ -48,6 +51,8 @@ interface DiskLoadResult {
   canvas: DiskCanvasState | null;
   projects: { savedAt: number; projects: Array<Record<string, unknown>> } | null;
   settings: { savedAt: number; settings: Record<string, unknown> } | null;
+  blueprints?: { savedAt: number; blueprints: Array<Record<string, unknown>> } | null;
+  automations?: { savedAt: number; automations: Array<Record<string, unknown>> } | null;
 }
 
 /**
@@ -97,6 +102,10 @@ async function reconcile() {
 
     // --- Reconcile generated assets from disk scan ---
     reconcileGeneratedAssets(scanRes, projectName);
+
+    // --- Blueprint + automation restoration ---
+    restoreBlueprintsFromDisk(loadRes);
+    restoreAutomationsFromDisk(loadRes);
 
     // Cache to localStorage now that we've reconciled
     if (projectId) {
@@ -311,4 +320,42 @@ function reconcileGeneratedAssets(scan: ScanResult | null, projectName: string) 
   if (added > 0) {
     console.log(`[DiskReconciliation] Reconciled ${added} assets from disk into file tree + canvas`);
   }
+}
+
+function restoreBlueprintsFromDisk(load: DiskLoadResult | null) {
+  const store = useBlueprintStore.getState();
+  if (store.blueprints.length > 0) return;
+
+  const diskBlueprints = load?.blueprints?.blueprints;
+  if (!Array.isArray(diskBlueprints) || diskBlueprints.length === 0) return;
+
+  for (const dbp of diskBlueprints) {
+    const id = (dbp.id as string) || `bp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const existing = store.blueprints.find((b) => b.id === id);
+    if (!existing) {
+      store.addBlueprint({
+        id,
+        name: (dbp.name as string) || 'Untitled Blueprint',
+        description: (dbp.description as string) || undefined,
+        category: (dbp.category as 'image' | 'video' | 'audio' | '3d' | 'social' | 'full-pipeline') || 'image',
+        nodes: Array.isArray(dbp.nodes) ? (dbp.nodes as Blueprint['nodes']) : [],
+        connections: Array.isArray(dbp.connections) ? (dbp.connections as Blueprint['connections']) : [],
+        parameters: Array.isArray(dbp.parameters) ? (dbp.parameters as Blueprint['parameters']) : [],
+        version: (dbp.version as string) || '1.0.0',
+        createdAt: (dbp.createdAt as number) || Date.now(),
+        updatedAt: (dbp.updatedAt as number) || Date.now(),
+        userId: (dbp.userId as string) || undefined,
+        isPublic: (dbp.isPublic as boolean) || false,
+      });
+    }
+  }
+  console.log(`[DiskReconciliation] Restored ${diskBlueprints.length} blueprints from disk`);
+}
+
+function restoreAutomationsFromDisk(load: DiskLoadResult | null) {
+  // Automations are stored in the blueprint store as runs for now
+  // Full automation store will be added in Phase 8
+  const diskAutomations = load?.automations?.automations;
+  if (!Array.isArray(diskAutomations) || diskAutomations.length === 0) return;
+  console.log(`[DiskReconciliation] Skipped ${diskAutomations.length} automations (Phase 8)`);
 }

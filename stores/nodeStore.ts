@@ -12,7 +12,7 @@ export type NodeType =
   | 'blend'
   | 'output';
 
-export type PortType = 'image' | 'text' | 'number';
+export type PortType = 'image' | 'video' | 'audio' | '3d' | 'text' | 'data' | 'mask' | 'number';
 
 export interface NodePort {
   id: string;

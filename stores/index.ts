@@ -16,4 +16,5 @@ export { useToastStore } from './toastStore';
 export type { Toast, ToastType } from './toastStore';
 export { useErrorStore } from './errorStore';
 export { useProductionStore } from './productionStore';
+export { useBlueprintStore } from './blueprintStore';
 export { useDashboardStore } from './dashboardStore';

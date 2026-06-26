@@ -89,7 +89,9 @@ This document describes how Ars TechnicAI's codebase and product modules are org
 │   ├── generationStore.ts             # Job queue (in-memory), prompt/dims state
 │   ├── logStore.ts                    # Action log entries
 │   ├── projectStore.ts                # Shared projectId, projectName, isDirty, lastSynced
-│   └── nodeStore.ts                   # Workflow nodes/connections, execution engine, 7 node types
+│   ├── nodeStore.ts                   # Workflow nodes/connections, execution engine, 7 node types
+│   ├── blueprintStore.ts              # Phase 0: Blueprint CRUD + import/export (Zustand + persist)
+│   └── index.ts                       # Re-exports all stores
 │
 ├── hooks/
 │   ├── useConnectionStatus.ts         # Polls /api/health + session → 4 status states
@@ -104,6 +106,19 @@ This document describes how Ars TechnicAI's codebase and product modules are org
 │   ├── ai/
 │   │   └── providers/
 │   │       └── google-imagen.ts       # Google Imagen REST client
+│   ├── modules/                       # Phase 0: Module registry + 80+ processing stubs
+│   │   ├── registry.ts                # ModuleRegistry with all Section 6 module IDs
+│   │   ├── ingest/                    # Import / read modules (14 stubs)
+│   │   ├── generate/                  # Generation modules (17 stubs)
+│   │   ├── edit/                      # Edit / transform modules (21 stubs)
+│   │   ├── spatial/                   # 3D / spatial modules (9 stubs)
+│   │   ├── intelligence/              # AI intelligence modules (10 stubs)
+│   │   ├── assembly/                  # Assembly / compositing modules (7 stubs)
+│   │   └── publish/                   # Publish + platform adapters (4 stubs + platforms/)
+│   ├── formats/                       # Phase 0: Format profiles
+│   │   └── profiles.ts                # 10 platform format profiles, exportable as JSON
+│   ├── project/                       # Phase 0: Project bundle spec
+│   │   └── bundle.ts                  # .arsproj manifest read/write + checksums
 │   ├── redis.ts                       # ioredis client singleton
 │   ├── prisma.ts                      # Prisma client singleton
 │   └── validation/
@@ -115,6 +130,9 @@ This document describes how Ars TechnicAI's codebase and product modules are org
 │
 ├── types/
 │   ├── index.ts                       # Shared TS types (CanvasItem, Asset, FileNode, etc.)
+│   ├── module.ts                      # Phase 0: ModuleDef, ModulePort, ModuleResult, ModuleContext
+│   ├── format.ts                      # Phase 0: FormatProfile, ExportSettings, AspectRatio
+│   ├── blueprint.ts                   # Phase 0: Blueprint, BlueprintParameter, BlueprintRun
 │   └── next-auth.d.ts                 # Session type augmentation
 │
 ├── styles/

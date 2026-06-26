@@ -34,6 +34,10 @@ enum AssetType {
   SCENE
   LUT
   SUBTITLE
+  MODEL_3D
+  SPLAT
+  WAVEFORM
+  FILMSTRIP
 }
 
 enum MediaStatus {
@@ -63,6 +67,12 @@ enum JobType {
   TRANSCODING
   THUMBNAIL
   EMBEDDING
+  BACKGROUND_REMOVAL
+  FACE_SWAP
+  DEPTH_ESTIMATION
+  SPLAT_GENERATION
+  PUBLISH
+  AUTOMATION
 }
 
 enum AIProvider {
@@ -104,6 +114,9 @@ enum PublishPlatform {
   INSTAGRAM
   TWITTER
   CUSTOM
+  LINKEDIN
+  FACEBOOK
+  THREADS
 }
 
 enum PublishStatus {
@@ -232,6 +245,10 @@ model User {
   memberships    ProjectMember[]
   devices        UserDevice[]
   userSessions   UserSession[]
+  blueprints     Blueprint[]
+  automations    Automation[]
+  schedules      Schedule[]
+  agentSessions  AgentSession[]
 
   @@map("users")
 }
@@ -806,4 +823,100 @@ model ProjectVersion {
 
   @@index([projectId, version])
   @@map("project_versions")
+}
+
+// ============================================================
+// Blueprints
+// ============================================================
+
+model Blueprint {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  category    String
+  graphJson   Json
+  parameters  Json?
+  version     String   @default("1.0.0")
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  automations Automation[]
+  @@map("blueprints")
+}
+
+// ============================================================
+// Automations
+// ============================================================
+
+model Automation {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  blueprintId     String
+  triggerType     String
+  triggerConfig   Json?
+  blueprintParams Json?
+  publishAccountId String?
+  scheduleId      String?
+  isActive        Boolean   @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blueprint       Blueprint @relation(fields: [blueprintId], references: [id])
+  schedule        Schedule? @relation(fields: [scheduleId], references: [id])
+  runs            AutomationRun[]
+  @@map("automations")
+}
+
+model AutomationRun {
+  id           String   @id @default(cuid())
+  automationId String
+  status       String
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  outputJson   Json?
+  error        String?  @db.Text
+  publishJobId String?
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  @@map("automation_runs")
+}
+
+// ============================================================
+// Schedules
+// ============================================================
+
+model Schedule {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  cronExpr    String?
+  cadence     String?
+  timezone    String   @default("UTC")
+  nextRunAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  automations Automation[]
+  @@map("schedules")
+}
+
+// ============================================================
+// Agent Sessions
+// ============================================================
+
+model AgentSession {
+  id        String   @id @default(cuid())
+  userId    String
+  agentId   String
+  messages  Json
+  context   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("agent_sessions")
 }

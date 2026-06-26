@@ -12,7 +12,7 @@ export type FilePath = string;
 // ------------------------------------------------------------
 // Asset Types
 // ------------------------------------------------------------
-export type AssetType = 'image' | 'video' | 'audio' | 'text' | 'prompt' | 'folder';
+export type AssetType = 'image' | 'video' | 'audio' | 'text' | 'prompt' | 'folder' | 'model_3d' | 'splat' | 'waveform' | 'filmstrip';
 
 export interface Asset {
   id: UUID;
