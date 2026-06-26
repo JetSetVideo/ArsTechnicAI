@@ -1,30 +1,39 @@
 /**
  * DashboardLayout
  *
- * Main dashboard wrapper with project grid, search, and settings/help.
+ * Home dashboard: sources, filters, project cards, and asset views.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Search, UserRound, LayoutGrid, Image as ImageIcon, PlusCircle, PenTool } from 'lucide-react';
+import { Search, UserRound, LayoutGrid, Image as ImageIcon, PenTool } from 'lucide-react';
 import { useRouter } from 'next/router';
 import styles from './DashboardLayout.module.css';
 import { Button } from '../ui';
 import { ConnectionBanner } from '../ui/ConnectionBanner';
 import { SettingsModal } from './SettingsModal';
-import { NavigationBar } from './NavigationBar';
 import { useProjectSync, saveProjectWorkspaceState } from '../../hooks/useProjectSync';
 import { useUserStore } from '../../stores/userStore';
 import { useTelemetryStore } from '../../stores/telemetryStore';
-import { ProjectsGrid } from '../dashboard/ProjectsGrid';
+import { SourcesGrid, ProjectsGrid, AssetFilterBar } from '../dashboard';
 import { AssetsGrid } from '../dashboard/AssetsGrid';
+
+type SettingsTab =
+  | 'account'
+  | 'api'
+  | 'appearance'
+  | 'shortcuts'
+  | 'help'
+  | 'about'
+  | 'publishing'
+  | 'usage';
 
 export function DashboardLayout() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'projects' | 'assets'>('projects');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'account' | 'api' | 'appearance' | 'shortcuts' | 'help' | 'about'>('account');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('account');
 
   const { openProjectFromDashboard } = useProjectSync();
   const currentProject = useUserStore((s) => s.currentProject);
@@ -39,11 +48,12 @@ export function DashboardLayout() {
     [router, currentProject.id, currentProject.name, openProjectFromDashboard]
   );
 
-  const profilePictureClass = health?.status === 'ok' 
-    ? styles.dashboardLayoutProfilePictureConnected 
-    : health?.status === 'error' || health?.status === 'degraded'
-      ? styles.dashboardLayoutProfilePictureDisconnected 
-      : '';
+  const profilePictureClass =
+    health?.status === 'ok'
+      ? styles.dashboardLayoutProfilePictureConnected
+      : health?.status === 'error' || health?.status === 'degraded'
+        ? styles.dashboardLayoutProfilePictureDisconnected
+        : '';
 
   return (
     <div id="dashboard-layout-root-page-region" className={styles.dashboardLayoutRootPageRegion}>
@@ -68,13 +78,13 @@ export function DashboardLayout() {
           </div>
 
           <div className={styles.dashboardLayoutHeaderPrimaryActionsRight}>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setSettingsTab('account');
                 setSettingsOpen(true);
-              }} 
+              }}
               title="Account and Preferences"
               style={{ padding: '4px' }}
             >
@@ -86,41 +96,42 @@ export function DashboardLayout() {
         </div>
       </header>
 
-      <SettingsModal 
-        isOpen={settingsOpen} 
-        onClose={() => setSettingsOpen(false)} 
-        defaultTab={settingsTab} 
-      />
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} defaultTab={settingsTab} />
 
-      {/* Secondary Navigation & View Toggles */}
       <div className={styles.dashboardSubNav}>
         <div className={styles.viewToggles}>
-          <button 
+          <button
+            type="button"
             className={`${styles.viewToggleButton} ${viewMode === 'projects' ? styles.active : ''}`}
             onClick={() => setViewMode('projects')}
           >
             <LayoutGrid size={16} /> Projects
           </button>
-          <button 
+          <button
+            type="button"
             className={`${styles.viewToggleButton} ${viewMode === 'assets' ? styles.active : ''}`}
             onClick={() => setViewMode('assets')}
           >
             <ImageIcon size={16} /> All Assets
           </button>
         </div>
-        
+
         <div className={styles.creationActions}>
-           <span className={styles.creationLabel}>Creation Mode:</span>
-           <Button variant="ghost" size="sm" icon={<PenTool size={14} />} onClick={() => { /* Trigger character creator */ }}>
-             Character
-           </Button>
+          <span className={styles.creationLabel}>Creation Mode:</span>
+          <Button variant="ghost" size="sm" icon={<PenTool size={14} />} onClick={() => {}}>
+            Character
+          </Button>
         </div>
       </div>
 
       <main id="dashboard-layout-main-content-region" className={styles.dashboardLayoutMainContentRegion}>
         <div className={styles.dashboardLayoutMainProjectsContentRegion}>
+          <AssetFilterBar />
           {viewMode === 'projects' ? (
-            <ProjectsGrid onOpenProject={handleOpenProject} searchQuery={searchQuery} />
+            <>
+              <SourcesGrid onOpenProject={handleOpenProject} />
+              <ProjectsGrid onOpenProject={handleOpenProject} searchQuery={searchQuery} />
+            </>
           ) : (
             <AssetsGrid searchQuery={searchQuery} />
           )}

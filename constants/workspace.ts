@@ -39,6 +39,7 @@ export const STORAGE_KEYS = {
   telemetry: 'ars-technicai-telemetry',
   errors: 'ars-technicai-errors',
   productionTracker: 'ars-technicai-production-tracker',
+  dashboard: 'ars-technicai-dashboard',
 } as const;
 
 export const WORKSPACE_DATA_KEYS_TO_CLEAR = [

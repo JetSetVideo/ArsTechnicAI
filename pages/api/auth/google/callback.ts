@@ -9,17 +9,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  // serverUrl: where THIS server lives (used for the OAuth redirect_uri registered with Google)
+  const serverUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  // frontendUrl: where the client app lives (Mac); falls back to serverUrl for single-host setups
+  const frontendUrl = (process.env.FRONTEND_URL || serverUrl).replace(/\/$/, '');
 
   try {
     const { code, error: oauthError } = req.query;
 
     if (oauthError) {
-      return res.redirect(`${appUrl}/home?auth_error=${encodeURIComponent(String(oauthError))}`);
+      return res.redirect(`${frontendUrl}/auth/callback?auth_error=${encodeURIComponent(String(oauthError))}`);
     }
 
     if (!code || typeof code !== 'string') {
-      return res.redirect(`${appUrl}/home?auth_error=missing_code`);
+      return res.redirect(`${frontendUrl}/auth/callback?auth_error=missing_code`);
     }
 
     // Exchange authorization code for tokens using native fetch
@@ -30,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         code,
         client_id: process.env.GOOGLE_CLIENT_ID!,
         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri: `${appUrl}/api/auth/google/callback`,
+        redirect_uri: `${serverUrl}/api/auth/google/callback`,
         grant_type: 'authorization_code',
       }).toString(),
     });
@@ -71,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       profileImage: data.picture,
     });
 
-    const redirectUrl = new URL(`${appUrl}/home`);
+    const redirectUrl = new URL(`${frontendUrl}/auth/callback`);
     redirectUrl.searchParams.set('auth_token', authResult.token);
     redirectUrl.searchParams.set('auth_expires_in', String(authResult.expiresIn));
 
@@ -79,6 +82,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     console.error('Google OAuth Callback Error:', error);
     const message = error instanceof Error ? error.message : 'Authentication failed';
-    return res.redirect(`${appUrl}/home?auth_error=${encodeURIComponent(message)}`);
+    return res.redirect(`${frontendUrl}/auth/callback?auth_error=${encodeURIComponent(message)}`);
   }
 }

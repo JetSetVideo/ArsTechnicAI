@@ -33,6 +33,7 @@ import { useSession } from 'next-auth/react';
 import { useProjectsStore } from '../../stores';
 import { useUserStore } from '../../stores/userStore';
 import { useFileStore } from '../../stores/fileStore';
+import { useDashboardStore } from '../../stores/dashboardStore';
 import { slugifyProjectName } from '../../utils/project';
 import { WORKSPACE_ROOT_PATHS } from '../../constants/workspace';
 import { Button } from '../ui';
@@ -251,13 +252,18 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
     void refreshCloudSyncStatus();
   }, [libraryAssets.length, refreshCloudSyncStatus]);
   
+  const projectScope = useDashboardStore((s) => s.filters.projectScope);
   const sortedProjects = getSortedProjects();
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const projects = useMemo(() => {
     const query = deferredSearchQuery.trim();
+    let scoped = sortedProjects;
+    if (projectScope !== 'all' && projectScope !== 'library') {
+      scoped = scoped.filter((project) => project.id === projectScope);
+    }
     const filteredBySearch = !query
-      ? sortedProjects
-      : sortedProjects.filter((project) => {
+      ? scoped
+      : scoped.filter((project) => {
           try {
             const regex = new RegExp(query, 'i');
             return (
@@ -278,7 +284,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
     return filteredBySearch.filter((project) =>
       project.assetCount >= minimumAssets
     );
-  }, [sortedProjects, deferredSearchQuery, minimumAssets]);
+  }, [sortedProjects, deferredSearchQuery, minimumAssets, projectScope]);
   const allTags = getAllTags();
 
   const handleNewProject = () => {

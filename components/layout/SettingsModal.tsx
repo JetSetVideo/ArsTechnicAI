@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi, CheckCircle, 
-  XCircle, Pencil, Check, CloudOff, Smartphone, Tablet, Monitor, Crown, Shield, Sparkles, User 
+import {
+  X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi, CheckCircle,
+  XCircle, Pencil, Check, CloudOff, Smartphone, Tablet, Monitor, Crown, Shield, Sparkles, User,
+  Share2, Cpu,
 } from 'lucide-react';
+import { useDashboardStore } from '@/stores/dashboardStore';
+import type { SocialPlatformId } from '@/types/dashboard';
+import { ServicesUsagePanel } from '@/components/dashboard/ServicesUsagePanel';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
@@ -67,7 +71,7 @@ interface SettingsModalProps {
   defaultTab?: SettingsTab;
 }
 
-type SettingsTab = 'account' | 'api' | 'appearance' | 'shortcuts' | 'help' | 'about';
+type SettingsTab = 'account' | 'api' | 'appearance' | 'shortcuts' | 'help' | 'about' | 'publishing' | 'usage';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -81,6 +85,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const telemetryEnabled = useTelemetryStore((s) => s.telemetryEnabled);
   const setTelemetryEnabled = useTelemetryStore((s) => s.setTelemetryEnabled);
   const latestSnapshot = useTelemetryStore((s) => s.getLatestSnapshot());
+  const publishingAccounts = useDashboardStore((s) => s.publishingAccounts);
+  const upsertPublishingAccount = useDashboardStore((s) => s.upsertPublishingAccount);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -243,6 +249,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={16} /> },
     { id: 'help', label: 'Help', icon: <HelpCircle size={16} /> },
     { id: 'about', label: 'About', icon: <Info size={16} /> },
+    { id: 'publishing', label: 'Publishing', icon: <Share2 size={16} /> },
+    { id: 'usage', label: 'Usage', icon: <Cpu size={16} /> },
+  ];
+
+  const PUBLISHING_PLATFORMS: { id: SocialPlatformId; label: string }[] = [
+    { id: 'instagram', label: 'Instagram' },
+    { id: 'youtube', label: 'YouTube' },
+    { id: 'tiktok', label: 'TikTok' },
+    { id: 'facebook', label: 'Facebook' },
+    { id: 'linkedin', label: 'LinkedIn' },
+    { id: 'x', label: 'X' },
   ];
   const suggestedFallbacks = getRecommendedModelFallbacks(localModel);
 
@@ -668,6 +685,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   />
                   <span>Auto-save prompts with generated images</span>
                 </label>
+              </div>
+            )}
+
+            {activeTab === 'usage' && (
+              <div className={styles.section}>
+                <ServicesUsagePanel />
+              </div>
+            )}
+
+            {activeTab === 'publishing' && (
+              <div className={styles.section}>
+                <h3>Publishing accounts</h3>
+                <p className={styles.description}>
+                  Add handles for platforms you publish to. OAuth and scheduled posting will connect here later;
+                  record posts from the Usage tab when you publish manually.
+                </p>
+                {PUBLISHING_PLATFORMS.map(({ id, label }) => {
+                  const account = publishingAccounts.find((a) => a.platform === id);
+                  return (
+                    <div key={id} className={styles.formGroup}>
+                      <label className={styles.checkbox}>
+                        <input
+                          type="checkbox"
+                          checked={account?.connected ?? false}
+                          onChange={(e) =>
+                            upsertPublishingAccount(id, { connected: e.target.checked })
+                          }
+                        />
+                        <span>{label}</span>
+                      </label>
+                      <Input
+                        label={`${label} handle`}
+                        value={account?.handle ?? ''}
+                        onChange={(e) =>
+                          upsertPublishingAccount(id, {
+                            handle: e.target.value,
+                            connected: account?.connected ?? false,
+                          })
+                        }
+                        placeholder="@username or channel id"
+                        disabled={!account?.connected}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
 

@@ -60,6 +60,7 @@ interface FileState {
 
   // File import from browser
   importFiles: (files: FileList) => Promise<ImageAsset[]>;
+  importSourceFiles: (files: FileList, target: 'imports' | 'library') => Promise<Asset[]>;
 
   // Import local files by reference (no copy)
   importLocalFiles: (files: File[]) => Promise<Asset[]>;
@@ -793,48 +794,75 @@ export const useFileStore = create<FileState>()(
       },
 
       importFiles: async (files) => {
-        const importedAssets: ImageAsset[] = [];
+        const imported = await get().importSourceFiles(files, 'library');
+        return imported.filter((a): a is ImageAsset => a.type === 'image');
+      },
+
+      importSourceFiles: async (files, target) => {
+        const folderPath =
+          target === 'imports' ? WORKSPACE_ROOT_PATHS.imports : WORKSPACE_ROOT_PATHS.library;
+        const folderName =
+          target === 'imports' ? WORKSPACE_ROOT_NAMES.imports : WORKSPACE_ROOT_NAMES.library;
+        get().ensureFolderExists(folderPath, folderName);
+
+        const importedAssets: Asset[] = [];
 
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
+          const basePath = `${folderPath}/${file.name}`;
 
-          if (!file.type.startsWith('image/')) continue;
+          if (file.type.startsWith('image/')) {
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            });
 
-          // Read file as data URL
-          const dataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(file);
-          });
+            const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
+              const img = new Image();
+              img.onload = () => resolve({ width: img.width, height: img.height });
+              img.onerror = () => resolve({ width: 0, height: 0 });
+              img.src = dataUrl;
+            });
 
-          // Get image dimensions
-          const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve({ width: img.width, height: img.height });
-            img.src = dataUrl;
-          });
+            const asset: ImageAsset = {
+              id: uuidv4(),
+              name: file.name,
+              type: 'image',
+              path: basePath,
+              size: file.size,
+              createdAt: Date.now(),
+              modifiedAt: Date.now(),
+              thumbnail: dataUrl,
+              width: dimensions.width,
+              height: dimensions.height,
+              dataUrl,
+              metadata: {
+                width: dimensions.width,
+                height: dimensions.height,
+                mimeType: file.type,
+              },
+            };
+            get().addAssetToFolder(asset, folderPath);
+            importedAssets.push(asset);
+            continue;
+          }
 
-          const asset: ImageAsset = {
+          let assetType: Asset['type'] = 'text';
+          if (file.type.startsWith('video/')) assetType = 'video';
+          else if (file.type.startsWith('audio/')) assetType = 'audio';
+
+          const asset: Asset = {
             id: uuidv4(),
             name: file.name,
-            type: 'image',
-            path: `${WORKSPACE_ROOT_PATHS.library}/${file.name}`,
+            type: assetType,
+            path: basePath,
             size: file.size,
             createdAt: Date.now(),
             modifiedAt: Date.now(),
-            thumbnail: dataUrl,
-            width: dimensions.width,
-            height: dimensions.height,
-            dataUrl,
-            metadata: {
-              width: dimensions.width,
-              height: dimensions.height,
-              mimeType: file.type,
-            },
+            metadata: { mimeType: file.type },
           };
-
-          // Add to assets and shared Library so assets can be reused across projects
-          get().addAssetToFolder(asset, '/library');
+          get().addAssetToFolder(asset, folderPath);
           importedAssets.push(asset);
         }
 
