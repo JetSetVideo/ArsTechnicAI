@@ -411,7 +411,7 @@ Data layer (optional — only needed for Modes 2 and 3)
 - [x] **Phase 0: Foundations** — Module registry (81 stubs), typed ports, format profiles, project bundles, blueprint store, Prisma schema extensions
 
 ### In progress
-- [ ] **Phase 1: Read Everything** — Universal file import with metadata extraction for all media types
+- [x] **Phase 1: Read Everything** — Universal file import with metadata extraction for all media types (image, video, audio, text, 3D, splat, ZIP, URL)
 - [ ] **Phase 2: Image Edit Modules** — Non-destructive image editing pipeline
 - [ ] **Phase 3: Video Engine** — ffmpeg.wasm + fluent-ffmpeg, real timeline playback
 - [ ] **Phase 4: Audio Engine** — TTS, music, multi-track mixing

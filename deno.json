@@ -13,6 +13,6 @@
     "prisma:studio": "deno run -A npm:prisma studio",
     "setup": "deno task install",
     "setup:db": "deno task prisma:push && deno task prisma:generate",
-    "type-check": "deno run -A npm:tsc --noEmit"
+    "type-check": "./node_modules/.bin/tsc --noEmit"
   }
 }

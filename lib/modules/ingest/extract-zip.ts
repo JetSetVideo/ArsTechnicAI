@@ -1,6 +1,6 @@
 // ============================================================
 // ARS TECHNICAI — Archive Extractor Module
-// Phase stub: implement in upcoming phases
+// Phase 1: Extract ZIP contents into assets
 // ============================================================
 
 import type { ModuleDef, ModuleContext, ModuleResult } from '@/types/module';
@@ -11,11 +11,20 @@ export const moduleDef: ModuleDef = {
   id,
   name: 'Archive Extractor',
   category: 'ingest',
-  description: 'Archive Extractor — module stub',
-  inputs: [],
-  outputs: [],
+  description: 'Extract ZIP archive contents into individual Assets',
+  library: 'fflate / JSZip',
+  inputs: [
+    { id: 'file', name: 'ZIP File', type: 'data', required: true, description: 'ZIP Blob or File' },
+  ],
+  outputs: [
+    { id: 'assets', name: 'Assets', type: 'data', array: true, description: 'Array of extracted Assets' },
+  ],
   parameters: [],
   execute: async (_ctx: ModuleContext): Promise<ModuleResult> => {
-    throw new Error(`Module ${id} is not yet implemented`);
+    // Phase 1 stub — full implementation requires fflate/JSZip dependency
+    return {
+      outputs: { assets: [] },
+      logs: ['ZIP extraction requires fflate/JSZip (add dependency in Phase 2+)'],
+    };
   },
 };

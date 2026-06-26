@@ -365,35 +365,112 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         Array.from(files).forEach(async (file, index) => {
-          if (!file.type.startsWith('image/')) return;
+          const mime = file.type.toLowerCase();
+          const name = file.name.toLowerCase();
+          const baseX = x + index * 20;
+          const baseY = y + index * 20;
 
-          const dataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(file);
-          });
+          // Handle images
+          if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp|tiff?|ico|exr|hdr)$/i.test(name)) {
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            });
 
-          const img = new Image();
-          img.onload = () => {
-            // Scale dropped images to a reasonable size for the viewport
-            const maxDim = Math.min(320, Math.round(window.innerWidth * 0.2));
-            const scaleFactor = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const img = new Image();
+            img.onload = () => {
+              const maxDim = Math.min(320, Math.round(window.innerWidth * 0.2));
+              const scaleFactor = Math.min(1, maxDim / Math.max(img.width, img.height));
+              addItem({
+                type: 'image',
+                x: baseX,
+                y: baseY,
+                width: img.width,
+                height: img.height,
+                rotation: 0,
+                scale: scaleFactor,
+                locked: false,
+                visible: true,
+                src: dataUrl,
+                name: file.name,
+              });
+              log('canvas_add', `Dropped image ${file.name} onto canvas`);
+            };
+            img.src = dataUrl;
+            return;
+          }
+
+          // Handle video
+          if (mime.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi|m4v|ogv|flv)$/i.test(name)) {
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            });
             addItem({
-              type: 'image',
-              x: x + index * 20,
-              y: y + index * 20,
-              width: img.width,
-              height: img.height,
+              type: 'video',
+              x: baseX,
+              y: baseY,
+              width: 640,
+              height: 360,
               rotation: 0,
-              scale: scaleFactor,
+              scale: 0.5,
               locked: false,
               visible: true,
               src: dataUrl,
               name: file.name,
+              mediaMeta: { duration: 0, mimeType: file.type },
             });
-            log('canvas_add', `Dropped ${file.name} onto canvas`);
-          };
-          img.src = dataUrl;
+            log('canvas_add', `Dropped video ${file.name} onto canvas`);
+            return;
+          }
+
+          // Handle audio
+          if (mime.startsWith('audio/') || /\.(wav|mp3|aac|ogg|flac|m4a|wma)$/i.test(name)) {
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            });
+            addItem({
+              type: 'audio',
+              x: baseX,
+              y: baseY,
+              width: 300,
+              height: 60,
+              rotation: 0,
+              scale: 1,
+              locked: false,
+              visible: true,
+              src: dataUrl,
+              name: file.name,
+              mediaMeta: { duration: 0, mimeType: file.type },
+            });
+            log('canvas_add', `Dropped audio ${file.name} onto canvas`);
+            return;
+          }
+
+          // Handle text / data / unknown
+          const textContent = mime.startsWith('text/') || file.size < 1024 * 1024
+            ? await file.text().catch(() => null)
+            : null;
+
+          addItem({
+            type: 'text',
+            x: baseX,
+            y: baseY,
+            width: 240,
+            height: textContent ? Math.min(300, 40 + textContent.split('\n').length * 18) : 40,
+            rotation: 0,
+            scale: 1,
+            locked: false,
+            visible: true,
+            src: textContent || undefined,
+            name: file.name,
+            mediaMeta: { mimeType: file.type },
+          });
+          log('canvas_add', `Dropped file ${file.name} onto canvas`);
         });
       }
     },

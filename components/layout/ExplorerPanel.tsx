@@ -16,6 +16,11 @@ import {
   Pencil,
   Trash2,
   PanelLeft,
+  Box,
+  Layers,
+  Type,
+  FileArchive,
+  Link,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useFileStore, useLogStore, useCanvasStore } from '@/stores';
@@ -42,6 +47,15 @@ const getFileIcon = (node: FileNode) => {
     case 'image': return <Image size={16} />;
     case 'video': return <Film size={16} />;
     case 'audio': return <Music size={16} />;
+    case 'model_3d': return <Box size={16} />;
+    case 'splat': return <Layers size={16} />;
+    case 'text': return <Type size={16} />;
+    case 'subtitle': return <FileText size={16} />;
+    case 'vocabulary': return <Sparkles size={16} />;
+    case 'character': return <Sparkles size={16} />;
+    case 'scene': return <Sparkles size={16} />;
+    case 'lut': return <Image size={16} />;
+    case 'prompt': return <Sparkles size={16} />;
     default: return <FileText size={16} />;
   }
 };
@@ -471,7 +485,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*,audio/*,text/*,application/json,.glb,.gltf,.obj,.fbx,.ply,.splat,.zip,.csv,.srt,.vtt,.md,.txt"
         multiple
         className={styles.hiddenInput}
         onChange={handleFileChange}

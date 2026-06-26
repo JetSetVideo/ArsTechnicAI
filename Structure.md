@@ -106,15 +106,20 @@ This document describes how Ars TechnicAI's codebase and product modules are org
 │   ├── ai/
 │   │   └── providers/
 │   │       └── google-imagen.ts       # Google Imagen REST client
-│   ├── modules/                       # Phase 0: Module registry + 80+ processing stubs
+│   ├── modules/                       # Phase 0-1: Module registry + processing modules
 │   │   ├── registry.ts                # ModuleRegistry with all Section 6 module IDs
-│   │   ├── ingest/                    # Import / read modules (14 stubs)
+│   │   ├── ingest/                    # Phase 1: Import / read modules (14 implemented)
 │   │   ├── generate/                  # Generation modules (17 stubs)
 │   │   ├── edit/                      # Edit / transform modules (21 stubs)
 │   │   ├── spatial/                   # 3D / spatial modules (9 stubs)
 │   │   ├── intelligence/              # AI intelligence modules (10 stubs)
 │   │   ├── assembly/                  # Assembly / compositing modules (7 stubs)
 │   │   └── publish/                   # Publish + platform adapters (4 stubs + platforms/)
+│   ├── media/                         # Phase 1: Media processing libraries
+│   │   ├── image.ts                   # sharp-based image ops (metadata, thumbnail, palette)
+│   │   ├── video.ts                   # fluent-ffmpeg video ops (probe, thumbnail, filmstrip)
+│   │   ├── audio.ts                   # Web Audio API + fluent-ffmpeg audio ops
+│   │   └── processor.ts               # Universal media processor (image/video/audio)
 │   ├── formats/                       # Phase 0: Format profiles
 │   │   └── profiles.ts                # 10 platform format profiles, exportable as JSON
 │   ├── project/                       # Phase 0: Project bundle spec

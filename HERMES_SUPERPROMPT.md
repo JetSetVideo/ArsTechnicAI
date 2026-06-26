@@ -11,7 +11,7 @@
 
 ## Phase Checklist
 
-### Phase 0: Foundations — IN PROGRESS
+### Phase 0: Foundations — COMPLETE
 
 | # | Deliverable | Files | Status |
 |---|------------|-------|--------|
@@ -28,18 +28,18 @@
 - [x] Format profiles exportable as JSON
 - [x] Project bundle can be written and read from disk
 
-### Phase 1: Read Everything — PENDING
+### Phase 1: Read Everything — IN PROGRESS
 
 | # | Deliverable | Files | Status |
 |---|------------|-------|--------|
-| 1.1 | Universal file import module | `lib/modules/ingest/import-file.ts` | [ ] |
-| 1.2 | Image decoder + metadata | `lib/modules/ingest/decode-image.ts` | [ ] |
-| 1.3 | Video decoder + filmstrip | `lib/modules/ingest/decode-video.ts` | [ ] |
-| 1.4 | Audio decoder + waveform | `lib/modules/ingest/decode-audio.ts` | [ ] |
-| 1.5 | Text/data parser (SRT, JSON, CSV, MD) | `lib/modules/ingest/decode-text.ts` | [ ] |
-| 1.6 | Metadata + thumbnail extraction | `lib/media/processor.ts` (extend) | [ ] |
-| 1.7 | Explorer: show all asset types with correct icons/previews | `components/layout/ExplorerPanel.tsx` | [ ] |
-| 1.8 | Drag any file type to canvas | `components/layout/Canvas.tsx`, `stores/canvasStore.ts` | [ ] |
+| 1.1 | Universal file import module | `lib/modules/ingest/import-file.ts` | [x] |
+| 1.2 | Image decoder + metadata | `lib/modules/ingest/decode-image.ts` | [x] |
+| 1.3 | Video decoder + filmstrip | `lib/modules/ingest/decode-video.ts` | [x] |
+| 1.4 | Audio decoder + waveform | `lib/modules/ingest/decode-audio.ts` | [x] |
+| 1.5 | Text/data parser (SRT, JSON, CSV, MD) | `lib/modules/ingest/decode-text.ts` | [x] |
+| 1.6 | Metadata + thumbnail extraction (video/audio) | `lib/media/processor.ts` | [x] |
+| 1.7 | Explorer: show all asset types with correct icons/previews | `components/layout/ExplorerPanel.tsx` | [x] |
+| 1.8 | Drag any file type to canvas | `components/layout/Canvas.tsx`, `stores/canvasStore.ts` | [x] |
 
 ### Phase 2: Image Edit Modules — PENDING
 ### Phase 3: Video Engine + Timeline Playback — PENDING
