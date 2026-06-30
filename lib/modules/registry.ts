@@ -74,6 +74,7 @@ import { moduleDef as mod_intel_magic_cut } from './intelligence/magic-cut';
 import { moduleDef as mod_intel_script_to_shots } from './intelligence/script-to-shots';
 import { moduleDef as mod_intel_segment } from './intelligence/segment';
 import { moduleDef as mod_intel_storyboard_from_prompt } from './intelligence/storyboard-from-prompt';
+import { moduleDef as mod_intel_prompt_from_image } from './intelligence/prompt-from-image';
 import { moduleDef as mod_pub_apply_format } from './publish/apply-format';
 import { moduleDef as mod_pub_export } from './publish/export';
 import { moduleDef as mod_pub_schedule } from './publish/schedule';
@@ -157,6 +158,7 @@ const MODULE_MAP: Record<string, ModuleDef> = {
   'intel.script.to.shots': mod_intel_script_to_shots,
   'intel.segment': mod_intel_segment,
   'intel.storyboard.from.prompt': mod_intel_storyboard_from_prompt,
+  'intel.prompt.from.image': mod_intel_prompt_from_image,
   'pub.apply.format': mod_pub_apply_format,
   'pub.export': mod_pub_export,
   'pub.schedule': mod_pub_schedule,

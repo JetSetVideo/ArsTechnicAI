@@ -10,11 +10,13 @@ interface GenerationState {
   width: number;
   height: number;
   isGenerating: boolean;
+  pendingAutoGenerate: boolean;
 
   // Prompt management
   setPrompt: (prompt: string) => void;
   setNegativePrompt: (prompt: string) => void;
   setDimensions: (width: number, height: number) => void;
+  setPendingAutoGenerate: (v: boolean) => void;
 
   // Job management
   startGeneration: (request: GenerationRequest) => GenerationJob;
@@ -37,10 +39,12 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   width: 1024,
   height: 1024,
   isGenerating: false,
+  pendingAutoGenerate: false,
 
   setPrompt: (prompt) => set({ prompt }),
   setNegativePrompt: (negativePrompt) => set({ negativePrompt }),
   setDimensions: (width, height) => set({ width, height }),
+  setPendingAutoGenerate: (v) => set({ pendingAutoGenerate: v }),
 
   startGeneration: (request) => {
     const job: GenerationJob = {

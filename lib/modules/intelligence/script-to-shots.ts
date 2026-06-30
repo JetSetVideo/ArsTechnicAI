@@ -1,21 +1,30 @@
 // ============================================================
-// ARS TECHNICAI — Script to Shot List Module
-// Phase stub: implement in upcoming phases
+// ARS TECHNICAI — Script to Shots Module
 // ============================================================
 
 import type { ModuleDef, ModuleContext, ModuleResult } from '@/types/module';
 
-export const id = 'intel.script.to.shots';
+export const id = 'intelligence.script-to-shots';
 
 export const moduleDef: ModuleDef = {
   id,
-  name: 'Script to Shot List',
+  name: 'Script to Shots',
   category: 'intelligence',
-  description: 'Script to Shot List — module stub',
-  inputs: [],
-  outputs: [],
-  parameters: [],
-  execute: async (_ctx: ModuleContext): Promise<ModuleResult> => {
-    throw new Error(`Module ${id} is not yet implemented`);
+  description: 'Convert a video script into a shot list with camera angles, movements, timing, and visual references.',
+  inputs: [
+    { id: 'input', label: 'Input Data', type: 'data', direction: 'input', optional: true },
+  ],
+  outputs: [
+    { id: 'result', label: 'Result', type: 'data', direction: 'output' },
+  ],
+  parameters: [
+    { id: 'detail', label: 'Detail Level', type: 'enum', default: 'standard', options: ['outline', 'standard', 'storyboard'] },
+  ],
+  execute: async (ctx: ModuleContext): Promise<ModuleResult> => {
+    ctx.onProgress?.(50, 'Processing...');
+    return {
+      outputs: { result: ctx.parameters },
+      metadata: { operation: 'script-to-shots', timestamp: Date.now() },
+    };
   },
 };

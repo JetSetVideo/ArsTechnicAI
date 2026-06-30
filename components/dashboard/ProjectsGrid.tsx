@@ -28,6 +28,7 @@ import {
   ChevronDown,
   ImageIcon,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useProjectsStore } from '../../stores';
@@ -627,12 +628,45 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
                   {project.name}
                 </h3>
 
+                {/* Media type badge counts */}
+                {(() => {
+                  const typeCounts: Record<string, number> = {};
+                  projectAssets.forEach(a => { typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; });
+                  const sourceCounts: Record<string, number> = {};
+                  projectAssets.forEach(a => { 
+                    const src = a.metadata?.source || 'imported'; 
+                    sourceCounts[src] = (sourceCounts[src] || 0) + 1; 
+                  });
+                  return (
+                    <>
+                      <div className={styles.mediaBadges}>
+                        {typeCounts['image'] ? <span className={styles.mediaBadge} data-type="image" title="Images"><Image size={10} /> {typeCounts['image']}</span> : null}
+                        {typeCounts['video'] ? <span className={styles.mediaBadge} data-type="video" title="Videos"><Film size={10} /> {typeCounts['video']}</span> : null}
+                        {typeCounts['audio'] ? <span className={styles.mediaBadge} data-type="audio" title="Audio"><Music size={10} /> {typeCounts['audio']}</span> : null}
+                        {typeCounts['text'] || typeCounts['prompt'] ? <span className={styles.mediaBadge} data-type="text" title="Text"><FileText size={10} /> {(typeCounts['text']||0) + (typeCounts['prompt']||0)}</span> : null}
+                        {(sourceCounts['generated'] || sourceCounts['imported'] || sourceCounts['remixed']) ? (
+                          <span 
+                            className={styles.mediaBadge} 
+                            data-type="source" 
+                            title={`AI: ${sourceCounts['generated']||0} | Import: ${sourceCounts['imported']||0} | Remix: ${sourceCounts['remixed']||0}`}
+                          >
+                            <Sparkles size={10} /> {sourceCounts['generated']||0}/{sourceCounts['imported']||0}/{sourceCounts['remixed']||0}
+                          </span>
+                        ) : null}
+                      </div>
+                    </>
+                  );
+                })()}
+
                 {(project.genre || project.style || project.length || project.type) && (
                   <div className={styles.details}>
                     {project.type && project.type !== 'generic' && (
                       <span className={styles.detailItem} style={{ color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}>
                         {project.type}
                       </span>
+                    )}
+                    {project.aspectRatio && project.aspectRatio !== '16:9' && (
+                      <span className={styles.detailItem}>{project.aspectRatio}</span>
                     )}
                     {project.genre && <span className={styles.detailItem}>{project.genre}</span>}
                     {project.style && <span className={styles.detailItem}>{project.style}</span>}
@@ -645,6 +679,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
                     <Calendar size={12} />
                     {formatDate(project.modifiedAt)}
                   </span>
+                  {/* Status indicator */}
+                  <span className={`${styles.statusDot} ${project.assetCount > 0 ? styles.statusActive : styles.statusEmpty}`} />
                   <button
                     className={`${styles.assetButton} ${isAssetsOpen ? styles.assetButtonActive : ''}`}
                     onClick={(e) => {

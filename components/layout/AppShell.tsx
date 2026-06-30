@@ -8,16 +8,20 @@ import { Timeline } from './Timeline';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { SettingsModal } from './SettingsModal';
 import { ActionLog } from './ActionLog';
-import { useLogStore } from '@/stores';
+import { FloatingToolbar } from './FloatingToolbar';
+import type { ToolId } from './FloatingToolbar';
+import { LayersPanel } from './LayersPanel';
+import { useLogStore, useCanvasStore } from '@/stores';
 import { useUserStore } from '@/stores/userStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useProjectSync, saveProjectWorkspaceState, loadProjectWorkspaceState } from '@/hooks/useProjectSync';
 import { useSettingsSync } from '@/hooks/useSettingsSync';
 import { useDiskReconciliation } from '@/hooks/useDiskReconciliation';
 import { saveToDisk } from '@/hooks/useDiskSave';
-import { PanelLeft, PanelRight } from 'lucide-react';
+import { PanelLeft, PanelRight, Sparkles, Film, Music, Download, Share2, GitBranch } from 'lucide-react';
 import styles from './AppShell.module.css';
 import type { WorkspaceMode, WorkspaceLayout } from '@/types';
+import { NODE_DEFS, type NodeType } from '@/stores/nodeStore';
 
 const DEFAULT_LAYOUT: WorkspaceLayout = {
   explorer: { visible: true, width: 260, collapsed: false },
@@ -30,16 +34,22 @@ const MAX_PANEL_WIDTH = 500;
 const MIN_TIMELINE_HEIGHT = 100;
 const MAX_TIMELINE_HEIGHT = 400;
 
-// Modes that use the node graph instead of canvas
-const NODE_GRAPH_MODES: WorkspaceMode[] = ['rework'];
+// All modes use canvas now (create+rework merged into creation)
+
+const BASIC_NODE_TYPES: NodeType[] = ['prompt', 'negative', 'generator', 'image-in', 'transform', 'blend', 'output'];
 
 export const AppShell: React.FC = () => {
-  const [mode, setMode] = useState<WorkspaceMode>('create');
+  const [mode, setMode] = useState<WorkspaceMode>('creation');
   const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [helpOpen, setHelpOpen] = useState(false);
   const [timelineHeight, setTimelineHeight] = useState(160);
+  const [activeTool, setActiveTool] = useState<ToolId>('pointer');
+  const [layersOpen, setLayersOpen] = useState(false);
+  const [nodePaletteOpen, setNodePaletteOpen] = useState(false);
   const log = useLogStore((s) => s.log);
+  const { setCanvasTool, activeTool: canvasTool } = useCanvasStore();
   
   // User and project management
   const { currentProject, updateProject, refreshDeviceInfo, deviceInfo } = useUserStore();
@@ -123,7 +133,7 @@ export const AppShell: React.FC = () => {
   const startWidth = useRef(0);
   const startHeight = useRef(0);
 
-  const showNodeGraph = NODE_GRAPH_MODES.includes(mode);
+  const showNodeGraph = false; // Node graph always available, never replaces canvas
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -223,7 +233,6 @@ export const AppShell: React.FC = () => {
 
   const handleModeChange = useCallback((newMode: WorkspaceMode) => {
     if (newMode === 'timeline') {
-      // Toggle timeline visibility when clicking the Timeline button
       setLayout((prev) => {
         const next = !prev.timeline.visible;
         return { ...prev, timeline: { ...prev.timeline, visible: next } };
@@ -235,11 +244,43 @@ export const AppShell: React.FC = () => {
 
     setMode(newMode);
     log('settings_change', `Switched to ${newMode} mode`, { mode: newMode });
-
-    if (newMode === 'rework') {
-      setLayout((prev) => ({ ...prev, timeline: { ...prev.timeline, visible: false } }));
-    }
   }, [log, mode]);
+
+  const handleToolChange = useCallback((tool: ToolId) => {
+    setActiveTool(tool);
+    if (tool === 'pointer' || tool === 'lasso' || tool === 'hand') {
+      setCanvasTool(tool);
+    }
+  }, [setCanvasTool]);
+
+  useEffect(() => {
+    const handleCreativeShortcut = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      if (e.key === 'b' || e.key === 'B') {
+        setActiveTool('pen');
+      } else if (e.key === 'r' || e.key === 'R') {
+        setActiveTool('shape');
+      } else if (e.key === 't' || e.key === 'T') {
+        setActiveTool('text');
+      }
+    };
+
+    window.addEventListener('keydown', handleCreativeShortcut);
+    return () => window.removeEventListener('keydown', handleCreativeShortcut);
+  }, []);
+
+  const handleExportCanvas = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('ars:export-canvas'));
+  }, []);
+
+  const handleNodeDragStart = useCallback((e: React.DragEvent, type: NodeType) => {
+    const def = NODE_DEFS[type];
+    e.dataTransfer.setData('application/x-ars-node-type', type);
+    e.dataTransfer.effectAllowed = 'copy';
+    log('canvas_add', `Started dragging ${def.title} node`);
+  }, [log]);
 
   return (
     <div id="app-shell-layout-root" className={styles.appShellLayoutRoot}>
@@ -279,7 +320,10 @@ export const AppShell: React.FC = () => {
             <NodeGraph />
           ) : (
             <>
-              <Canvas showTimeline={layout.timeline.visible} />
+              <Canvas
+                showTimeline={layout.timeline.visible}
+                overlayTool={(['pen', 'shape', 'text'].includes(activeTool) ? activeTool : null) as 'pen' | 'shape' | 'text' | null}
+              />
               {layout.timeline.visible && (
                 <>
                   <div className={styles.resizeHandleHorizontal} onMouseDown={handleTimelineResizeStart} />
@@ -289,6 +333,65 @@ export const AppShell: React.FC = () => {
               {layout.timeline.visible && (
                 <ConnectionOverlay containerRef={mainAreaRef} />
               )}
+              {/* Module action bar — top right above canvas */}
+              <div className={styles.moduleBar}>
+                <button title="AI Generate — open Inspector" onClick={() => togglePanel('inspector')}>
+                  <Sparkles size={15} />
+                </button>
+                <button title="Node Graph" onClick={() => {
+                  setNodePaletteOpen((open) => !open);
+                }}>
+                  <GitBranch size={15} />
+                </button>
+                {nodePaletteOpen && (
+                  <div className={styles.nodePalette} role="menu" aria-label="Node palette">
+                    <div className={styles.nodePaletteHeader}>
+                      <span>Nodes</span>
+                      <small>Drag onto canvas</small>
+                    </div>
+                    {BASIC_NODE_TYPES.map((type) => {
+                      const def = NODE_DEFS[type];
+                      return (
+                        <button
+                          key={type}
+                          className={styles.nodePaletteItem}
+                          draggable
+                          onDragStart={(e) => handleNodeDragStart(e, type)}
+                          onDragEnd={() => setNodePaletteOpen(false)}
+                          style={{ '--node-color': def.color } as React.CSSProperties}
+                          title={`Drag ${def.title} onto the canvas`}
+                          type="button"
+                        >
+                          <span className={styles.nodePaletteDot} />
+                          <span>{def.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className={styles.moduleBarDivider} />
+                <button title="Video Pipeline" onClick={() => handleModeChange('timeline')}>
+                  <Film size={15} />
+                </button>
+                <button title="Audio">
+                  <Music size={15} />
+                </button>
+                <div className={styles.moduleBarDivider} />
+                <button title="Export Canvas" onClick={handleExportCanvas}>
+                  <Download size={15} />
+                </button>
+                <button title="Publish" onClick={() => { setSettingsInitialTab('publishing'); setSettingsOpen(true); }}>
+                  <Share2 size={15} />
+                </button>
+              </div>
+
+              {/* Floating tool bar — sits above canvas on the left */}
+              <FloatingToolbar
+                activeTool={(['pen', 'shape', 'text', 'eyedropper'].includes(activeTool) ? activeTool : canvasTool) as ToolId}
+                onToolChange={handleToolChange}
+                mode={mode}
+                side="left"
+              />
             </>
           )}
         </div>
@@ -299,6 +402,8 @@ export const AppShell: React.FC = () => {
             <InspectorPanel
               width={layout.inspector.width}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenPublishing={() => { setSettingsInitialTab('publishing'); setSettingsOpen(true); }}
+              onOpenLayers={() => setLayersOpen(v => !v)}
               onToggle={() => togglePanel('inspector')}
             />
           </>
@@ -313,11 +418,14 @@ export const AppShell: React.FC = () => {
             </button>
           )
         )}
+
+        {/* Layers Panel — overlay on the right */}
+        <LayersPanel isOpen={layersOpen} onClose={() => setLayersOpen(false)} width={260} />
       </div>
 
       <ActionLog />
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal isOpen={settingsOpen} onClose={() => { setSettingsOpen(false); setSettingsInitialTab(undefined); }} defaultTab={settingsInitialTab as 'publishing' | undefined} />
     </div>
   );
 };

@@ -1,0 +1,353 @@
+/* ═══════════════════════════════════════════════════
+   Layers Panel — right sidebar overlay
+   ═══════════════════════════════════════════════════ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  overflow: hidden;
+  z-index: 20;
+  animation: slideInRight 0.2s var(--ease-out);
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-sm, 8px) var(--sp-sm, 8px) var(--sp-sm, 8px) var(--sp-md, 12px);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: var(--font-xs, 0.6875rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.headerActions {
+  display: flex;
+  gap: 4px;
+}
+
+.headerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--r-sm, 4px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.headerBtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.headerBtnActive {
+  background: var(--accent-primary-alpha);
+  color: var(--accent-primary);
+}
+
+/* ── Layer list ──────────────────────────────────── */
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 0;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px 12px;
+  text-align: center;
+}
+
+.empty p {
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.empty span {
+  color: var(--text-muted);
+  font-size: var(--font-2xs);
+  opacity: 0.6;
+}
+
+/* ── Layer row ───────────────────────────────────── */
+
+.layerRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 0;
+  border-left: 3px solid var(--e-original, #3b82f6);
+  cursor: pointer;
+  transition: background 0.1s ease, opacity 0.1s ease;
+  min-height: 32px;
+  margin: 1px 0;
+}
+
+.layerRow:hover {
+  background: var(--bg-tertiary);
+}
+
+.layerSelected {
+  background: var(--selection-bg) !important;
+}
+
+.layerHidden {
+  opacity: 0.4;
+}
+
+.grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.layerRow:hover .grip {
+  opacity: 0.6;
+}
+
+.layerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.layerName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs, 0.6875rem);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.layerNameHidden {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.layerInfo {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+/* ── Layer actions (visible on hover) ────────────── */
+
+.layerActions {
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.layerRow:hover .layerActions,
+.layerSelected .layerActions {
+  opacity: 1;
+}
+
+.layerActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.layerActionBtn:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+.layerActionDanger:hover {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+/* ── Z-order quick actions (shown for selected) ──── */
+
+.layerZActions {
+  display: flex;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.layerZActions button {
+  width: 20px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.layerZActions button:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* ── Footer ──────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px var(--sp-sm, 8px);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.footerCount {
+  font-size: var(--font-2xs, 0.625rem);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.footerHint {
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* ── Group Containers ────────────────────────────── */
+
+.groupContainer {
+  border-left: 2px solid var(--accent-tertiary, #f59e0b);
+  margin: 2px 0;
+  border-radius: 0 4px 4px 0;
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.groupContainerSelected {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.groupHeader:hover {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.groupChevron {
+  color: var(--accent-tertiary, #f59e0b);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.groupIcon {
+  color: var(--accent-tertiary, #f59e0b);
+  flex-shrink: 0;
+}
+
+.groupLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--accent-tertiary, #f59e0b);
+  flex: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.groupCount {
+  font-size: 0.625rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: var(--accent-tertiary, #f59e0b);
+  color: #000;
+  border-radius: 8px;
+  padding: 0 5px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.groupActions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.groupHeader:hover .groupActions {
+  opacity: 1;
+}
+
+.groupedItem {
+  background: rgba(245, 158, 11, 0.025);
+}
+
+.groupedItem:hover {
+  background: rgba(245, 158, 11, 0.06) !important;
+}
+
+.groupIndent {
+  width: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Reduced motion ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}

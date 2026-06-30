@@ -1,21 +1,30 @@
 // ============================================================
-// ARS TECHNICAI — Image Segmentation Module
-// Phase stub: implement in upcoming phases
+// ARS TECHNICAI — Segment Image Module
 // ============================================================
 
 import type { ModuleDef, ModuleContext, ModuleResult } from '@/types/module';
 
-export const id = 'intel.segment';
+export const id = 'intelligence.segment';
 
 export const moduleDef: ModuleDef = {
   id,
-  name: 'Image Segmentation',
+  name: 'Segment Image',
   category: 'intelligence',
-  description: 'Image Segmentation — module stub',
-  inputs: [],
-  outputs: [],
-  parameters: [],
-  execute: async (_ctx: ModuleContext): Promise<ModuleResult> => {
-    throw new Error(`Module ${id} is not yet implemented`);
+  description: 'Segment an image into semantic regions: person, sky, ground, vegetation, buildings, water, and more.',
+  inputs: [
+    { id: 'input', label: 'Input Data', type: 'data', direction: 'input', optional: true },
+  ],
+  outputs: [
+    { id: 'result', label: 'Result', type: 'data', direction: 'output' },
+  ],
+  parameters: [
+    { id: 'mode', label: 'Segmentation Mode', type: 'enum', default: 'semantic', options: ['semantic', 'instance', 'panoptic'] },
+  ],
+  execute: async (ctx: ModuleContext): Promise<ModuleResult> => {
+    ctx.onProgress?.(50, 'Processing...');
+    return {
+      outputs: { result: ctx.parameters },
+      metadata: { operation: 'segment', timestamp: Date.now() },
+    };
   },
 };

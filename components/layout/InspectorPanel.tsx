@@ -25,6 +25,8 @@ import {
   FileText,
   Eye,
   FolderOpen,
+  Download,
+  Share2,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
@@ -39,8 +41,9 @@ import {
   useProjectStore,
   useToastStore,
 } from '@/stores';
+import { useDashboardStore } from '@/stores/dashboardStore';
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
-import type { GenerationResult, GenerationMeta } from '@/types';
+import type { GenerationResult, GenerationMeta, CanvasItem } from '@/types';
 import { saveProjectWorkspaceState } from '@/hooks/useProjectSync';
 import { saveToDisk } from '@/hooks/useDiskSave';
 import styles from './InspectorPanel.module.css';
@@ -48,6 +51,8 @@ import styles from './InspectorPanel.module.css';
 interface InspectorPanelProps {
   width: number;
   onOpenSettings: () => void;
+  onOpenPublishing?: () => void;
+  onOpenLayers?: () => void;
   onToggle: () => void;
 }
 
@@ -1389,8 +1394,274 @@ const formatDuration = (seconds: number): string => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
+// ─── Video Pipeline Section ───────────────────────────────────────────────────
+const SFX_PRESETS = [
+  { id: 'none',      label: 'None' },
+  { id: 'ambient',   label: 'Ambient' },
+  { id: 'cinematic', label: 'Cinematic' },
+  { id: 'upbeat',    label: 'Upbeat' },
+  { id: 'nature',    label: 'Nature' },
+  { id: 'tech',      label: 'Tech' },
+] as const;
+type SfxPreset = typeof SFX_PRESETS[number]['id'];
+
+const VideoPipelineSection: React.FC<{ items: CanvasItem[]; onOpenPublishing: () => void }> = ({ items, onOpenPublishing }) => {
+  const imageItems = items.filter((i) => i.src && (i.type === 'generated' || i.type === 'image'));
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [videoUrl, setVideoUrl] = React.useState<string | null>(null);
+  const [platform, setPlatform] = React.useState<string>('tiktok');
+  const [sfxPreset, setSfxPreset] = React.useState<SfxPreset>('none');
+  const [isGeneratingSfx, setIsGeneratingSfx] = React.useState(false);
+  const [sfxAudioUrl, setSfxAudioUrl] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const log = useLogStore((s) => s.log);
+  const publishingAccounts = useDashboardStore((s) => s.publishingAccounts);
+
+  // Restore platform from quick-create params (consumed by ProjectLoader, so use generationStore instead)
+  React.useEffect(() => {
+    try {
+      const qc = localStorage.getItem('ars:quick-create');
+      if (qc) {
+        const parsed = JSON.parse(qc);
+        if (parsed.platform) setPlatform(parsed.platform);
+      }
+    } catch { /* */ }
+  }, []);
+
+  const handleGenerateSfx = React.useCallback(async () => {
+    if (sfxPreset === 'none') { setSfxAudioUrl(null); return; }
+    setIsGeneratingSfx(true);
+    try {
+      const res = await fetch('/api/audio/sfx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset: sfxPreset, duration: 10 }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'SFX generation failed');
+      const data = await res.json();
+      setSfxAudioUrl(data.audioUrl ?? null);
+      log('sfx_generate', `SFX generated: ${sfxPreset}`, { preset: sfxPreset });
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setIsGeneratingSfx(false);
+    }
+  }, [sfxPreset, log]);
+
+  const handleCreateVideo = React.useCallback(async () => {
+    if (imageItems.length === 0) return;
+    setIsCreating(true);
+    setError(null);
+    setVideoUrl(null);
+    try {
+      const frames = imageItems
+        .sort((a, b) => a.zIndex - b.zIndex)
+        .map((i) => i.src)
+        .filter(Boolean) as string[];
+
+      const body: Record<string, unknown> = { frames, platform, duration: 2, transition: 'fade' };
+      if (sfxAudioUrl) body.audio = sfxAudioUrl;
+
+      const res = await fetch('/api/video/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Failed');
+      const data = await res.json();
+      setVideoUrl(data.url);
+      log('video_create', `Video created: ${data.filename}`, { platform, frameCount: frames.length, sfx: sfxPreset });
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setIsCreating(false);
+    }
+  }, [imageItems, platform, sfxPreset, sfxAudioUrl, log]);
+
+  const PLATFORM_LABELS: Record<string, string> = {
+    tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', twitter: 'Twitter/X',
+  };
+
+  return (
+    <CollapsibleSection
+      title="Video Pipeline"
+      icon={<Film size={14} />}
+      defaultOpen={imageItems.length > 0}
+      badge={imageItems.length}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Pipeline steps */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.625rem', color: 'var(--text-muted)' }}>
+          <span style={{ color: imageItems.length > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+            ✓ {imageItems.length} image{imageItems.length !== 1 ? 's' : ''}
+          </span>
+          <span>→</span>
+          <span style={{ color: videoUrl ? 'var(--success)' : 'var(--text-muted)' }}>
+            {videoUrl ? '✓ Video' : '○ Video'}
+          </span>
+          <span>→</span>
+          <span style={{ color: 'var(--text-muted)' }}>○ Publish</span>
+        </div>
+
+        {/* Platform selector */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {Object.entries(PLATFORM_LABELS).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setPlatform(id)}
+              style={{
+                padding: '3px 8px',
+                borderRadius: 'var(--r-pill, 20px)',
+                border: `1px solid ${platform === id ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                background: platform === id ? 'var(--accent-primary-alpha)' : 'transparent',
+                color: platform === id ? 'var(--accent-primary)' : 'var(--text-muted)',
+                fontSize: '0.625rem',
+                cursor: 'pointer',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Sound FX presets */}
+        <div>
+          <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)', margin: '0 0 4px' }}>
+            <Headphones size={10} style={{ verticalAlign: 'middle', marginRight: 3 }} />
+            Sound FX
+          </p>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+            {SFX_PRESETS.map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => { setSfxPreset(id); setSfxAudioUrl(null); }}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: 'var(--r-pill, 20px)',
+                  border: `1px solid ${sfxPreset === id ? 'var(--accent-secondary, #22d3ee)' : 'var(--border-color)'}`,
+                  background: sfxPreset === id ? 'rgba(34,211,238,0.12)' : 'transparent',
+                  color: sfxPreset === id ? 'var(--accent-secondary, #22d3ee)' : 'var(--text-muted)',
+                  fontSize: '0.625rem',
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {sfxPreset !== 'none' && !sfxAudioUrl && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={isGeneratingSfx ? <Loader2 size={11} className={styles.spin} /> : <Headphones size={11} />}
+              onClick={handleGenerateSfx}
+              disabled={isGeneratingSfx}
+              style={{ fontSize: '0.625rem', height: 22, padding: '0 8px' }}
+            >
+              {isGeneratingSfx ? 'Generating…' : 'Generate SFX'}
+            </Button>
+          )}
+          {sfxAudioUrl && (
+            <audio src={sfxAudioUrl} controls style={{ width: '100%', height: 28 }} />
+          )}
+        </div>
+
+        {/* Create video button */}
+        <Button
+          variant={imageItems.length === 0 ? 'ghost' : 'primary'}
+          size="sm"
+          icon={isCreating ? <Loader2 size={12} className={styles.spin} /> : <Film size={12} />}
+          onClick={handleCreateVideo}
+          disabled={isCreating || imageItems.length === 0}
+          style={{ width: '100%' }}
+        >
+          {isCreating ? 'Creating video…' : `Create Video (${imageItems.length} frames)`}
+        </Button>
+
+        {error && (
+          <p style={{ fontSize: '0.6875rem', color: 'var(--error)', margin: 0 }}>{error}</p>
+        )}
+
+        {/* Video preview + download + publish */}
+        {videoUrl && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <video
+              src={videoUrl}
+              controls
+              style={{ width: '100%', borderRadius: 'var(--r-md, 6px)', border: '1px solid var(--border-color)' }}
+            />
+            <div style={{ display: 'flex', gap: 4 }}>
+              <a
+                href={videoUrl}
+                download
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  padding: '5px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--r-sm, 4px)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.6875rem',
+                  textDecoration: 'none',
+                }}
+              >
+                <Download size={12} /> Download
+              </a>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Share2 size={12} />}
+                onClick={async () => {
+                  log('publish_intent', `Publish to ${PLATFORM_LABELS[platform]}`, { platform, videoUrl });
+                  const connectedAccount = publishingAccounts.find(
+                    (a) => a.platform === platform && a.connected
+                  );
+                  if (!connectedAccount) {
+                    onOpenPublishing();
+                    return;
+                  }
+                  try {
+                    const res = await fetch('/api/publish/post', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        platform,
+                        handle: connectedAccount.handle,
+                        videoUrl,
+                        caption: '',
+                      }),
+                    });
+                    if (!res.ok) throw new Error((await res.json()).error ?? 'Failed');
+                    const data = await res.json();
+                    log('publish_queued', `Queued publish to ${PLATFORM_LABELS[platform]}`, { platform, jobId: data.jobId });
+                  } catch (e) {
+                    setError(`Publish failed: ${String(e)}`);
+                  }
+                }}
+                style={{ flex: 1 }}
+              >
+                Publish
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {imageItems.length === 0 && (
+          <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0 }}>
+            Generate images to enable video creation.
+          </p>
+        )}
+      </div>
+    </CollapsibleSection>
+  );
+};
+
 // ─── Main InspectorPanel ──────────────────────────────────────────────────────
-export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSettings, onToggle }) => {
+export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSettings, onOpenPublishing, onOpenLayers, onToggle }) => {
   const { data: session, status: sessionStatus } = useSession();
   const isAuthenticated = sessionStatus === 'authenticated' && !!session?.user;
 
@@ -1398,6 +1669,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     prompt, setPrompt, negativePrompt, setNegativePrompt,
     width: genWidth, height: genHeight, setDimensions,
     isGenerating, startGeneration, completeJob, failJob, jobs,
+    pendingAutoGenerate, setPendingAutoGenerate,
   } = useGenerationStore();
 
   const { updateItem, addItem, removeSelected, copy, paste } = useCanvasStore();
@@ -1446,6 +1718,17 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   }, [settings.aiProvider?.apiKey]);
 
   const toast = useToastStore();
+
+  // Auto-trigger generation when quick-create flow sets pendingAutoGenerate
+  const handleGenerateRef = useRef<(() => Promise<void>) | null>(null);
+  useEffect(() => {
+    if (pendingAutoGenerate && prompt.trim() && !isGenerating) {
+      setPendingAutoGenerate(false);
+      // Defer slightly so the component finishes mounting with updated store values
+      const id = setTimeout(() => { handleGenerateRef.current?.(); }, 400);
+      return () => clearTimeout(id);
+    }
+  }, [pendingAutoGenerate, prompt, isGenerating, setPendingAutoGenerate]);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) {
@@ -1635,6 +1918,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     }
   }, [prompt, negativePrompt, genWidth, genHeight, localApiKey, settings, isAuthenticated, projectId, projectName, startGeneration, completeJob, failJob, addItem, addAssetToFolder, getProjectGeneratedPath, updateAIProvider, markDirty, log, toast]);
 
+  // Keep ref current so the auto-generate effect can call it without stale closure
+  handleGenerateRef.current = handleGenerate;
+
   const handleUpdatePosition = useCallback(
     (axis: 'x' | 'y', value: number) => {
       if (selectedItem) updateItem(selectedItem.id, { [axis]: value });
@@ -1677,6 +1963,15 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
               <Sparkles size={12} />
               {activeTab === 'prompt' && promptMode === 'templates' ? 'Templates' : 'Prompt'}
             </button>
+            {onOpenLayers && (
+              <button
+                className={styles.toggleButton}
+                onClick={onOpenLayers}
+                title="Toggle Layers panel"
+              >
+                <Layers size={16} />
+              </button>
+            )}
           </div>
           <button
             className={styles.toggleButton}
@@ -2141,6 +2436,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
                 </div>
               </CollapsibleSection>
             )}
+
+            {/* ── Video Pipeline ── */}
+            <VideoPipelineSection items={allItems} onOpenPublishing={onOpenPublishing ?? onOpenSettings} />
           </div>
         )}
 

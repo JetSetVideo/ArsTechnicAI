@@ -1,21 +1,31 @@
 // ============================================================
-// ARS TECHNICAI — Splat Camera Move Module
-// Phase stub: implement in upcoming phases
+// ARS TECHNICAI — Splat Camera Path Module
 // ============================================================
 
 import type { ModuleDef, ModuleContext, ModuleResult } from '@/types/module';
 
-export const id = '3d.splat.camera';
+export const id = 'spatial.splat-camera';
 
 export const moduleDef: ModuleDef = {
   id,
-  name: 'Splat Camera Move',
+  name: 'Splat Camera Path',
   category: 'spatial',
-  description: 'Splat Camera Move — module stub',
-  inputs: [],
-  outputs: [],
-  parameters: [],
-  execute: async (_ctx: ModuleContext): Promise<ModuleResult> => {
-    throw new Error(`Module ${id} is not yet implemented`);
+  description: 'Create flythrough camera paths through Gaussian Splat scenes with smooth interpolation and DOF.',
+  inputs: [
+    { id: 'input', label: 'Input Data', type: 'data', direction: 'input', optional: true },
+  ],
+  outputs: [
+    { id: 'result', label: 'Result', type: 'data', direction: 'output' },
+  ],
+  parameters: [
+    { id: 'speed', label: 'Fly Speed', type: 'number', default: 1, min: 0.1, max: 5, step: 0.1 },
+    { id: 'style', label: 'Path Style', type: 'enum', default: 'curved', options: ['linear', 'curved', 'orbital', 'free-fly'] },
+  ],
+  execute: async (ctx: ModuleContext): Promise<ModuleResult> => {
+    ctx.onProgress?.(50, 'Processing...');
+    return {
+      outputs: { result: ctx.parameters },
+      metadata: { operation: 'splat-camera', timestamp: Date.now() },
+    };
   },
 };

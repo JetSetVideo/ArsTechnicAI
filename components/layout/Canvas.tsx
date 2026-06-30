@@ -21,12 +21,11 @@ import {
   FileText,
   Image as ImageIcon,
   Sparkles,
-  BoxSelect,
-  MousePointer2,
-  Hand,
   Film,
   Headphones,
   Music,
+  Group,
+  BookOpen,
 } from 'lucide-react';
 import { useCanvasStore, useFileStore, useLogStore, useSettingsStore, useNodeStore } from '@/stores';
 import { Button } from '../ui/Button';
@@ -34,8 +33,53 @@ import styles from './Canvas.module.css';
 import nodeStyles from './NodeGraph.module.css';
 import { NodeCard, ConnLine } from './NodeComponents';
 import type { CanvasItem, Asset, GenerationMeta } from '@/types';
+import { NODE_DEFS, type NodeType } from '@/stores/nodeStore';
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+type OverlayTool = 'pen' | 'shape' | 'text';
+type OverlayDraft = {
+  tool: Exclude<OverlayTool, 'text'>;
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  points: { x: number; y: number }[];
+};
+
+const NODE_DRAG_MIME = 'application/x-ars-node-type';
+
+function isNodeType(value: string): value is NodeType {
+  return value in NODE_DEFS;
+}
+
+function escapeSvgText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function createShapeSvg(width: number, height: number): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect x="2" y="2" width="${Math.max(1, width - 4)}" height="${Math.max(1, height - 4)}" rx="10" fill="rgba(0,212,170,0.08)" stroke="#00d4aa" stroke-width="4"/>
+  </svg>`;
+  return svgToDataUrl(svg);
+}
+
+function createPenSvg(points: { x: number; y: number }[], width: number, height: number): string {
+  const path = points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+    .join(' ');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <path d="${path}" fill="none" stroke="#00d4aa" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  return svgToDataUrl(svg);
+}
 
 /** Which secondary tabs have real content (name row is handled separately). */
 function getNodeTabVisibility(item: CanvasItem, meta: GenerationMeta | undefined) {
@@ -92,9 +136,10 @@ function formatMediaDuration(seconds: number): string {
 
 interface CanvasProps {
   showTimeline?: boolean;
+  overlayTool?: OverlayTool | null;
 }
 
-export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = false }) => {
+export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = false, overlayTool = null }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const {
@@ -119,6 +164,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     redo,
     canUndo,
     canRedo,
+    groupItems,
+    addItemToGroup,
+    setGroupOrbit,
   } = useCanvasStore();
 
   const { nodes, connections } = useNodeStore();
@@ -128,26 +176,43 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const log = useLogStore((s) => s.log);
 
   type CanvasTool = 'pointer' | 'lasso' | 'hand';
-  const [activeTool, setActiveTool] = useState<CanvasTool>('pointer');
+  const activeTool = useCanvasStore((s) => s.activeTool);
+  const setCanvasTool = useCanvasStore((s) => s.setCanvasTool);
   const [isDragging, setIsDragging] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const panOriginRef = useRef<{
+    mouseX: number;
+    mouseY: number;
+    viewportX: number;
+    viewportY: number;
+  } | null>(null);
 
   type LassoPhase = 'idle' | 'drawing';
   const [lassoPhase, setLassoPhase] = useState<LassoPhase>('idle');
   const [marqueeStart, setMarqueeStart] = useState({ x: 0, y: 0 });
   const [marqueeEnd, setMarqueeEnd] = useState({ x: 0, y: 0 });
   const lassoJustFinishedRef = useRef(false);
+  // Auto-lasso: pointer tool + hold-drag on empty canvas activates marquee temporarily
+  const [autoLassoActive, setAutoLassoActive] = useState(false);
+
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const groupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [groupingPreview, setGroupingPreview] = useState<{ sourceId: string; targetId: string } | null>(null);
 
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(settings.showGrid);
   const [promptOverlayItemId, setPromptOverlayItemId] = useState<string | null>(null);
   const [versionOverlayItemId, setVersionOverlayItemId] = useState<string | null>(null);
+  const [overlayDraft, setOverlayDraft] = useState<OverlayDraft | null>(null);
   
   // Editable filename tag state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Context menu
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // Tab state for all canvas nodes: map of itemId -> activeTab
   type NodeTabId = 'name' | 'prompt' | 'info' | 'versions';
@@ -174,6 +239,77 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     [items],
   );
 
+  // Blueprint groups: items sharing the same generationMeta.parentIds[0] are variants
+  const blueprintGroups = useMemo(() => {
+    const groups = new Map<string, string[]>(); // parentId → [itemId, ...]
+    for (const item of items) {
+      const parentId = item.generationMeta?.parentIds?.[0];
+      if (parentId) {
+        if (!groups.has(parentId)) groups.set(parentId, []);
+        groups.get(parentId)!.push(item.id);
+      }
+    }
+    // Only return groups with ≥2 members
+    for (const [key, members] of groups) {
+      if (members.length < 2) groups.delete(key);
+    }
+    return groups;
+  }, [items]);
+
+  // Map from itemId → { groupParentId, indexInGroup, groupSize }
+  const blueprintGroupInfo = useMemo(() => {
+    const info = new Map<string, { groupParentId: string; idx: number; total: number }>();
+    for (const [parentId, members] of blueprintGroups) {
+      members.forEach((id, idx) => info.set(id, { groupParentId: parentId, idx, total: members.length }));
+    }
+    return info;
+  }, [blueprintGroups]);
+
+  // User groups: items sharing the same groupId field (drag-to-group)
+  const userGroupInfo = useMemo(() => {
+    const info = new Map<string, { groupId: string; idx: number; total: number }>();
+    const groups = new Map<string, string[]>();
+    for (const item of items) {
+      if (item.groupId) {
+        if (!groups.has(item.groupId)) groups.set(item.groupId, []);
+        groups.get(item.groupId)!.push(item.id);
+      }
+    }
+    for (const [groupId, members] of groups) {
+      if (members.length >= 2) {
+        members.forEach((id, idx) => info.set(id, { groupId, idx, total: members.length }));
+      }
+    }
+    return info;
+  }, [items]);
+
+  // Orbit positions: itemId → {x, y} overrides when group is in fragmented/orbit mode
+  const groupOrbitPositions = useMemo(() => {
+    const posMap = new Map<string, { x: number; y: number }>();
+    const orbitGroups = new Map<string, CanvasItem[]>();
+    for (const item of items) {
+      if (item.groupId && item.groupOrbit) {
+        if (!orbitGroups.has(item.groupId)) orbitGroups.set(item.groupId, []);
+        orbitGroups.get(item.groupId)!.push(item);
+      }
+    }
+    for (const [, members] of orbitGroups) {
+      if (members.length < 2) continue;
+      const cx = members.reduce((s, i) => s + i.x + (i.width * i.scale) / 2, 0) / members.length;
+      const cy = members.reduce((s, i) => s + i.y + (i.height * i.scale) / 2, 0) / members.length;
+      const maxDim = Math.max(...members.map(i => Math.max(i.width * i.scale, i.height * i.scale)));
+      const radius = maxDim * 0.75 + 80;
+      members.forEach((member, idx) => {
+        const angle = (2 * Math.PI * idx) / members.length - Math.PI / 2;
+        posMap.set(member.id, {
+          x: cx + radius * Math.cos(angle) - (member.width * member.scale) / 2,
+          y: cy + radius * Math.sin(angle) - (member.height * member.scale) / 2,
+        });
+      });
+    }
+    return posMap;
+  }, [items]);
+
   const toggleNodeTab = useCallback((itemId: string, tab: NodeTabId) => {
     setActiveNodeTabs((prev) => ({
       ...prev,
@@ -191,6 +327,14 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     });
     setOrbSpinKey((prev) => ({ ...prev, [itemId]: (prev[itemId] ?? 0) + 1 }));
   }, []);
+
+  const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
+    e.stopPropagation();
+    const currentItems = useCanvasStore.getState().items;
+    const isOrbit = currentItems.some(i => i.groupId === groupId && i.groupOrbit);
+    setGroupOrbit(groupId, !isOrbit);
+    log('canvas_move', isOrbit ? 'Collapsed group orbit' : 'Expanded group orbit');
+  }, [setGroupOrbit, log]);
 
   const computeTabsMaxWidth = useCallback(
     (itemW: number) => {
@@ -260,9 +404,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const toolBeforeSpaceRef = useRef<CanvasTool>('pointer');
 
   const switchTool = useCallback((tool: CanvasTool) => {
-    setActiveTool(tool);
+    setCanvasTool(tool);
     setLassoPhase('idle');
-  }, []);
+  }, [setCanvasTool]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -273,6 +417,10 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         e.preventDefault();
         spaceHeldRef.current = true;
         toolBeforeSpaceRef.current = activeTool;
+        if (lassoPhase === 'drawing' && autoLassoActive) {
+          setLassoPhase('idle');
+          setAutoLassoActive(false);
+        }
         switchTool('hand');
         return;
       }
@@ -287,8 +435,11 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           selectedNodeIds.forEach(id => useNodeStore.getState().removeNode(id));
         }
       } else if (e.key === 'Escape') {
-        if (lassoPhase === 'drawing') {
+        if (contextMenu) {
+          setContextMenu(null);
+        } else if (lassoPhase === 'drawing') {
           setLassoPhase('idle');
+          setAutoLassoActive(false);
         } else {
           clearSelection();
           useNodeStore.getState().clearSelection();
@@ -302,6 +453,30 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault();
         useCanvasStore.getState().selectAll();
+      } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'g') {
+        e.preventDefault();
+        // Ungroup all user groups that have selected members
+        const currentItems = useCanvasStore.getState().items;
+        const groupIds = new Set(
+          currentItems.filter(i => selectedIds.includes(i.id) && i.groupId).map(i => i.groupId!)
+        );
+        groupIds.forEach(gid => useCanvasStore.getState().ungroupItems(gid));
+        if (groupIds.size > 0) log('canvas_move', `Ungrouped ${groupIds.size} group(s)`);
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+        e.preventDefault();
+        if (selectedIds.length >= 2) {
+          // If all selected are already in the same group, collapse → ungroup
+          const currentItems = useCanvasStore.getState().items;
+          const selectedItems = currentItems.filter(i => selectedIds.includes(i.id));
+          const groupIds = new Set(selectedItems.map(i => i.groupId).filter(Boolean));
+          if (groupIds.size === 1 && selectedItems.every(i => i.groupId === [...groupIds][0])) {
+            useCanvasStore.getState().ungroupItems([...groupIds][0]!);
+            log('canvas_move', 'Ungrouped items');
+          } else {
+            useCanvasStore.getState().groupItems(selectedIds);
+            log('canvas_add', `Grouped ${selectedIds.length} items`);
+          }
+        }
       } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
         e.preventDefault();
         redo();
@@ -336,7 +511,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedIds, removeSelected, clearSelection, copy, paste, zoomIn, zoomOut, resetViewport, undo, redo, log, activeTool, lassoPhase, switchTool]);
+  }, [selectedIds, removeSelected, clearSelection, copy, paste, zoomIn, zoomOut, resetViewport, undo, redo, log, activeTool, lassoPhase, autoLassoActive, contextMenu, switchTool]);
 
   // Handle drop from explorer
   const handleDrop = useCallback(
@@ -349,6 +524,15 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
       const x = (e.clientX - rect.left - viewport.x) / viewport.zoom;
       const y = (e.clientY - rect.top - viewport.y) / viewport.zoom;
+
+      const nodeType = e.dataTransfer.getData(NODE_DRAG_MIME);
+      if (isNodeType(nodeType)) {
+        const def = NODE_DEFS[nodeType];
+        const node = useNodeStore.getState().addNode(nodeType, x - def.defaultWidth / 2, y - 24);
+        useNodeStore.getState().selectNode(node.id);
+        log('canvas_add', `Added ${def.title} node to canvas`);
+        return;
+      }
 
       const data = e.dataTransfer.getData('application/json');
       if (data) {
@@ -479,6 +663,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = e.dataTransfer.types.includes(NODE_DRAG_MIME) ? 'copy' : 'move';
     setIsDragging(true);
   }, []);
 
@@ -494,34 +679,10 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       const isBackground = target === canvasRef.current || target.classList.contains(styles.canvasContent);
       if (!isBackground) return;
 
-      if (activeTool === 'lasso') {
-        if (lassoPhase === 'idle') {
-          setMarqueeStart({ x: e.clientX, y: e.clientY });
-          setMarqueeEnd({ x: e.clientX, y: e.clientY });
-          setLassoPhase('drawing');
-        } else if (lassoPhase === 'drawing') {
-          const rect = canvasRef.current?.getBoundingClientRect();
-          if (rect) {
-            const sx = (Math.min(marqueeStart.x, e.clientX) - rect.left - viewport.x) / viewport.zoom;
-            const sy = (Math.min(marqueeStart.y, e.clientY) - rect.top - viewport.y) / viewport.zoom;
-            const ex = (Math.max(marqueeStart.x, e.clientX) - rect.left - viewport.x) / viewport.zoom;
-            const ey = (Math.max(marqueeStart.y, e.clientY) - rect.top - viewport.y) / viewport.zoom;
-            const newSelected = items.filter((item) => {
-              const iw = item.width * item.scale;
-              const ih = item.height * item.scale;
-              return item.x + iw > sx && item.x < ex && item.y + ih > sy && item.y < ey;
-            }).map((item) => item.id);
-            useCanvasStore.setState({ selectedIds: newSelected });
-            if (newSelected.length > 0) {
-              log('canvas_move', `Selected ${newSelected.length} item(s) via lasso`);
-            }
-          }
-          setLassoPhase('idle');
-          lassoJustFinishedRef.current = true;
-          setTimeout(() => { lassoJustFinishedRef.current = false; }, 100);
-        }
-        return;
-      }
+      // Lasso tool: click on empty canvas after a quick non-drag mousedown/up → no-op.
+      // All selection is handled in mousedown/move/up. Clicking empty canvas in lasso mode
+      // preserves the current selection (does not deselect).
+      if (activeTool === 'lasso') return;
 
       if (activeTool === 'pointer') {
         clearSelection();
@@ -530,14 +691,105 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         setVersionOverlayItemId(null);
       }
     },
-    [clearSelection, activeTool, lassoPhase, marqueeStart, viewport, items, log]
+    [clearSelection, activeTool]
   );
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (selectedIds.length > 0) {
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    }
+  }, [selectedIds]);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  const beginPan = useCallback((e: Pick<MouseEvent | React.MouseEvent, 'clientX' | 'clientY'>) => {
+    panOriginRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      viewportX: useCanvasStore.getState().viewport.x,
+      viewportY: useCanvasStore.getState().viewport.y,
+    };
+    setIsPanning(true);
+  }, []);
+
+  const beginMarquee = useCallback((e: Pick<MouseEvent | React.MouseEvent, 'clientX' | 'clientY'>, auto = false) => {
+    setMarqueeStart({ x: e.clientX, y: e.clientY });
+    setMarqueeEnd({ x: e.clientX, y: e.clientY });
+    setLassoPhase('drawing');
+    setAutoLassoActive(auto);
+  }, []);
+
+  const getCanvasPoint = useCallback((e: Pick<MouseEvent | React.MouseEvent, 'clientX' | 'clientY'>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return {
+      x: (e.clientX - rect.left - viewport.x) / viewport.zoom,
+      y: (e.clientY - rect.top - viewport.y) / viewport.zoom,
+    };
+  }, [viewport]);
+
+  const createTextLayer = useCallback((x: number, y: number) => {
+    const item = addItem({
+      type: 'text',
+      x,
+      y,
+      width: 260,
+      height: 72,
+      rotation: 0,
+      scale: 1,
+      locked: false,
+      visible: true,
+      src: 'Double-click to edit text',
+      name: 'Text Layer',
+    });
+    selectItem(item.id);
+    log('canvas_add', 'Added text layer');
+  }, [addItem, selectItem, log]);
+
+  const beginOverlayDraft = useCallback((e: Pick<MouseEvent | React.MouseEvent, 'clientX' | 'clientY'>) => {
+    if (!overlayTool) return false;
+    const point = getCanvasPoint(e);
+    if (!point) return false;
+
+    if (overlayTool === 'text') {
+      createTextLayer(point.x, point.y);
+      return true;
+    }
+
+    setOverlayDraft({
+      tool: overlayTool,
+      startX: point.x,
+      startY: point.y,
+      currentX: point.x,
+      currentY: point.y,
+      points: [point],
+    });
+    return true;
+  }, [overlayTool, getCanvasPoint, createTextLayer]);
 
   // Item drag start — take snapshot for undo
   const handleItemMouseDown = useCallback(
     (e: React.MouseEvent, item: CanvasItem) => {
       e.stopPropagation();
+      if (overlayTool) {
+        e.preventDefault();
+        beginOverlayDraft(e);
+        return;
+      }
       if (item.locked) return;
+
+      if (activeTool === 'hand') {
+        e.preventDefault();
+        beginPan(e);
+        return;
+      }
+
+      if (activeTool === 'lasso') {
+        e.preventDefault();
+        beginMarquee(e);
+        return;
+      }
 
       snapshot(); // Snapshot before move for undo
 
@@ -550,7 +802,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         y: e.clientY - item.y * viewport.zoom,
       });
     },
-    [selectItem, bringToFront, viewport.zoom, snapshot]
+    [overlayTool, beginOverlayDraft, activeTool, beginPan, beginMarquee, selectItem, bringToFront, viewport.zoom, snapshot]
   );
 
   // Resize handle mouse down
@@ -574,11 +826,42 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   );
 
   const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
+    (e: Pick<MouseEvent | React.MouseEvent, 'clientX' | 'clientY' | 'movementX' | 'movementY'>) => {
       if (dragItemId) {
         const newX = (e.clientX - dragStart.x) / viewport.zoom;
         const newY = (e.clientY - dragStart.y) / viewport.zoom;
         updateItem(dragItemId, { x: newX, y: newY });
+
+        // Detect hovering over another item for drag-to-group
+        const currentItems = useCanvasStore.getState().items;
+        const dragItem = currentItems.find(i => i.id === dragItemId);
+        if (dragItem) {
+          const overItem = currentItems.find(i => {
+            if (i.id === dragItemId) return false;
+            const iw = i.width * i.scale;
+            const ih = i.height * i.scale;
+            const dragCX = newX + (dragItem.width * dragItem.scale) / 2;
+            const dragCY = newY + (dragItem.height * dragItem.scale) / 2;
+            return dragCX >= i.x && dragCX <= i.x + iw && dragCY >= i.y && dragCY <= i.y + ih;
+          });
+          if (overItem && !overItem.locked) {
+            if (dragOverItemId !== overItem.id) {
+              setDragOverItemId(overItem.id);
+              if (groupTimerRef.current) clearTimeout(groupTimerRef.current);
+              const delay = useSettingsStore.getState().settings.groupingDelay ?? 800;
+              const capturedDragItemId = dragItemId;
+              groupTimerRef.current = setTimeout(() => {
+                setGroupingPreview({ sourceId: capturedDragItemId, targetId: overItem.id });
+              }, delay);
+            }
+          } else {
+            if (dragOverItemId) {
+              setDragOverItemId(null);
+              if (groupTimerRef.current) clearTimeout(groupTimerRef.current);
+              setGroupingPreview(null);
+            }
+          }
+        }
       } else if (resizingItemId && resizingHandle && resizeOrigin.current) {
         const { mouseX, mouseY, item: orig } = resizeOrigin.current;
         const dx = (e.clientX - mouseX) / viewport.zoom;
@@ -613,46 +896,198 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         });
       } else if (lassoPhase === 'drawing') {
         setMarqueeEnd({ x: e.clientX, y: e.clientY });
-      } else if (isPanning) {
-        setViewport({
-          x: viewport.x + e.movementX,
-          y: viewport.y + e.movementY,
+      } else if (overlayDraft) {
+        const point = getCanvasPoint(e);
+        if (!point) return;
+        setOverlayDraft((draft) => {
+          if (!draft) return draft;
+          return {
+            ...draft,
+            currentX: point.x,
+            currentY: point.y,
+            points: draft.tool === 'pen' ? [...draft.points, point] : draft.points,
+          };
         });
+      } else if (isPanning) {
+        const panOrigin = panOriginRef.current;
+        if (panOrigin) {
+          setViewport({
+            x: panOrigin.viewportX + (e.clientX - panOrigin.mouseX),
+            y: panOrigin.viewportY + (e.clientY - panOrigin.mouseY),
+          });
+        } else {
+          setViewport({
+            x: viewport.x + e.movementX,
+            y: viewport.y + e.movementY,
+          });
+        }
       }
     },
-    [dragItemId, dragStart, viewport, isPanning, lassoPhase, updateItem, resizingItemId, resizingHandle, setViewport]
+    [dragItemId, dragStart, viewport, isPanning, lassoPhase, overlayDraft, getCanvasPoint, updateItem, resizingItemId, resizingHandle, setViewport]
   );
 
   const handleMouseUp = useCallback(() => {
+    if (overlayDraft) {
+      const minX = Math.min(overlayDraft.startX, overlayDraft.currentX);
+      const minY = Math.min(overlayDraft.startY, overlayDraft.currentY);
+      const width = Math.max(24, Math.abs(overlayDraft.currentX - overlayDraft.startX));
+      const height = Math.max(24, Math.abs(overlayDraft.currentY - overlayDraft.startY));
+      const itemX = overlayDraft.tool === 'pen'
+        ? Math.min(...overlayDraft.points.map((p) => p.x)) - 8
+        : minX;
+      const itemY = overlayDraft.tool === 'pen'
+        ? Math.min(...overlayDraft.points.map((p) => p.y)) - 8
+        : minY;
+
+      const src = overlayDraft.tool === 'pen'
+        ? (() => {
+            const penWidth = Math.max(24, Math.max(...overlayDraft.points.map((p) => p.x)) - itemX + 8);
+            const penHeight = Math.max(24, Math.max(...overlayDraft.points.map((p) => p.y)) - itemY + 8);
+            return {
+              dataUrl: createPenSvg(
+                overlayDraft.points.map((p) => ({ x: p.x - itemX, y: p.y - itemY })),
+                Math.round(penWidth),
+                Math.round(penHeight),
+              ),
+              width: Math.round(penWidth),
+              height: Math.round(penHeight),
+            };
+          })()
+        : {
+            dataUrl: createShapeSvg(Math.round(width), Math.round(height)),
+            width: Math.round(width),
+            height: Math.round(height),
+          };
+
+      const item = addItem({
+        type: 'image',
+        x: itemX,
+        y: itemY,
+        width: src.width,
+        height: src.height,
+        rotation: 0,
+        scale: 1,
+        locked: false,
+        visible: true,
+        src: src.dataUrl,
+        name: overlayDraft.tool === 'pen' ? 'Draw Layer' : 'Shape Layer',
+      });
+      selectItem(item.id);
+      log('canvas_add', `Added ${overlayDraft.tool === 'pen' ? 'draw' : 'shape'} layer`);
+      setOverlayDraft(null);
+      return;
+    }
+
     if (dragItemId) {
       log('canvas_move', 'Moved item on canvas');
     }
     if (resizingItemId) {
       log('canvas_resize', 'Resized item on canvas');
     }
+
+    // Finalize lasso selection on mouseup (hold-drag-release flow)
+    if (lassoPhase === 'drawing') {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const sx = (Math.min(marqueeStart.x, marqueeEnd.x) - rect.left - viewport.x) / viewport.zoom;
+        const sy = (Math.min(marqueeStart.y, marqueeEnd.y) - rect.top - viewport.y) / viewport.zoom;
+        const ex = (Math.max(marqueeStart.x, marqueeEnd.x) - rect.left - viewport.x) / viewport.zoom;
+        const ey = (Math.max(marqueeStart.y, marqueeEnd.y) - rect.top - viewport.y) / viewport.zoom;
+        const mW = Math.abs(marqueeEnd.x - marqueeStart.x);
+        const mH = Math.abs(marqueeEnd.y - marqueeStart.y);
+        if (mW > 4 && mH > 4) {
+          const newSelected = items.filter((item) => {
+            const iw = item.width * item.scale;
+            const ih = item.height * item.scale;
+            return item.x + iw > sx && item.x < ex && item.y + ih > sy && item.y < ey;
+          }).map((item) => item.id);
+          useCanvasStore.setState({ selectedIds: newSelected });
+          if (newSelected.length > 0) {
+            log('canvas_move', `Selected ${newSelected.length} item(s) via marquee`);
+          }
+          // Prevent the click handler from immediately deselecting after a drag
+          lassoJustFinishedRef.current = true;
+          setTimeout(() => { lassoJustFinishedRef.current = false; }, 150);
+        }
+      }
+      setLassoPhase('idle');
+      setAutoLassoActive(false);
+      return;
+    }
+
+    // Commit group if preview is active
+    if (groupingPreview) {
+      const currentItems = useCanvasStore.getState().items;
+      const sourceItem = currentItems.find(i => i.id === groupingPreview.sourceId);
+      const targetItem = currentItems.find(i => i.id === groupingPreview.targetId);
+      if (sourceItem && targetItem) {
+        const existingGroupId = targetItem.groupId;
+        if (existingGroupId) {
+          addItemToGroup(groupingPreview.sourceId, existingGroupId);
+        } else {
+          groupItems([groupingPreview.sourceId, groupingPreview.targetId]);
+        }
+        log('canvas_add', `Grouped ${sourceItem.name} with ${targetItem.name}`);
+      }
+      setGroupingPreview(null);
+    }
+    if (groupTimerRef.current) clearTimeout(groupTimerRef.current);
+    setDragOverItemId(null);
+
     setDragItemId(null);
     setIsPanning(false);
+    panOriginRef.current = null;
     setResizingHandle(null);
     setResizingItemId(null);
     resizeOrigin.current = null;
-  }, [dragItemId, resizingItemId, log]);
+  }, [overlayDraft, addItem, selectItem, dragItemId, resizingItemId, log, lassoPhase, marqueeStart, marqueeEnd, items, viewport, groupingPreview, addItemToGroup, groupItems]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 1) {
       e.preventDefault();
-      setIsPanning(true);
+      beginPan(e);
       return;
     }
     if (e.button !== 0) return;
+
+    if (overlayTool) {
+      e.preventDefault();
+      beginOverlayDraft(e);
+      return;
+    }
 
     const target = e.target as HTMLElement;
     const isBackground = target === canvasRef.current || target.classList.contains(styles.canvasContent);
     if (!isBackground) return;
 
     if (activeTool === 'hand') {
-      setIsPanning(true);
+      beginPan(e);
+    } else if (activeTool === 'lasso') {
+      beginMarquee(e);
+    } else if (activeTool === 'pointer') {
+      // Auto-lasso: hold-drag on empty canvas starts marquee selection
+      beginMarquee(e, true);
     }
-  }, [activeTool]);
+  }, [overlayTool, beginOverlayDraft, activeTool, beginPan, beginMarquee]);
+
+  useEffect(() => {
+    if (!dragItemId && !resizingItemId && !isPanning && lassoPhase !== 'drawing' && !overlayDraft) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      handleMouseMove(e);
+    };
+
+    const handleWindowMouseUp = () => {
+      handleMouseUp();
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [dragItemId, resizingItemId, isPanning, lassoPhase, overlayDraft, handleMouseMove, handleMouseUp]);
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -766,6 +1201,13 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     });
   }, [updateItem, snapshot]);
 
+  // Listen for export-canvas event dispatched by module bar
+  useEffect(() => {
+    const handler = () => { void handleExport(); };
+    window.addEventListener('ars:export-canvas', handler);
+    return () => window.removeEventListener('ars:export-canvas', handler);
+  }, [handleExport]);
+
   const getCursor = () => {
     if (resizingHandle) {
       const map: Record<ResizeHandle, string> = {
@@ -777,6 +1219,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     }
     if (isPanning) return 'grabbing';
     if (dragItemId) return 'grabbing';
+    if (lassoPhase === 'drawing') return 'crosshair'; // marquee active (either tool or auto-lasso)
     if (activeTool === 'lasso') return 'crosshair';
     if (activeTool === 'hand') return 'grab';
     return 'default';
@@ -831,38 +1274,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
               <Redo2 size={16} />
             </Button>
           </div>
-
-          <div className={styles.toolbarDivider} />
-
-          <div className={styles.toolbarGroup}>
-            <Button
-              variant={activeTool === 'pointer' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => switchTool('pointer')}
-              title="Pointer (V)"
-            >
-              <MousePointer2 size={16} />
-            </Button>
-            <Button
-              variant={activeTool === 'lasso' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => switchTool(activeTool === 'lasso' ? 'pointer' : 'lasso')}
-              title="Lasso Select (L)"
-              className={activeTool === 'lasso' ? styles.toolButtonActive : undefined}
-            >
-              <BoxSelect size={16} />
-            </Button>
-            <Button
-              variant={activeTool === 'hand' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => switchTool(activeTool === 'hand' ? 'pointer' : 'hand')}
-              title="Hand / Pan (H)"
-            >
-              <Hand size={16} />
-            </Button>
-          </div>
-
-          <div className={styles.toolbarDivider} />
 
           <div className={styles.toolbarGroup}>
             <Button variant="ghost" size="sm" onClick={zoomOut} title="Zoom Out (-)">
@@ -945,10 +1356,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
         onMouseDown={handleMouseDown}
         onWheel={handleWheel}
+        onContextMenu={handleContextMenu}
       >
         <div
           className={styles.canvasContent}
@@ -983,23 +1393,67 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             const tabsMaxW = computeTabsMaxWidth(item.width * item.scale);
             const orbSpinClass = orbSpinKey[item.id] ? styles.nodeOrbSpin : '';
 
+            // Blueprint group
+            const bpInfo = blueprintGroupInfo.get(item.id);
+            const isTopOfGroup = bpInfo ? bpInfo.idx === bpInfo.total - 1 : false;
+            const isInGroup = bpInfo != null;
+
+            // User group (drag-to-group)
+            const ugInfo = userGroupInfo.get(item.id);
+            const isUserGrouped = ugInfo != null;
+            const isUserGroupTop = ugInfo ? ugInfo.idx === ugInfo.total - 1 : false;
+            // Orbit position override
+            const orbitPos = groupOrbitPositions.get(item.id);
+            const displayX = orbitPos ? orbitPos.x : item.x;
+            const displayY = orbitPos ? orbitPos.y : item.y;
+            // Drag-to-group highlight
+            const isDragGroupTarget = dragOverItemId === item.id || groupingPreview?.targetId === item.id;
+            const isDragGroupSource = groupingPreview?.sourceId === item.id;
+
             return (
               <div
                 key={item.id}
                 data-canvas-item-id={item.id}
-                className={`${styles.canvasItem} ${selectedIds.includes(item.id) ? styles.selected : ''} ${item.locked ? styles.locked : ''} ${isHighestZ ? styles.nodeFrameHighZ : ''}`}
+                className={[
+                  styles.canvasItem,
+                  selectedIds.includes(item.id) ? styles.selected : '',
+                  item.locked ? styles.locked : '',
+                  isHighestZ ? styles.nodeFrameHighZ : '',
+                  isInGroup ? styles.blueprintGrouped : '',
+                  isUserGrouped ? styles.userGrouped : '',
+                  isDragGroupTarget ? styles.dragGroupTarget : '',
+                  isDragGroupSource ? styles.dragGroupSource : '',
+                  orbitPos ? styles.orbitItem : '',
+                ].filter(Boolean).join(' ')}
                 style={{
-                  left: item.x,
-                  top: item.y,
+                  left: displayX,
+                  top: displayY,
                   width: item.width * item.scale,
                   height: item.height * item.scale,
                   transform: `rotate(${item.rotation}deg)`,
                   zIndex: item.zIndex,
                   opacity: item.visible ? 1 : 0.3,
                   ['--orb-color' as string]: orbColor,
+                  ['--zoom' as string]: String(viewport.zoom),
+                  ['--group-idx' as string]: String(ugInfo?.idx ?? 0),
                 }}
                 onMouseDown={(e) => handleItemMouseDown(e, item)}
               >
+                {/* Blueprint group badge (on top item only) */}
+                {isTopOfGroup && bpInfo && (
+                  <div className={styles.blueprintBadge}>{bpInfo.total}</div>
+                )}
+                {/* User group badge — click to toggle orbit/fragmentation */}
+                {isUserGroupTop && ugInfo && (
+                  <div
+                    className={styles.groupBadge}
+                    onClick={(e) => handleGroupBadgeClick(e, ugInfo.groupId)}
+                    title={`${ugInfo.total} items grouped — click to ${orbitPos ? 'collapse' : 'expand'} orbit`}
+                  >
+                    <Group size={10} />
+                    {ugInfo.total}
+                  </div>
+                )}
                 {/* ── Node Orb ── */}
                 <div
                   key={`orb-${orbSpinKey[item.id] ?? 0}`}
@@ -1312,6 +1766,11 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                 {!isOrbOpen && activeTab && (
                   <div
                     className={styles.nodeTabPanel}
+                    style={{
+                      transform: `scale(${1 / viewport.zoom})`,
+                      transformOrigin: 'top left',
+                      ['--orb-color' as string]: orbColor,
+                    }}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     {activeTab === 'prompt' && (
@@ -1470,7 +1929,21 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   </div>
                 )}
 
-                {item.type !== 'video' && item.type !== 'audio' && item.type !== 'template' && item.src && (
+                {item.type === 'text' && (
+                  <div
+                    className={styles.textLayer}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      const next = window.prompt('Edit text layer', item.src || '');
+                      if (next != null) updateItem(item.id, { src: next, name: next.trim() ? next.trim().slice(0, 40) : item.name });
+                    }}
+                    title="Double-click to edit text"
+                  >
+                    {item.src || 'Double-click to edit text'}
+                  </div>
+                )}
+
+                {item.type !== 'video' && item.type !== 'audio' && item.type !== 'template' && item.type !== 'text' && item.src && (
                   <img
                     src={item.src}
                     alt={item.name}
@@ -1479,7 +1952,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   />
                 )}
 
-                {!item.src && item.type !== 'audio' && item.type !== 'template' && (
+                {!item.src && item.type !== 'audio' && item.type !== 'template' && item.type !== 'text' && (
                   <div className={styles.placeholder}>
                     <Layers size={32} />
                     <span>{item.name}</span>
@@ -1504,6 +1977,16 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                     <Lock size={12} />
                   </div>
                 )}
+
+                {/* Connection dot — bottom center, appears on hover */}
+                <div
+                  className={styles.connectionDot}
+                  title="Drag to connect to another asset"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    // Future: start connection line drag from this dot
+                  }}
+                />
               </div>
             );
           })}
@@ -1519,6 +2002,39 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
               />
             </div>
           ))}
+
+          {overlayDraft && (() => {
+            const left = overlayDraft.tool === 'pen'
+              ? Math.min(...overlayDraft.points.map((p) => p.x)) - 8
+              : Math.min(overlayDraft.startX, overlayDraft.currentX);
+            const top = overlayDraft.tool === 'pen'
+              ? Math.min(...overlayDraft.points.map((p) => p.y)) - 8
+              : Math.min(overlayDraft.startY, overlayDraft.currentY);
+            const width = overlayDraft.tool === 'pen'
+              ? Math.max(24, Math.max(...overlayDraft.points.map((p) => p.x)) - left + 8)
+              : Math.max(24, Math.abs(overlayDraft.currentX - overlayDraft.startX));
+            const height = overlayDraft.tool === 'pen'
+              ? Math.max(24, Math.max(...overlayDraft.points.map((p) => p.y)) - top + 8)
+              : Math.max(24, Math.abs(overlayDraft.currentY - overlayDraft.startY));
+
+            return (
+              <svg
+                className={styles.overlayDraft}
+                style={{ left, top, width, height }}
+                viewBox={`0 0 ${width} ${height}`}
+              >
+                {overlayDraft.tool === 'shape' ? (
+                  <rect x="2" y="2" width={Math.max(1, width - 4)} height={Math.max(1, height - 4)} rx="10" />
+                ) : (
+                  <path
+                    d={overlayDraft.points
+                      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${(point.x - left).toFixed(1)} ${(point.y - top).toFixed(1)}`)
+                      .join(' ')}
+                  />
+                )}
+              </svg>
+            );
+          })()}
         </div>
 
         {items.length === 0 && nodes.length === 0 && (
@@ -1561,11 +2077,139 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           );
         })()}
 
+        {/* Group contour outline — shown when 2+ items are selected, not during lasso */}
+        {lassoPhase !== 'drawing' && selectedIds.length >= 2 && (() => {
+          const selectedItems = items.filter(it => selectedIds.includes(it.id));
+          if (selectedItems.length < 2) return null;
+          
+          // Compute bounding box of all selected items
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          const typeColors: string[] = [];
+          selectedItems.forEach(item => {
+            const w = item.width * item.scale;
+            const h = item.height * item.scale;
+            minX = Math.min(minX, item.x);
+            minY = Math.min(minY, item.y);
+            maxX = Math.max(maxX, item.x + w);
+            maxY = Math.max(maxY, item.y + h);
+            // Collect unique type colors for the striped border
+            const tc = item.generationMeta ? 'var(--asset-image, #ec4899)' :
+              item.type === 'video' ? 'var(--asset-video, #8b5cf6)' :
+              item.type === 'audio' ? 'var(--asset-audio, #22c55e)' :
+              item.type === 'text' ? 'var(--asset-text, #60a5fa)' :
+              'var(--asset-image, #ec4899)';
+            if (!typeColors.includes(tc)) typeColors.push(tc);
+          });
+          
+          const padding = 8;
+          // Coordinates are relative to the .canvas element (position:relative parent).
+          // canvasContent has transform:translate(vp.x, vp.y) scale(vp.zoom),
+          // so canvas-space → element-space: x_el = item.x * zoom + vp.x
+          const gLeft = minX * viewport.zoom + viewport.x - padding;
+          const gTop  = minY * viewport.zoom + viewport.y - padding;
+          const gW = (maxX - minX) * viewport.zoom + padding * 2;
+          const gH = (maxY - minY) * viewport.zoom + padding * 2;
+          
+          // Build stacked stripe border
+          const stripeColors = typeColors.slice(0, 4);
+          const borderImage = stripeColors.length > 1
+            ? `repeating-linear-gradient(0deg, ${stripeColors.map((c, i) => {
+                const pct = (i / stripeColors.length * 100);
+                const nextPct = ((i + 1) / stripeColors.length * 100);
+                return `${c} ${pct}%, ${c} ${nextPct}%`;
+              }).join(', ')}) 4`
+            : 'none';
+          
+          return (
+            <div
+              className={styles.groupContour}
+              style={{
+                left: gLeft,
+                top: gTop,
+                width: gW,
+                height: gH,
+                border: stripeColors.length > 1 ? '4px solid transparent' : `4px solid ${stripeColors[0] || 'var(--accent-primary)'}`,
+                borderImage: stripeColors.length > 1 ? borderImage : undefined,
+              }}
+            >
+              <span className={styles.groupContourBadge}>
+                {selectedItems.length} selected — ⌘G to group
+              </span>
+            </div>
+          );
+        })()}
+
         {isDragging && (
           <div className={styles.dropIndicator}>
             <span>Drop to add to canvas</span>
           </div>
         )}
+
+        {/* Context menu */}
+        {contextMenu && selectedIds.length > 0 && (() => {
+          const rect = canvasRef.current?.getBoundingClientRect();
+          const menuX = contextMenu.x - (rect?.left ?? 0);
+          const menuY = contextMenu.y - (rect?.top ?? 0);
+          const currentItems = useCanvasStore.getState().items;
+          const selItems = currentItems.filter(i => selectedIds.includes(i.id));
+          const groupIds = new Set(selItems.map(i => i.groupId).filter(Boolean) as string[]);
+          const allInSameGroup = groupIds.size === 1 && selItems.every(i => i.groupId === [...groupIds][0]);
+          const anyGrouped = groupIds.size > 0;
+
+          return (
+            <>
+              <div className={styles.contextMenuBackdrop} onClick={closeContextMenu} />
+              <div className={styles.contextMenu} style={{ left: menuX, top: menuY }}>
+                {selectedIds.length >= 2 && (
+                  <button
+                    className={styles.contextMenuItem}
+                    onClick={() => {
+                      if (allInSameGroup) {
+                        useCanvasStore.getState().ungroupItems([...groupIds][0]);
+                        log('canvas_move', 'Ungrouped items');
+                      } else {
+                        useCanvasStore.getState().groupItems(selectedIds);
+                        log('canvas_add', `Grouped ${selectedIds.length} items`);
+                      }
+                      closeContextMenu();
+                    }}
+                  >
+                    {allInSameGroup ? 'Ungroup' : 'Group'}
+                    <kbd>⌘G</kbd>
+                  </button>
+                )}
+                {anyGrouped && !allInSameGroup && (
+                  <button
+                    className={styles.contextMenuItem}
+                    onClick={() => {
+                      groupIds.forEach(gid => useCanvasStore.getState().ungroupItems(gid));
+                      log('canvas_move', `Ungrouped ${groupIds.size} group(s)`);
+                      closeContextMenu();
+                    }}
+                  >
+                    Ungroup all selected
+                    <kbd>⌘⇧G</kbd>
+                  </button>
+                )}
+                <div className={styles.contextMenuDivider} />
+                <button
+                  className={styles.contextMenuItem}
+                  onClick={() => { copy(); paste(); closeContextMenu(); }}
+                >
+                  Duplicate
+                  <kbd>⌘D</kbd>
+                </button>
+                <button
+                  className={`${styles.contextMenuItem} ${styles.contextMenuDanger}`}
+                  onClick={() => { removeSelected(); closeContextMenu(); }}
+                >
+                  Delete
+                  <kbd>⌫</kbd>
+                </button>
+              </div>
+            </>
+          );
+        })()}
       </div>
     </div>
   );

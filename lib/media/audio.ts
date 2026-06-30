@@ -1,12 +1,10 @@
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import fs from 'fs/promises';
+import { getFfmpegPath, getFfprobePath } from './ffmpegPath';
 
-const FFMPEG_PATH = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';
-const FFPROBE_PATH = process.env.FFPROBE_PATH || '/usr/bin/ffprobe';
-
-ffmpeg.setFfmpegPath(FFMPEG_PATH);
-ffmpeg.setFfprobePath(FFPROBE_PATH);
+ffmpeg.setFfmpegPath(getFfmpegPath());
+ffmpeg.setFfprobePath(getFfprobePath());
 
 export interface AudioMetadata {
   duration: number;

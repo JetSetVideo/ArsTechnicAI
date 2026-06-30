@@ -5,6 +5,14 @@ import path from 'path';
 const DATA_DIR = path.join(process.cwd(), '.ars-data');
 const SETTINGS_FILE = path.join(process.cwd(), '.ars-settings.json');
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '25mb',
+    },
+  },
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });

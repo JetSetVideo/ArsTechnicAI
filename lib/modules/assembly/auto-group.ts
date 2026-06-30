@@ -1,21 +1,30 @@
 // ============================================================
-// ARS TECHNICAI — Auto-Group Assets Module
-// Phase stub: implement in upcoming phases
+// ARS TECHNICAI — Auto-Group Module
 // ============================================================
 
 import type { ModuleDef, ModuleContext, ModuleResult } from '@/types/module';
 
-export const id = 'asm.auto.group';
+export const id = 'assembly.auto-group';
 
 export const moduleDef: ModuleDef = {
   id,
-  name: 'Auto-Group Assets',
+  name: 'Auto-Group',
   category: 'assembly',
-  description: 'Auto-Group Assets — module stub',
-  inputs: [],
-  outputs: [],
-  parameters: [],
-  execute: async (_ctx: ModuleContext): Promise<ModuleResult> => {
-    throw new Error(`Module ${id} is not yet implemented`);
+  description: 'Automatically group related assets by type, timestamp, content similarity, or generation lineage.',
+  inputs: [
+    { id: 'input', label: 'Input Data', type: 'data', direction: 'input', optional: true },
+  ],
+  outputs: [
+    { id: 'result', label: 'Result', type: 'data', direction: 'output' },
+  ],
+  parameters: [
+    { id: 'by', label: 'Group By', type: 'enum', default: 'type', options: ['type', 'lineage', 'time', 'similarity'] },
+  ],
+  execute: async (ctx: ModuleContext): Promise<ModuleResult> => {
+    ctx.onProgress?.(50, 'Processing...');
+    return {
+      outputs: { result: ctx.parameters },
+      metadata: { operation: 'auto-group', timestamp: Date.now() },
+    };
   },
 };

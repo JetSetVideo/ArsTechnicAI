@@ -110,6 +110,8 @@ export interface CanvasItem {
   updatedAt?: Timestamp;
   generationMeta?: GenerationMeta;
   mediaMeta?: MediaMeta;
+  groupId?: string;
+  groupOrbit?: boolean;
 }
 
 export interface MediaMeta {
@@ -242,6 +244,7 @@ export interface AppSettings {
   snapToGrid: boolean;
   gridSize: number;
   recentPaths: string[];
+  groupingDelay?: number;
 }
 
 // ------------------------------------------------------------
@@ -287,7 +290,148 @@ export interface WorkspaceLayout {
   timeline: PanelState;
 }
 
-export type WorkspaceMode = 'create' | 'rework' | 'composite' | 'timeline';
+export type WorkspaceMode = 'creation' | 'composite' | 'timeline';
+// Legacy aliases for backward compatibility (create/rework merged into 'creation')
+export type LegacyWorkspaceMode = 'create' | 'rework' | 'composite' | 'timeline';
+
+// ------------------------------------------------------------
+// Depth & Spatial Types — 3D layering
+// ------------------------------------------------------------
+export interface DepthLayer {
+  z: number;           // absolute z-index
+  depth: number;       // normalized 0 (background) → 1 (foreground)
+  layer: 'backdrop' | 'midground' | 'foreground' | 'overlay';
+}
+
+// ------------------------------------------------------------
+// Time & Temporal Types
+// ------------------------------------------------------------
+export interface TimeKeyframe {
+  id: UUID;
+  time: number;          // seconds from start
+  duration: number;      // duration of this keyframe segment
+  properties: Record<string, number | string | boolean>;
+  easing: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'bounce';
+}
+
+export interface TimeFactor {
+  scale: number;         // 1 = real-time, 0.5 = half-speed, 2 = double-speed
+  loop: boolean;
+  loopCount: number;     // 0 = infinite
+  startOffset: number;   // seconds
+}
+
+// ------------------------------------------------------------
+// Transition Types
+// ------------------------------------------------------------
+export type TransitionType =
+  | 'fade' | 'dissolve' | 'wipe-left' | 'wipe-right' | 'wipe-up' | 'wipe-down'
+  | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down'
+  | 'zoom-in' | 'zoom-out' | 'rotate' | 'flip' | 'cube'
+  | 'glitch' | 'pixelate' | 'blur' | 'none';
+
+export interface Transition {
+  id: UUID;
+  type: TransitionType;
+  fromSceneId: UUID;
+  toSceneId: UUID;
+  duration: number;       // seconds
+  easing: string;
+  overlayColor?: string;
+  parameters?: Record<string, number>;
+}
+
+// ------------------------------------------------------------
+// Scene Types
+// ------------------------------------------------------------
+export interface Scene {
+  id: UUID;
+  name: string;
+  order: number;
+  startTime: number;     // seconds in timeline
+  endTime: number;
+  items: UUID[];         // canvas item IDs in this scene
+  transitions: Transition[];
+  backgroundColor?: string;
+  notes?: string;
+}
+
+// ------------------------------------------------------------
+// Character Consistency Types
+// ------------------------------------------------------------
+export interface CharacterProfile {
+  id: UUID;
+  name: string;
+  description: string;
+  age?: string;
+  gender?: string;
+  appearance: string;    // detailed visual description
+  outfit?: string;
+  accessories?: string[];
+  referenceImages: string[];  // UUIDs of reference assets
+  styleConsistency: number;   // 0-1 score
+  generatedAt?: Timestamp;
+  lastUsedAt?: Timestamp;
+}
+
+export interface CharacterConsistencyCheck {
+  characterId: UUID;
+  generatedImageId: UUID;
+  similarityScore: number;   // 0-1
+  issues: string[];          // e.g. "hair color mismatch", "different face shape"
+  passed: boolean;
+}
+
+// ------------------------------------------------------------
+// Prompt Generation Types
+// ------------------------------------------------------------
+export interface PromptTemplate {
+  id: UUID;
+  name: string;
+  category: 'character' | 'scene' | 'object' | 'style' | 'mood' | 'action';
+  template: string;          // with {placeholders}
+  variables: PromptVariable[];
+  usageCount: number;
+  successRate?: number;     // user feedback score
+}
+
+export interface PromptVariable {
+  id: string;
+  label: string;
+  type: 'text' | 'select' | 'number' | 'color' | 'style' | 'character';
+  default?: string;
+  options?: string[];       // for select type
+  min?: number;
+  max?: number;
+  required: boolean;
+}
+
+export interface ImageAnalysisResult {
+  detectedObjects: string[];
+  detectedStyles: string[];
+  colorPalette: string[];
+  composition: string;
+  suggestedPrompt: string;
+  confidence: number;       // 0-1
+}
+
+// ------------------------------------------------------------
+// Format Conversion Types
+// ------------------------------------------------------------
+export type FormatConversion = {
+  id: UUID;
+  fromFormat: string;
+  toFormat: string;
+  sourceAssetId: UUID;
+  resultAssetId?: UUID;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  parameters?: Record<string, unknown>;
+  createdAt: Timestamp;
+  completedAt?: Timestamp;
+};
+
+// Re-export in index barrel
+export type { FormatConversion as ConversionJob };
 
 // ------------------------------------------------------------
 // Dashboard Types (re-exported)

@@ -68,9 +68,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const resolvedProvider: AIProvider = (provider as AIProvider) || 'GOOGLE_IMAGEN';
 
-  // Require API key (from body) for all generation requests
+  // Validate dimensions first (shared by both paths)
+  const validWidth = Number(width) || 1024;
+  const validHeight = Number(height) || 1024;
+
+  if (validWidth < 256 || validWidth > 2048 || validHeight < 256 || validHeight > 2048) {
+    return createError(
+      res,
+      400,
+      'Image dimensions must be between 256 and 2048 pixels',
+      'INVALID_DIMENSIONS'
+    );
+  }
+
+  // If no API key, use placeholder generation (works offline)
   if (!apiKey) {
-    return res.status(400).json({ error: 'API key required' });
+    console.log('[Generate] No API key — using placeholder mode');
+    return generatePlaceholder(res, validWidth, validHeight, prompt || 'generated', projectId, session?.user?.id);
   }
 
   const providerInstance = getProvider(resolvedProvider);
@@ -110,21 +124,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
   }
 
-  // Validate dimensions
-  const validWidth = Number(width) || 1024;
-  const validHeight = Number(height) || 1024;
-
-  if (validWidth < 256 || validWidth > 2048 || validHeight < 256 || validHeight > 2048) {
-    return createError(
-      res,
-      400,
-      'Image dimensions must be between 256 and 2048 pixels',
-      'INVALID_DIMENSIONS'
-    );
-  }
-
   // ═══════════════════════════════════════════════════════════
-  // API REQUEST
+  // API REQUEST (dimensions validated above)
   // ═══════════════════════════════════════════════════════════
   
   try {
@@ -312,7 +313,9 @@ async function generatePlaceholder(
   res: NextApiResponse,
   width: number,
   height: number,
-  prompt: string
+  prompt: string,
+  projectId?: string,
+  sessionUserId?: string,
 ) {
   const seed = hashPrompt(prompt);
   console.log(`[Placeholder] Generating visual placeholder for: "${prompt.slice(0, 30)}..." (${width}x${height}, seed: ${seed})`);
@@ -324,6 +327,8 @@ async function generatePlaceholder(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
     
+    let dataUrl = '';
+    
     try {
       const response = await fetch(picsumUrl, {
         signal: controller.signal,
@@ -333,17 +338,10 @@ async function generatePlaceholder(
       if (response.ok) {
         const buffer = await response.arrayBuffer();
         
-        if (buffer.byteLength > 1000) { // Valid image should be > 1KB
+        if (buffer.byteLength > 1000) {
           const base64 = Buffer.from(buffer).toString('base64');
-          const dataUrl = `data:image/jpeg;base64,${base64}`;
-
+          dataUrl = `data:image/jpeg;base64,${base64}`;
           console.log(`[Placeholder] Successfully fetched from picsum.photos (${buffer.byteLength} bytes)`);
-          
-          return res.status(200).json({
-            imageUrl: picsumUrl,
-            dataUrl,
-            seed,
-          });
         }
       }
     } catch (fetchError) {
@@ -351,20 +349,57 @@ async function generatePlaceholder(
       console.log('[Placeholder] External service failed, using generated placeholder');
     }
 
-    // Fallback to generated visual placeholder
-    const svgDataUrl = generateVisualPlaceholder(width, height, seed);
-    console.log(`[Placeholder] Generated visual SVG placeholder`);
+    // Fallback to generated visual SVG placeholder
+    if (!dataUrl) {
+      dataUrl = generateVisualPlaceholder(width, height, seed);
+      console.log(`[Placeholder] Generated visual SVG placeholder`);
+    }
+
+    // Save to disk so the file persists
+    let filePath = '';
+    try {
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const promptSlug = (prompt || 'generated').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
+      const filename = `gen_${promptSlug}_${timestamp}.png`;
+      const generatedDir = path.join(process.cwd(), 'public', 'generated');
+      await fs.mkdir(generatedDir, { recursive: true });
+      await fs.writeFile(path.join(generatedDir, filename), Buffer.from(base64Data, 'base64'));
+      filePath = `/generated/${filename}`;
+    } catch { /* non-fatal */ }
+    
+    // Create DB asset record for authenticated users
+    let assetId: string | undefined;
+    if (sessionUserId) {
+      try {
+        const asset = await prisma.asset.create({
+          data: {
+            name: `Generated — ${prompt?.slice(0, 50) ?? 'untitled'}`,
+            type: 'IMAGE',
+            status: 'READY',
+            path: filePath || null,
+            mimeType: 'image/png',
+            width, height,
+            prompt: prompt ?? null,
+            provider: 'PLACEHOLDER',
+            seed,
+            userId: sessionUserId,
+            projectId: projectId ?? null,
+          },
+        });
+        assetId = asset.id;
+      } catch { /* non-fatal */ }
+    }
     
     return res.status(200).json({
-      dataUrl: svgDataUrl,
+      dataUrl,
       seed,
+      assetId,
+      filePath,
     });
   } catch (error) {
     console.error('[Placeholder] Error:', error);
-    
-    // Last resort: return a simple colored placeholder
     const fallbackDataUrl = generateVisualPlaceholder(width, height, Date.now());
-    
     return res.status(200).json({
       dataUrl: fallbackDataUrl,
       seed: Date.now(),

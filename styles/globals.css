@@ -450,15 +450,250 @@ kbd {
   --space-5: 1rem;
   --space-6: 1.25rem;
   --space-8: 1.5rem;
-  
+
   --panel-padding: var(--space-2);
   --section-gap: var(--space-2);
   --input-padding-x: var(--space-2);
   --input-padding-y: 0.25rem;
   --button-padding-x: var(--space-2);
   --button-padding-y: 0.25rem;
-  
+
   --topbar-height: 40px;
   --sidebar-width: 220px;
   --inspector-width: 280px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PARAMETRIC DESIGN SYSTEM
+   "Knob" variables that cascade via calc() to the whole UI.
+   Changing a single knob shifts spacing, radii, glow, etc.
+   Range: 0 (minimal) → 1 (default) → 2 (maximum)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Knobs ─────────────────────────────────────────────── */
+  --param-density:   1;  /* 0 = airy,  1 = balanced, 2 = compact  */
+  --param-roundness: 1;  /* 0 = sharp, 1 = rounded,  2 = pill     */
+  --param-glow:      1;  /* 0 = flat,  1 = subtle,   2 = vivid    */
+  --param-contrast:  1;  /* 0 = soft,  1 = normal,   2 = crisp    */
+
+  /* ── Density → spacing multiplier ──────────────────────── */
+  /* density 0 → ×1.5 (airy) | 1 → ×1.0 (default) | 2 → ×0.5 (compact) */
+  --density-scale: calc(1.5 - var(--param-density) * 0.5);
+
+  --sp-unit: calc(4px * var(--density-scale));
+  --sp-xs:   var(--sp-unit);
+  --sp-sm:   calc(var(--sp-unit) * 2);
+  --sp-md:   calc(var(--sp-unit) * 3);
+  --sp-lg:   calc(var(--sp-unit) * 4);
+  --sp-xl:   calc(var(--sp-unit) * 6);
+  --sp-2xl:  calc(var(--sp-unit) * 8);
+
+  /* ── Roundness → radii ──────────────────────────────────── */
+  /* roundness 0 → 2px (sharp) | 1 → 6px | 2 → 10px */
+  --r-base: calc(2px + var(--param-roundness) * 4px);
+  --r-xs:   var(--r-base);
+  --r-sm:   calc(var(--r-base) * 1.25);
+  --r-md:   calc(var(--r-base) * 1.75);
+  --r-lg:   calc(var(--r-base) * 2.5);
+  --r-pill: calc(var(--r-base) * 8);
+
+  /* ── Glow → shadow & accent glow ────────────────────────── */
+  --glow-spread:    calc(var(--param-glow) * 10px);
+  --glow-alpha:     calc(var(--param-glow) * 0.18);
+  --glow-accent:    rgba(0, 212, 170, var(--glow-alpha));
+  --glow-secondary: rgba(124, 58, 237, var(--glow-alpha));
+
+  /* ── Contrast → shadow depth ────────────────────────────── */
+  --shadow-depth: calc(0.25 + var(--param-contrast) * 0.15);
+  --shadow-xs:  0 1px 2px rgba(0,0,0,var(--shadow-depth));
+  --shadow-sm:  0 2px 4px  rgba(0,0,0,var(--shadow-depth)), 0 0 0 1px rgba(0,0,0,0.1);
+  --shadow-md:  0 4px 12px rgba(0,0,0,var(--shadow-depth));
+  --shadow-lg:  0 8px 24px rgba(0,0,0,var(--shadow-depth));
+  --shadow-glow-accent: 0 0 var(--glow-spread) var(--glow-accent);
+
+  /* ── Blueprint/stack visual tokens ─────────────────────── */
+  --stack-offset-x: 3px;
+  --stack-offset-y: -3px;
+  --stack-rotate:   1.5deg;
+  --stack-shadow:   0 2px 8px rgba(0,0,0,0.4);
+
+  /* ── Motion ── (speed 0=instant, 1=default, 2=slow) ────── */
+  --param-speed: 1;
+  --dur-fast:   calc(80ms  + (1 - var(--param-speed)) * 80ms);
+  --dur-normal: calc(150ms + (1 - var(--param-speed)) * 100ms);
+  --dur-slow:   calc(250ms + (1 - var(--param-speed)) * 150ms);
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:    cubic-bezier(0.32, 0, 0.67, 0);
+
+  /* ── Floating toolbar ── */
+  --toolbar-w:          44px;
+  --toolbar-icon-size:  18px;
+  --toolbar-gap:        var(--sp-xs);
+  --toolbar-padding:    var(--sp-sm);
+  --toolbar-bg:         rgba(18, 18, 21, 0.88);
+  --toolbar-border:     rgba(62, 62, 74, 0.6);
+  --toolbar-blur:       12px;
+
+  /* ═══════════════════════════════════════════════════════════════
+     GLASS DESIGN SYSTEM — Complex Variables
+     
+     Every surface derives its appearance from a small set of
+     "physical" parameters that generate realistic glass, frost,
+     and translucent surface effects through mathematical relations.
+     
+     The core insight: glass isn't one style — it's a continuous
+     space defined by:
+       - opacity      (how much background shows through)
+       - roughness    (how much light scatters = blur amount)
+       - thickness    (edge highlight intensity / border weight)
+       - tint         (HSL-based color cast)
+       - elevation    (shadow depth & spread)
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* ── Glass Base Parameters (knobs) ─────────────────────── */
+  --glass-opacity:     0.85;   /* 0 = invisible, 1 = opaque */
+  --glass-roughness:   0.15;   /* 0 = clear, 1 = fully frosted */
+  --glass-thickness:   0.5;    /* 0 = hairline, 1 = heavy border */
+  --glass-tint-h:      210;    /* hue 0-360 */
+  --glass-tint-s:      15;     /* saturation 0-100% */
+  --glass-tint-l:      15;     /* lightness for bg blend */
+  --glass-elevation:   0.3;    /* 0 = flush, 1 = highly elevated */
+
+  /* ── Computed Glass Properties ─────────────────────────── */
+  /* Background: semi-transparent with HSL tint blended via alpha */
+  --glass-bg-alpha:    calc(var(--glass-opacity) * (1 - var(--glass-roughness) * 0.6));
+  --glass-bg:          hsla(
+    var(--glass-tint-h),
+    calc(var(--glass-tint-s) * 1%),
+    calc(var(--glass-tint-l) * 1%),
+    var(--glass-bg-alpha)
+  );
+
+  /* Backdrop blur: roughness controls blur amount (0 to 24px) */
+  --glass-blur:        calc(var(--glass-roughness) * 24px);
+  
+  /* Border: thickness controls opacity and width */
+  --glass-border-alpha: calc(0.08 + var(--glass-thickness) * 0.32);
+  --glass-border-color: hsla(
+    calc(var(--glass-tint-h) + 180),
+    calc(var(--glass-tint-s) * 1%),
+    calc(100% - var(--glass-tint-l) * 1%),
+    var(--glass-border-alpha)
+  );
+  --glass-border-width: calc(0.5px + var(--glass-thickness) * 1.5px);
+
+  /* Edge highlight (where light catches the glass edge) */
+  --glass-edge-brightness: calc(1 - var(--glass-roughness)) * var(--glass-thickness);
+  --glass-edge-glow:   hsla(
+    calc(var(--glass-tint-h) + 60),
+    calc(var(--glass-tint-s) * 0.8%),
+    calc(80%),
+    calc(var(--glass-edge-brightness) * 0.3)
+  );
+
+  /* Inner shadow for depth */
+  --glass-inner-shadow: inset 0 0 calc(var(--glass-thickness) * 8px) 
+    hsla(var(--glass-tint-h), 5%, 100%, calc(var(--glass-thickness) * 0.1));
+
+  /* Elevation shadow */
+  --glass-elevation-y: calc(var(--glass-elevation) * 16px);
+  --glass-elevation-blur: calc(var(--glass-elevation) * 40px);
+  --glass-elevation-shadow: 0 
+    var(--glass-elevation-y) 
+    var(--glass-elevation-blur) 
+    rgba(0, 0, 0, calc(var(--glass-elevation) * 0.4));
+
+  /* ── Glass Surface Shorthand ────────────────────────────── */
+  --glass-surface: 
+    background var(--glass-bg),
+    backdrop-filter blur(var(--glass-blur)) saturate(180%),
+    -webkit-backdrop-filter blur(var(--glass-blur)) saturate(180%),
+    border var(--glass-border-width) solid var(--glass-border-color),
+    box-shadow var(--glass-elevation-shadow), var(--glass-inner-shadow);
+
+  /* ── Glass States (derived from base parameters) ─────────── */
+  /* Hover: increase opacity, reduce roughness (clearer on focus) */
+  --glass-hover-opacity:   calc(var(--glass-opacity) + 0.08);
+  --glass-hover-roughness: calc(var(--glass-roughness) * 0.6);
+  --glass-hover-elevation: calc(var(--glass-elevation) + 0.15);
+
+  /* Active/Pressed: maximum clarity, flat elevation */
+  --glass-active-opacity:   calc(var(--glass-opacity) + 0.12);
+  --glass-active-roughness: calc(var(--glass-roughness) * 0.3);
+  --glass-active-elevation: calc(var(--glass-elevation) * 0.4);
+
+  /* Disabled: more opaque, rougher, no elevation */
+  --glass-disabled-opacity:   calc(var(--glass-opacity) * 0.6);
+  --glass-disabled-roughness: calc(var(--glass-roughness) + 0.3);
+  --glass-disabled-elevation: 0;
+
+  /* ── Modal / Overlay Glass Variant ───────────────────────── */
+  --glass-modal-opacity:    0.92;
+  --glass-modal-roughness:  0.08;
+  --glass-modal-thickness:  0.6;
+  --glass-modal-elevation:  0.8;
+
+  /* ── Panel Glass Variant ──────────────────────────────────── */
+  --glass-panel-opacity:    0.78;
+  --glass-panel-roughness:  0.2;
+  --glass-panel-thickness:  0.3;
+  --glass-panel-elevation:  0.2;
+
+  /* ── Toolbar Glass Variant ────────────────────────────────── */
+  --glass-toolbar-opacity:   0.72;
+  --glass-toolbar-roughness: 0.35;
+  --glass-toolbar-thickness: 0.4;
+  --glass-toolbar-elevation: 0.5;
+
+  /* ═══════════════════════════════════════════════════════════════
+     STATE-AWARE VARIABLES — Dynamic relations between assets
+     
+     These variables change based on what's selected, connected,
+     or related. CSS can use them to reflect system state visually.
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* Asset relationship distance (JS sets these via custom properties on elements) */
+  --relation-distance: 0;    /* 0 = unrelated, 0.5 = similar, 1 = identical */
+  --relation-type: 0;        /* -1 = opposition, 0 = neutral, 1 = similarity */
+  --relation-intensity: 0;   /* 0 = weak, 1 = strong */
+
+  /* Computed relation colors */
+  --relation-color: rgba(0, 212, 170, calc(var(--relation-intensity) * 0.8));
+
+  /* Opposition color (when assets are opposites/contrasting) */
+  --opposition-color: rgba(239, 68, 68, calc(var(--relation-intensity) * 0.5));
+
+  /* Similarity glow */
+  --similarity-glow: 0 0 calc(var(--relation-intensity) * 20px) 
+    rgba(0, 212, 170, calc(var(--relation-intensity) * 0.3));
+
+  /* ═══════════════════════════════════════════════════════════════
+     TIME-VARIANT DESIGN VARIABLES
+     
+     Reflect temporal relationships between assets in the timeline.
+     ═══════════════════════════════════════════════════════════════ */
+
+  --time-overlap: 0;       /* 0 = no overlap, 1 = fully overlapping */
+  --time-precedence: 0;    /* -1 = before, 0 = same, 1 = after */
+  --time-proximity: 0;     /* 0 = far apart, 1 = adjacent/close */
+
+  /* ═══════════════════════════════════════════════════════════════
+     DEPTH-AWARE VARIABLES (Z-axis)
+     ═══════════════════════════════════════════════════════════════ */
+
+  --asset-depth: 0;        /* normalized z position 0-1 */
+  --depth-focus: 0;        /* which depth layer is "in focus" */
+  --depth-blur: calc(clamp(0, var(--asset-depth) - var(--depth-focus), 1) * 8px + clamp(0, var(--depth-focus) - var(--asset-depth), 1) * 8px);
+  --depth-scale: calc(0.8 + (1 - var(--asset-depth)) * 0.4);
+  --depth-opacity: calc(0.6 + (1 - clamp(0, var(--asset-depth) - var(--depth-focus), 1) - clamp(0, var(--depth-focus) - var(--asset-depth), 1)) * 0.4);
+
+}
+
+/* Preset overrides applied by JS (settingsStore) */
+.theme-airy       { --param-density: 0;   }
+.theme-compact    { --param-density: 2;   }
+.theme-sharp      { --param-roundness: 0; }
+.theme-pill       { --param-roundness: 2; }
+.theme-flat       { --param-glow: 0; --param-contrast: 0; }
+.theme-vivid      { --param-glow: 2; --param-contrast: 2; }

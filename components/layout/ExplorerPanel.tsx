@@ -39,6 +39,21 @@ interface ExplorerPanelProps {
   onToggle: () => void;
 }
 
+const ICON_COLORS: Partial<Record<string, string>> = {
+  image: 'var(--t-image, #ec4899)',
+  video: 'var(--t-video, #8b5cf6)',
+  audio: 'var(--t-audio, #22c55e)',
+  text: 'var(--t-text, #60a5fa)',
+  model_3d: 'var(--t-3d, #f59e0b)',
+  splat: 'var(--t-3d, #f59e0b)',
+  prompt: 'var(--t-prompt, #c084fc)',
+  subtitle: 'var(--t-text, #60a5fa)',
+  vocabulary: 'var(--t-prompt, #c084fc)',
+  character: 'var(--t-prompt, #c084fc)',
+  scene: 'var(--t-prompt, #c084fc)',
+  lut: 'var(--t-image, #ec4899)',
+};
+
 const getFileIcon = (node: FileNode) => {
   if (node.type === 'folder') return node.expanded ? <FolderOpen size={16} /> : <Folder size={16} />;
   const asset = node.asset;
@@ -79,16 +94,34 @@ interface FileTreeItemProps {
   isExpanded: boolean;
 }
 
+const isFolderEmpty = (node: FileNode): boolean => {
+  if (node.type !== 'folder') return false;
+  if (!node.children || node.children.length === 0) return true;
+  return node.children.every((child) => isFolderEmpty(child));
+};
+
+const hasFolderContent = (node: FileNode): boolean => {
+  if (node.type !== 'folder') return false;
+  if (!node.children || node.children.length === 0) return false;
+  return node.children.some((child) => child.type !== 'folder' || hasFolderContent(child));
+};
+
 const FileTreeItem: React.FC<FileTreeItemProps> = ({
   node, depth, onSelect, onToggle, onDragStart, onDropNode, onStartRename, onDeleteNode, onContextMenu,
   editingPath, editingName, onEditingNameChange, onRenameSubmit, onRenameCancel, isSelected, isExpanded,
 }) => {
+  const isEmpty = node.type === 'folder' && isFolderEmpty(node);
+  const hasContent = node.type === 'folder' && hasFolderContent(node);
+  const isActiveFolder = node.type === 'folder' && isExpanded && hasContent;
+
   return (
     <div className={styles.treeItem}>
       <div
-        className={`${styles.treeItemRow} ${isSelected ? styles.selected : ''}`}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        className={`${styles.treeItemRow} ${isSelected ? styles.selected : ''} ${isEmpty ? styles.emptyFolder : ''} ${isActiveFolder ? styles.activeFolder : ''}`}
+        style={{ paddingLeft: `${depth * 12 + 4}px` }}
         onClick={() => onSelect(node)}
+        data-empty={isEmpty ? 'true' : undefined}
+        data-active-folder={isActiveFolder ? 'true' : undefined}
         onContextMenu={(e) => onContextMenu(e, node)}
         draggable={!(node.type === 'folder' && ['/', '/projects', '/imports', '/library', '/prompts'].includes(node.path))}
         onDragStart={(e) => onDragStart(e, node)}
@@ -122,7 +155,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
             {getFileIcon({ ...node, expanded: isExpanded })}
           </button>
         ) : (
-          <span className={styles.icon}>{getFileIcon({ ...node, expanded: isExpanded })}</span>
+          <span className={styles.icon} style={{ color: node.asset ? (ICON_COLORS[node.asset.type] ?? undefined) : undefined }}>{getFileIcon({ ...node, expanded: isExpanded })}</span>
         )}
         {editingPath === node.path ? (
           <input
@@ -350,6 +383,8 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
   const { data: session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [filter, setFilter] = useState('');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
   const [tab, setTab] = useState<Tab>('local');
 
   const { assets: cloudAssets, loading: cloudLoading, refresh: refreshCloud } = useAssetLibrary();
@@ -369,12 +404,47 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
     e.target.value = '';
   }, [importFiles, log]);
 
-  const filteredNodes = filter
-    ? rootNodes.filter((n) =>
-        n.name.toLowerCase().includes(filter.toLowerCase()) ||
-        n.children?.some((c) => c.name.toLowerCase().includes(filter.toLowerCase()))
-      )
-    : rootNodes;
+  // Recursive filter: if a folder matches or any child matches, include it
+  const nodeMatchesFilter = useCallback((node: FileNode, query: string, typeFilter: string): boolean => {
+    const q = query.toLowerCase().trim();
+    const nameMatch = !q || node.name.toLowerCase().includes(q);
+    const typeMatch = typeFilter === 'all' || 
+      (node.asset?.type === typeFilter) ||
+      (node.type === 'folder' && typeFilter === 'folder');
+    if (node.type !== 'folder') return nameMatch && typeMatch;
+    // Folder: match if its own name matches, or any descendant matches
+    if (typeFilter === 'folder' && nameMatch) return true;
+    if (node.children && node.children.some(c => nodeMatchesFilter(c, query, typeFilter))) return true;
+    return nameMatch && typeFilter === 'all';
+  }, []);
+
+  const filterTree = useCallback((nodes: FileNode[], query: string, typeFilter: string): FileNode[] => {
+    return nodes
+      .filter(n => nodeMatchesFilter(n, query, typeFilter))
+      .map(n => ({
+        ...n,
+        children: n.children ? filterTree(n.children, query, typeFilter) : undefined,
+      }));
+  }, [nodeMatchesFilter]);
+
+  const sortNodes = useCallback((nodes: FileNode[]): FileNode[] => {
+    return [...nodes].sort((a, b) => {
+      // Folders first
+      if (a.type === 'folder' && b.type !== 'folder') return -1;
+      if (a.type !== 'folder' && b.type === 'folder') return 1;
+      if (sortBy === 'date') {
+        const aDate = a.asset?.modifiedAt || a.asset?.createdAt || 0;
+        const bDate = b.asset?.modifiedAt || b.asset?.createdAt || 0;
+        return bDate - aDate;
+      }
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    }).map(n => ({
+      ...n,
+      children: n.children ? sortNodes(n.children) : undefined,
+    }));
+  }, [sortBy]);
+
+  const filteredNodes = sortNodes(filterTree(rootNodes, filter, filterType));
 
   const filteredCloud = filter
     ? cloudAssets.filter((a) => a.name.toLowerCase().includes(filter.toLowerCase()) || a.prompt?.toLowerCase().includes(filter.toLowerCase()))
@@ -432,6 +502,33 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
+        {tab === 'local' && (
+          <div className={styles.filterControls}>
+            <select
+              className={styles.filterSelect}
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              title="Filter by type"
+            >
+              <option value="all">All Types</option>
+              <option value="folder">Folders</option>
+              <option value="image">Images</option>
+              <option value="video">Videos</option>
+              <option value="audio">Audio</option>
+              <option value="text">Text</option>
+              <option value="model_3d">3D Models</option>
+            </select>
+            <select
+              className={styles.filterSelect}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'name' | 'date')}
+              title="Sort order"
+            >
+              <option value="name">A-Z</option>
+              <option value="date">Recent</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Local tab */}

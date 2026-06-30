@@ -1,100 +1,185 @@
 # Project System Expansion Plan
 
-This document outlines a methodical approach to expanding the Ars TechnicAI project system to support the creation of various media types (scripts, scenarios, videos, shorts, etc.). It maps the user journey and identifies options for expansion at every node.
+> **Document Version**: 2.0 · **Last Updated**: June 2026
+>
+> This document outlines a methodical approach to expanding the Ars TechnicAI project system to support every media type, asset lifecycle stage, and distribution channel. It maps the complete user journey from ideation to analytics.
+
+---
 
 ## Phase 1: Project Creation & Setup
 
-**Goal:** Allow the user to define the *intent* and *constraints* of their project upfront.
+**Goal:** Allow the user to define the intent, constraints, and target platforms of their project upfront.
 
 ### Node 1.1: Project Definition
-*   **Current State:** Name, Tags, Length, Style, Genre, Characters.
-*   **Expansion Options:**
-    *   **Project Type:** Explicitly select the format.
-        *   *Options:* `Video` (Linear), `Short` (Vertical Video), `Feature Film`, `Script/Screenplay`, `Comic Book`, `Storyboard`, `Audio Drama`.
-    *   **Target Audience:** Define who this is for (e.g., "Young Adult", "Professional", "General").
-    *   **Aspect Ratio:** Set a default aspect ratio for the project canvas/player (e.g., 16:9, 9:16, 1:1, 2.35:1).
-    *   **Synopsis/Logline:** A dedicated text field for a 1-2 sentence summary (crucial for AI context).
+
+| Field | Current State | Expansion |
+|-------|--------------|-----------|
+| **Name** | ✅ Text field | Preserve |
+| **Project Type** | ❌ Not explicit | Add selector: `Video (Linear)`, `Short (Vertical)`, `Feature Film`, `Script/Screenplay`, `Comic Book`, `Storyboard`, `Audio Drama`, `Interactive Story`, `Social Campaign` |
+| **Target Audience** | ❌ Not present | Add: "Young Adult", "Professional", "General", "Kids", "Niche" |
+| **Aspect Ratio** | ❌ Only per-platform | Add project-wide default: 16:9, 9:16, 1:1, 4:5, 2.35:1, 21:9 |
+| **Synopsis/Logline** | ❌ None | Add dedicated textarea for 1-2 sentence summary (feeds AI context) |
+| **Style** | ⚠️ Text field | Preserve as free text, add preset dropdown |
+| **Genre** | ⚠️ Text field | Add genre selector: Action, Comedy, Drama, Horror, Sci-Fi, Fantasy, Documentary, etc. |
+| **Tags** | ✅ Array | Preserve, add auto-suggest from existing tags |
+| **Characters** | ⚠️ Single text field | Replace with Character Database (see Phase 2) |
+| **Length/Duration** | ⚠️ Text field | Add numeric input with unit selector (minutes, seconds) |
 
 ### Node 1.2: Templates & Presets
-*   **Current State:** Empty project.
-*   **Expansion Options:**
-    *   **Starter Templates:**
-        *   *Video:* "Music Video", "Documentary", "Vlog".
-        *   *Script:* "Hero's Journey", "Three-Act Structure", "Save the Cat".
-    *   **Style Presets:** Pre-fill the "Style" field with complex prompt engineering presets (e.g., "Cyberpunk 2077", "Studio Ghibli", "Film Noir").
 
-## Phase 2: Ideation & Pre-Production (The "Script & Scenario" Layer)
+| Preset Category | Options |
+|----------------|---------|
+| **Video Templates** | Music Video, Documentary, Vlog, Product Demo, Tutorial, Trailer, Social Ad |
+| **Script Templates** | Hero's Journey, Three-Act Structure, Save the Cat, A-B-A-B Rhyme, Monologue |
+| **Comic Templates** | Manga (R→L), Western (L→R), 4-panel, 6-panel, Splash Page, Infinite Scroll |
+| **Style Presets** | Cyberpunk 2077, Studio Ghibli, Film Noir, Wes Anderson, 80s VHS, Minimalist, Baroque, Neon Pop |
+| **Platform Presets** | TikTok (9:16, ≤10min), Instagram Reel (9:16, ≤90s), YouTube (16:9, any), Twitter/X (16:9, ≤140s), LinkedIn (16:9, ≤10min) |
 
-**Goal:** Before generating assets, the user needs to write the story and define the world.
+---
+
+## Phase 2: Ideation & Pre-Production
+
+**Goal:** Before generating assets, write the story and define the world.
 
 ### Node 2.1: World Building (Context)
-*   **Current State:** "Characters" text field.
-*   **Expansion Options:**
-    *   **Character Database:** A dedicated UI to create detailed character profiles (Name, Age, Appearance, Voice, Personality) that feed into the AI image generator.
-    *   **Location Manager:** Define key locations (e.g., "The Abandoned Station", "Hero's Bedroom") with reference images.
-    *   **Lore/Wiki:** A simple wiki or notes section for world rules.
+
+| Component | Current | Expansion |
+|-----------|---------|-----------|
+| **Character Database** | Single text field | Dedicated UI: Name, Age, Appearance (text + reference image), Voice profile, Personality traits, Wardrobe, Arc/Motivation |
+| **Location Manager** | ❌ None | Define locations: Name, Description, Reference images, Time-of-day presets, Weather |
+| **Lore/Wiki** | ❌ None | Simple notes section for world rules, history, terminology |
+| **Mood Board** | ❌ None | Grid of reference images + color palette per scene |
 
 ### Node 2.2: Scriptwriting
-*   **Current State:** None.
-*   **Expansion Options:**
-    *   **Script Editor:** A text editor formatted for screenplays (Sluglines, Action, Dialogue).
-    *   **AI Co-Writer:** "Autocomplete" for dialogue or scene descriptions.
-    *   **Script-to-Scene:** A feature to highlight a scene in the script and generate a "Shot List" automatically.
+
+| Component | Current | Expansion |
+|-----------|---------|-----------|
+| **Script Editor** | ❌ None | Formatted screenplay editor: Sluglines, Action, Character, Dialogue, Parenthetical |
+| **AI Co-Writer** | ❌ None | "Autocomplete" for dialogue/scene descriptions, tone adjustment, pacing suggestions |
+| **Script-to-Scene** | ❌ None | Highlight scene in script → auto-generate shot list |
+| **Version Tracking** | ❌ None | Script version history with diff view |
 
 ### Node 2.3: Storyboarding
-*   **Current State:** Infinite Canvas (generic).
-*   **Expansion Options:**
-    *   **Frame Logic:** Special canvas nodes that represent "Shots" with specific camera angles (Wide, Close-up, Dutch Angle).
-    *   **Sequencing:** Ability to order canvas nodes linearly to create a rough animatic.
+
+| Component | Current | Expansion |
+|-----------|---------|-----------|
+| **Frame Logic** | ❌ None | Special canvas nodes representing "Shots" with camera angles (Wide, Medium, Close-up, Dutch Angle, POV) |
+| **Sequencing** | ❌ None | Linear ordering of canvas nodes to create rough animatic |
+| **Shot List** | ❌ None | Table view: Shot #, Description, Camera, Duration, Status |
+
+---
 
 ## Phase 3: Production (Asset Generation)
 
-**Goal:** Generate the actual media files based on the pre-production data.
+**Goal:** Generate actual media files based on pre-production data.
 
 ### Node 3.1: Visuals (Image/Video)
-*   **Current State:** Image Generation.
-*   **Expansion Options:**
-    *   **Consistency Control:** "Face Swap" or "Character LoRA" integration to keep characters looking the same across shots.
-    *   **Video Generation:** Integration with video models (Runway, Pika, Stable Video Diffusion) to turn static storyboard frames into clips.
-    *   **Shot Consistency:** "Camera Control" tools to re-shoot the same scene from different angles.
+
+| Capability | Current | Expansion |
+|-----------|---------|-----------|
+| **Image Generation** | ✅ Google Imagen | Add: DALL·E 3, Stable Diffusion 3, Midjourney (API pending), Flux |
+| **Consistency Control** | ❌ None | Face Swap, Character LoRA integration, Reference Image conditioning |
+| **Video Generation** | ❌ None | Runway Gen-3, Pika, Kling, Sora integration |
+| **Shot Consistency** | ❌ None | Camera Control tools: re-shoot same scene from different angles |
+| **Batch Generation** | ❌ None | Generate N variants per prompt, per model, compare side-by-side |
+| **Style Transfer** | ❌ None | Apply reference style to generated image |
 
 ### Node 3.2: Audio
-*   **Current State:** Basic file support.
-*   **Expansion Options:**
-    *   **TTS (Text-to-Speech):** Generate dialogue for characters using ElevenLabs or similar.
-    *   **SFX Generation:** AI generation of sound effects (footsteps, explosions).
-    *   **Music Generation:** AI background score generation based on "Mood" or "Genre".
+
+| Capability | Current | Expansion |
+|-----------|---------|-----------|
+| **TTS (Text-to-Speech)** | ❌ None | Generate dialogue via ElevenLabs with character voice profiles |
+| **SFX Generation** | ✅ Basic | AI generation of sound effects (footsteps, explosions, ambiance) |
+| **Music Generation** | ❌ None | AI background score based on mood/genre (Suno, MusicGen) |
+| **Voice Cloning** | ❌ None | Clone user's voice for consistent narration |
+
+### Node 3.3: 3D Assets
+
+| Capability | Current | Expansion |
+|-----------|---------|-----------|
+| **3D Generation** | ❌ None | Rodin, Luma, Meshy integration |
+| **Puppet Animation** | ❌ None | Skeletal rigs with pose library |
+| **Camera Rigs** | ❌ None | Dolly, crane, handheld simulation → recorded camera paths |
+
+---
 
 ## Phase 4: Post-Production (Assembly)
 
 **Goal:** Combine assets into the final piece.
 
 ### Node 4.1: The Timeline
-*   **Current State:** Basic visual timeline.
-*   **Expansion Options:**
-    *   **Multi-Track Editing:** Dedicated tracks for Video, Dialogue, SFX, Music.
-    *   **Transitions:** AI-generated transitions between clips.
-    *   **Auto-Edit:** "Magic Cut" feature that syncs cuts to the beat of the music.
+
+| Capability | Current | Expansion |
+|-----------|---------|-----------|
+| **Multi-Track Editing** | ⚠️ UI only | Real playback engine (ffmpeg.wasm) |
+| **Transitions** | ❌ None | Cross-fade, dissolve, wipe, push, L-cut, J-cut |
+| **Auto-Edit** | ❌ None | "Magic Cut" — sync cuts to music beat |
+| **Color Grading** | ❌ None | LUT application, curves, levels, white balance |
+| **Text/Captions** | ❌ None | Auto-generated captions (whisper.cpp), styling |
+| **Audio Mixing** | ❌ None | Per-track volume, pan, EQ, compression |
 
 ### Node 4.2: The Canvas (Non-Linear)
-*   **Current State:** Node graph.
-*   **Expansion Options:**
-    *   **Interactive Logic:** For "Game" or "Interactive Story" project types, allow branching logic nodes.
+
+| Capability | Current | Expansion |
+|-----------|---------|-----------|
+| **Node Graph** | ✅ 7 types | Expand to 30+ node types (see `Structure.md` module catalog) |
+| **Interactive Logic** | ❌ None | Branching logic nodes for interactive stories/games |
+| **Group Nesting** | ❌ None | Nested groups with independent canvases |
+| **Connection Dots** | ❌ None | Visual linking between assets via drag-from-dot |
+
+---
 
 ## Phase 5: Distribution
 
 **Goal:** Export and share.
 
 ### Node 5.1: Export
-*   **Current State:** Basic.
-*   **Expansion Options:**
-    *   **Format Presets:** "Export for Instagram Reels", "Export for YouTube 4K".
-    *   **Metadata Embedding:** Embed the prompt/generation data into the final video file for provenance.
+
+| Capability | Current | Expansion |
+|-----------|---------|-----------|
+| **Format Presets** | ✅ 10 profiles | Add more: TikTok (specific bitrates), Instagram Story, YouTube Shorts, LinkedIn |
+| **Metadata Embedding** | ❌ None | Embed prompt, seed, model, and provenance in EXIF/XMP of exported files |
+| **Batch Export** | ❌ None | Export all variants of a project at once |
+
+### Node 5.2: Publishing
+
+| Platform | Current | Expansion |
+|----------|---------|-----------|
+| **TikTok** | ⬜ Stub | Direct API posting with caption, hashtags, schedule |
+| **Instagram** | ⬜ Stub | Reels + Feed + Stories, carousel posts |
+| **YouTube** | ⬜ Stub | Upload + title/description/tags/thumbnail/schedule |
+| **Twitter/X** | ⬜ Stub | Post with media attachment |
+| **LinkedIn** | ⬜ Stub | Video post + article |
+| **Analytics** | ❌ None | Views, likes, shares, comments aggregated per platform |
 
 ---
 
-## Immediate Action Plan (Next Steps)
+## Phase 6: Filter System (Homepage + Explorer)
 
-1.  **Upgrade Data Model:** Add `type` (Project Type) and `aspectRatio` to the Project schema.
-2.  **Enhance UI:** Add a "Project Type" selector to the Create/Edit modal.
-3.  **Implement Character Profiles:** Create a structured way to store character details beyond a simple string.
+### Multi-Dimensional Filters
+
+| Dimension | Options |
+|-----------|---------|
+| **Media Type** | Video, Short, Feature Film, Comic, Storyboard, Script, Audio Drama |
+| **Status** | Active (editing), Ready (published), Generating, Archived, Failed |
+| **Platform** | TikTok, Instagram, YouTube, Twitter/X, LinkedIn, Custom |
+| **Source** | AI Generated, Manual/Imported, Remixed, External URL |
+| **Date** | Custom range picker (from → to) |
+| **Sort** | Most Recent, Alphabetical, Largest (asset count), Most Published |
+| **Search** | Free-text search across name, tags, synopsis |
+
+### Filter UI
+- Chip-based active filter display (each filter is a removable chip)
+- Dropdown for adding filter dimensions
+- Results update in real-time via `useDeferredValue`
+- Clear All button to reset
+
+---
+
+## Immediate Action Plan
+
+1. **Add Project Type field** to project schema (enum: video, short, film, comic, storyboard, script, audio_drama)
+2. **Add Character Database** — structured character profiles beyond single string
+3. **Implement faceted filter UI** on homepage
+4. **Expand project card** with media badges, status, expandable detail panel
+5. **Add aspect ratio** as first-class project property

@@ -3,9 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
   Settings,
-  ImagePlus,
   Wand2,
-  Layers,
   Film,
   Save,
   Loader2,
@@ -35,9 +33,7 @@ interface TopBarProps {
 }
 
 const modes: { id: WorkspaceMode; label: string; icon: React.ReactNode }[] = [
-  { id: 'create', label: 'Create', icon: <ImagePlus size={16} /> },
-  { id: 'rework', label: 'Rework', icon: <Wand2 size={16} /> },
-  { id: 'composite', label: 'Composite', icon: <Layers size={16} /> },
+  { id: 'creation', label: 'Creation', icon: <Wand2 size={16} /> },
   { id: 'timeline', label: 'Timeline', icon: <Film size={16} /> },
 ];
 
@@ -171,20 +167,17 @@ export const TopBar: React.FC<TopBarProps> = ({
   const handleModeClick = (modeId: WorkspaceMode) => {
     onModeChange(modeId);
     
-    if (modeId === 'create') {
+    if (modeId === 'creation') {
       const { addNode } = useNodeStore.getState();
       const { viewport } = useCanvasStore.getState();
       
-      // Calculate center of viewport
-      // We use window dimensions as a proxy for canvas size since we don't have ref here
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
-      
-      const x = (cx - viewport.x) / viewport.zoom - 130; // Center horizontally (node width ~260)
-      const y = (cy - viewport.y) / viewport.zoom - 100; // Center vertically
+      const x = (cx - viewport.x) / viewport.zoom - 130;
+      const y = (cy - viewport.y) / viewport.zoom - 100;
       
       addNode('prompt', x, y);
-      log('canvas_add', 'Added prompt node via Create button');
+      log('canvas_add', 'Added prompt node via Creation button');
     }
   };
 

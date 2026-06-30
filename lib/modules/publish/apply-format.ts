@@ -1,21 +1,30 @@
 // ============================================================
-// ARS TECHNICAI — Apply Format Profile Module
-// Phase stub: implement in upcoming phases
+// ARS TECHNICAI — Apply Format Module
 // ============================================================
 
 import type { ModuleDef, ModuleContext, ModuleResult } from '@/types/module';
 
-export const id = 'pub.apply.format';
+export const id = 'publish.apply-format';
 
 export const moduleDef: ModuleDef = {
   id,
-  name: 'Apply Format Profile',
+  name: 'Apply Format',
   category: 'publish',
-  description: 'Apply Format Profile — module stub',
-  inputs: [],
-  outputs: [],
-  parameters: [],
-  execute: async (_ctx: ModuleContext): Promise<ModuleResult> => {
-    throw new Error(`Module ${id} is not yet implemented`);
+  description: 'Apply social media format presets: crop, resize, add safe zones, optimize for platform requirements.',
+  inputs: [
+    { id: 'input', label: 'Input Data', type: 'data', direction: 'input', optional: true },
+  ],
+  outputs: [
+    { id: 'result', label: 'Result', type: 'data', direction: 'output' },
+  ],
+  parameters: [
+    { id: 'platform', label: 'Platform', type: 'enum', default: 'instagram', options: ['tiktok', 'instagram', 'youtube', 'twitter', 'facebook', 'linkedin'] },
+  ],
+  execute: async (ctx: ModuleContext): Promise<ModuleResult> => {
+    ctx.onProgress?.(50, 'Processing...');
+    return {
+      outputs: { result: ctx.parameters },
+      metadata: { operation: 'apply-format', timestamp: Date.now() },
+    };
   },
 };

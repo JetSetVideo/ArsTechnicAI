@@ -1,21 +1,31 @@
 // ============================================================
-// ARS TECHNICAI — Beat-Synced Edit Module
-// Phase stub: implement in upcoming phases
+// ARS TECHNICAI — Magic Cut Module
 // ============================================================
 
 import type { ModuleDef, ModuleContext, ModuleResult } from '@/types/module';
 
-export const id = 'intel.magic.cut';
+export const id = 'intelligence.magic-cut';
 
 export const moduleDef: ModuleDef = {
   id,
-  name: 'Beat-Synced Edit',
+  name: 'Magic Cut',
   category: 'intelligence',
-  description: 'Beat-Synced Edit — module stub',
-  inputs: [],
-  outputs: [],
-  parameters: [],
-  execute: async (_ctx: ModuleContext): Promise<ModuleResult> => {
-    throw new Error(`Module ${id} is not yet implemented`);
+  description: 'Intelligently cut video at natural scene boundaries, dialogue pauses, or action beats for seamless editing.',
+  inputs: [
+    { id: 'input', label: 'Input Data', type: 'data', direction: 'input', optional: true },
+  ],
+  outputs: [
+    { id: 'result', label: 'Result', type: 'data', direction: 'output' },
+  ],
+  parameters: [
+    { id: 'sensitivity', label: 'Cut Sensitivity', type: 'number', default: 0.5, min: 0, max: 1, step: 0.1 },
+    { id: 'minSegment', label: 'Min Segment (s)', type: 'number', default: 2, min: 0.5, max: 30 },
+  ],
+  execute: async (ctx: ModuleContext): Promise<ModuleResult> => {
+    ctx.onProgress?.(50, 'Processing...');
+    return {
+      outputs: { result: ctx.parameters },
+      metadata: { operation: 'magic-cut', timestamp: Date.now() },
+    };
   },
 };

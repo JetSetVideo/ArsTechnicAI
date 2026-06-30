@@ -31,6 +31,8 @@ function schedulePersist() {
   }, DEBOUNCE_MS);
 }
 
+export type CanvasNavTool = 'pointer' | 'lasso' | 'hand';
+
 interface CanvasState {
   items: CanvasItem[];
   selectedIds: string[];
@@ -38,6 +40,8 @@ interface CanvasState {
   clipboard: CanvasItem[];
   past: CanvasItem[][];
   future: CanvasItem[][];
+  activeTool: CanvasNavTool;
+  setCanvasTool: (tool: CanvasNavTool) => void;
 
   // Item operations
   addItem: (item: Omit<CanvasItem, 'id' | 'createdAt' | 'zIndex'>) => CanvasItem;
@@ -67,6 +71,14 @@ interface CanvasState {
   copy: () => void;
   paste: (offsetX?: number, offsetY?: number) => void;
 
+  // Group operations
+  groupItems: (itemIds: string[]) => string;
+  ungroupItems: (groupId: string) => void;
+  addItemToGroup: (itemId: string, groupId: string) => void;
+  removeItemFromGroup: (itemId: string) => void;
+  setGroupOrbit: (groupId: string, orbit: boolean) => void;
+  getGroupItems: (groupId: string) => CanvasItem[];
+
   // Clear
   clearCanvas: () => void;
   /** Full reset: items, selection, history, clipboard, viewport (e.g. project switch). */
@@ -87,6 +99,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   clipboard: [],
   past: [],
   future: [],
+  activeTool: 'pointer',
+  setCanvasTool: (tool) => set({ activeTool: tool }),
 
   snapshot: () => {
     const { items, past } = get();
@@ -298,6 +312,60 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       newIds.push(newItem.id);
     });
     set({ selectedIds: newIds });
+  },
+
+  groupItems: (itemIds) => {
+    const groupId = uuidv4();
+    get().snapshot();
+    set((state) => ({
+      items: state.items.map((i) =>
+        itemIds.includes(i.id) ? { ...i, groupId } : i
+      ),
+    }));
+    schedulePersist();
+    return groupId;
+  },
+
+  ungroupItems: (groupId) => {
+    get().snapshot();
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.groupId === groupId ? { ...i, groupId: undefined, groupOrbit: undefined } : i
+      ),
+    }));
+    schedulePersist();
+  },
+
+  addItemToGroup: (itemId, groupId) => {
+    get().snapshot();
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.id === itemId ? { ...i, groupId } : i
+      ),
+    }));
+    schedulePersist();
+  },
+
+  removeItemFromGroup: (itemId) => {
+    get().snapshot();
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.id === itemId ? { ...i, groupId: undefined, groupOrbit: undefined } : i
+      ),
+    }));
+    schedulePersist();
+  },
+
+  setGroupOrbit: (groupId, orbit) => {
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.groupId === groupId ? { ...i, groupOrbit: orbit } : i
+      ),
+    }));
+  },
+
+  getGroupItems: (groupId) => {
+    return get().items.filter((i) => i.groupId === groupId);
   },
 
   clearCanvas: () => {

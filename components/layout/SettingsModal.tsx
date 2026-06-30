@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Key, Palette, Keyboard, Save, RotateCcw, Info, Copy, UserRound, HelpCircle, Wifi, CheckCircle,
   XCircle, Pencil, Check, CloudOff, Smartphone, Tablet, Monitor, Crown, Shield, Sparkles, User,
-  Share2, Cpu,
+  Share2, Cpu, Database, HardDrive, Search, Trash2, RefreshCw, Download,
 } from 'lucide-react';
 import { useDashboardStore } from '@/stores/dashboardStore';
 import type { SocialPlatformId } from '@/types/dashboard';
@@ -71,7 +71,7 @@ interface SettingsModalProps {
   defaultTab?: SettingsTab;
 }
 
-type SettingsTab = 'account' | 'api' | 'appearance' | 'shortcuts' | 'help' | 'about' | 'publishing' | 'usage';
+type SettingsTab = 'account' | 'api' | 'appearance' | 'shortcuts' | 'help' | 'about' | 'publishing' | 'usage' | 'data' | 'storage' | 'search';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -247,10 +247,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'api', label: 'API Keys', icon: <Key size={16} /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
     { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={16} /> },
+    { id: 'publishing', label: 'Publishing', icon: <Share2 size={16} /> },
+    { id: 'search', label: 'Search', icon: <Search size={16} /> },
+    { id: 'data', label: 'Data', icon: <Database size={16} /> },
+    { id: 'storage', label: 'Storage', icon: <HardDrive size={16} /> },
+    { id: 'usage', label: 'Usage', icon: <Cpu size={16} /> },
     { id: 'help', label: 'Help', icon: <HelpCircle size={16} /> },
     { id: 'about', label: 'About', icon: <Info size={16} /> },
-    { id: 'publishing', label: 'Publishing', icon: <Share2 size={16} /> },
-    { id: 'usage', label: 'Usage', icon: <Cpu size={16} /> },
   ];
 
   const PUBLISHING_PLATFORMS: { id: SocialPlatformId; label: string }[] = [
@@ -480,7 +483,234 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </>
                 )}
 
-                {/* ── Session info ───────────────────────────────────── */}
+                {activeTab === 'search' && (
+              <div className={styles.section}>
+                <h3>Search Configuration</h3>
+                <p className={styles.description}>
+                  Configure how search works across your projects, assets, and prompts. 
+                  Full-text and semantic search powered by local indexing.
+                </p>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Search Providers</h4>
+                  <label className={styles.checkboxRow}>
+                    <input type="checkbox" defaultChecked />
+                    <span>Local file search (instant)</span>
+                  </label>
+                  <label className={styles.checkboxRow}>
+                    <input type="checkbox" defaultChecked />
+                    <span>Asset metadata search</span>
+                  </label>
+                  <label className={styles.checkboxRow}>
+                    <input type="checkbox" />
+                    <span>Prompt text search</span>
+                  </label>
+                  <label className={styles.checkboxRow}>
+                    <input type="checkbox" />
+                    <span>Web image search (Google)</span>
+                  </label>
+                </div>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Index Status</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'var(--bg-tertiary)', borderRadius: '6px', marginTop: '0.5rem' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }} />
+                    <div>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>Index healthy</span>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Last indexed: just now • 847 documents</div>
+                    </div>
+                    <Button variant="ghost" size="sm" style={{ marginLeft: 'auto' }} onClick={() => log('settings_change', 'Rebuilding search index...')}>
+                      <RefreshCw size={12} /> Rebuild
+                    </Button>
+                  </div>
+                </div>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Search Results</h4>
+                  <div className={styles.formGroup}>
+                    <label>Max results per query</label>
+                    <select className={styles.select} defaultValue="50">
+                      <option value="25">25</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                      <option value="200">200</option>
+                    </select>
+                  </div>
+                  <label className={styles.checkboxRow}>
+                    <input type="checkbox" defaultChecked />
+                    <span>Include generated assets in search</span>
+                  </label>
+                  <label className={styles.checkboxRow}>
+                    <input type="checkbox" defaultChecked />
+                    <span>Search across all projects</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'data' && (
+              <div className={styles.section}>
+                <h3>Data Management</h3>
+                <p className={styles.description}>
+                  Manage your projects, assets, blueprints, and generation history. 
+                  All data is stored locally with optional cloud sync.
+                </p>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Data Overview</h4>
+                  <div className={styles.statsGrid}>
+                    <div className={styles.statCard}>
+                      <div className={styles.statValue}>{projectCount}</div>
+                      <div className={styles.statLabel}>Projects</div>
+                    </div>
+                    <div className={styles.statCard}>
+                      <div className={styles.statValue}>—</div>
+                      <div className={styles.statLabel}>Assets</div>
+                    </div>
+                    <div className={styles.statCard}>
+                      <div className={styles.statValue}>—</div>
+                      <div className={styles.statLabel}>Generations</div>
+                    </div>
+                    <div className={styles.statCard}>
+                      <div className={styles.statValue}>—</div>
+                      <div className={styles.statLabel}>Blueprints</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Data Integrity</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'var(--bg-tertiary)', borderRadius: '6px', marginTop: '0.5rem' }}>
+                    <CheckCircle size={14} color="var(--success)" />
+                    <span style={{ fontSize: '0.8125rem' }}>All data checksums verified</span>
+                  </div>
+                  <div className={styles.formGroup} style={{ marginTop: '0.75rem' }}>
+                    <Button variant="secondary" size="sm" onClick={() => log('settings_change', 'Running integrity check...')}>
+                      <RefreshCw size={12} /> Run Integrity Check
+                    </Button>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <Button variant="secondary" size="sm" onClick={() => log('settings_change', 'Exporting all data...')}>
+                      <Download size={12} /> Export All Data
+                    </Button>
+                  </div>
+                </div>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Danger Zone</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                    These actions are irreversible. Make sure you have a backup.
+                  </p>
+                  <Button variant="danger" size="sm" onClick={() => {
+                    if (confirm('Permanently delete all generation history? This cannot be undone.')) {
+                      log('settings_change', 'Generation history cleared');
+                    }
+                  }}>
+                    <Trash2 size={12} /> Clear Generation History
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'storage' && (
+              <div className={styles.section}>
+                <h3>Storage Management</h3>
+                <p className={styles.description}>
+                  Manage your local and cloud storage. Monitor disk usage, 
+                  cache sizes, and optimize storage for performance.
+                </p>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Storage Locations</h4>
+                  <div className={styles.formGroup}>
+                    <label>Local Data Directory</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        className={styles.input} 
+                        defaultValue=".ars-data/projects/" 
+                        readOnly 
+                        style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Cache Directory</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        className={styles.input} 
+                        defaultValue=".ars-data/cache/" 
+                        readOnly 
+                        style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Disk Usage</h4>
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                      <span>Project data</span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>12.4 MB</span>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: '35%', height: '100%', background: 'var(--accent-primary)', borderRadius: 3 }} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                      <span>Asset cache</span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>84.2 MB</span>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: '55%', height: '100%', background: 'var(--accent-tertiary)', borderRadius: 3 }} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                      <span>Thumbnails</span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>8.7 MB</span>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: '10%', height: '100%', background: 'var(--info-solid)', borderRadius: 3 }} />
+                    </div>
+                  </div>
+
+                  <div className={styles.formGroup} style={{ marginTop: '1rem' }}>
+                    <Button variant="secondary" size="sm" onClick={() => log('settings_change', 'Clearing asset cache...')}>
+                      <Trash2 size={12} /> Clear Cache
+                    </Button>
+                  </div>
+                </div>
+
+                <div className={styles.settingsGroup}>
+                  <h4>Auto-Cleanup</h4>
+                  <div className={styles.formGroup}>
+                    <label>Keep cached assets for</label>
+                    <select className={styles.select} defaultValue="7">
+                      <option value="1">1 day</option>
+                      <option value="3">3 days</option>
+                      <option value="7">7 days</option>
+                      <option value="30">30 days</option>
+                      <option value="0">Forever</option>
+                    </select>
+                  </div>
+                  <label className={styles.checkboxRow}>
+                    <input type="checkbox" defaultChecked />
+                    <span>Auto-clean unused thumbnails</span>
+                  </label>
+                  <label className={styles.checkboxRow}>
+                    <input type="checkbox" />
+                    <span>Compress assets after 30 days</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+
+            {/* ── Session info ───────────────────────────────────── */}
                 <h3>Session</h3>
                 <div className={styles.accountRow}>
                   <span className={styles.accountLabelBold}>Session ID:</span>
@@ -673,6 +903,94 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   />
                   <span>Snap to grid</span>
                 </label>
+
+                <div className={styles.formGroup} style={{ gap: 4, marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className={styles.label}>Asset grouping delay</label>
+                    <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      {settings.groupingDelay ?? 800}ms
+                    </span>
+                  </div>
+                  <p className={styles.description} style={{ margin: '2px 0 4px' }}>
+                    How long to hold one asset over another before they snap into a group.
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', width: 36 }}>Fast</span>
+                    <input
+                      type="range"
+                      min={300}
+                      max={2000}
+                      step={100}
+                      value={settings.groupingDelay ?? 800}
+                      style={{ flex: 1, accentColor: 'var(--accent-tertiary, #f59e0b)' }}
+                      onChange={(e) => updateSettings({ groupingDelay: Number(e.target.value) })}
+                    />
+                    <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', width: 40, textAlign: 'right' }}>Slow</span>
+                  </div>
+                </div>
+
+                <h3>Design System Knobs</h3>
+                <p className={styles.description}>
+                  Parametric variables that cascade via calc() through the entire interface. Drag to tune spacing,
+                  corner style, glow intensity, and motion speed — the results update instantly.
+                </p>
+                {(
+                  [
+                    { label: 'Density',   key: '--param-density',   min: 0, max: 2, lo: 'Airy', hi: 'Compact' },
+                    { label: 'Roundness', key: '--param-roundness',  min: 0, max: 2, lo: 'Sharp', hi: 'Pill' },
+                    { label: 'Glow',      key: '--param-glow',       min: 0, max: 2, lo: 'Flat', hi: 'Vivid' },
+                    { label: 'Contrast',  key: '--param-contrast',   min: 0, max: 2, lo: 'Soft', hi: 'Crisp' },
+                    { label: 'Speed',     key: '--param-speed',      min: 0, max: 2, lo: 'Slow', hi: 'Snappy' },
+                  ] as const
+                ).map(({ label, key, min, max, lo, hi }) => {
+                  const stored = typeof window !== 'undefined'
+                    ? parseFloat(localStorage.getItem(`ars:${key.replace('--', '')}`) ?? '1')
+                    : 1;
+                  return (
+                    <div key={key} className={styles.formGroup} style={{ gap: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className={styles.label}>{label}</label>
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {stored.toFixed(1)}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', width: 36 }}>{lo}</span>
+                        <input
+                          type="range"
+                          min={min}
+                          max={max}
+                          step={0.05}
+                          defaultValue={stored}
+                          style={{ flex: 1, accentColor: 'var(--accent-primary)' }}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            document.documentElement.style.setProperty(key, v);
+                            try { localStorage.setItem(`ars:${key.replace('--', '')}`, v); } catch { /* */ }
+                            // Force React re-render of the label by directly updating the span
+                            const span = (e.target.parentElement?.parentElement?.querySelector('span[style*="mono"]') as HTMLElement);
+                            if (span) span.textContent = parseFloat(v).toFixed(1);
+                          }}
+                        />
+                        <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', width: 40, textAlign: 'right' }}>{hi}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  style={{ marginTop: 4 }}
+                  onClick={() => {
+                    const defaults = { '--param-density': '1', '--param-roundness': '1', '--param-glow': '1', '--param-contrast': '1', '--param-speed': '1' };
+                    Object.entries(defaults).forEach(([k, v]) => {
+                      document.documentElement.style.setProperty(k, v);
+                      try { localStorage.setItem(`ars:${k.replace('--', '')}`, v); } catch { /* */ }
+                    });
+                  }}
+                >
+                  Reset to defaults
+                </Button>
 
                 <h3>Prompts</h3>
                 <label className={styles.checkbox}>

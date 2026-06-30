@@ -63,6 +63,7 @@ const defaultSettings: AppSettings = {
   snapToGrid: false,
   gridSize: 20,
   recentPaths: [],
+  groupingDelay: 800,
 };
 
 // Font scale values for each size option

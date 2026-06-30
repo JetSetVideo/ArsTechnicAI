@@ -9,11 +9,20 @@ const AppShell = dynamic(
   { ssr: false }
 );
 
+// Platform → dimensions map for quick-create
+const PLATFORM_DIMS: Record<string, { width: number; height: number }> = {
+  tiktok:    { width: 1080, height: 1920 },
+  instagram: { width: 1080, height: 1080 },
+  youtube:   { width: 1920, height: 1080 },
+  twitter:   { width: 1280, height: 720  },
+};
+
 const ProjectLoader = dynamic(
   () =>
     Promise.resolve(function ProjectLoaderInner() {
       const router = useRouter();
       const projectId = router.query.id as string | undefined;
+      const isQuickCreate = router.query.quickcreate === '1';
       const [loaded, setLoaded] = useState(false);
 
       useEffect(() => {
@@ -26,6 +35,63 @@ const ProjectLoader = dynamic(
         const { useProjectStore } = require('@/stores/projectStore');
 
         const dashProject = useProjectsStore.getState().getProject(projectId);
+
+        const afterLoad = () => {
+          setLoaded(true);
+          if (isQuickCreate) {
+            try {
+              const raw = localStorage.getItem('ars:quick-create');
+              if (raw) {
+                const qc = JSON.parse(raw) as {
+                  prompt?: string; style?: string; platform?: string;
+                  imageCount?: number; projectId?: string; createdAt?: number;
+                  prefillDataUrl?: string;
+                };
+                // Only apply if created recently (< 5 min old)
+                if (qc.createdAt && Date.now() - qc.createdAt < 5 * 60 * 1000 && qc.projectId === projectId) {
+                  const { useGenerationStore } = require('@/stores/generationStore');
+                  const gs = useGenerationStore.getState();
+                  if (qc.prompt) gs.setPrompt(qc.prompt);
+                  const dims = PLATFORM_DIMS[qc.platform ?? ''];
+                  if (dims) gs.setDimensions(dims.width, dims.height);
+                  
+                  // If a pre-generated image URL is provided, add it to canvas immediately
+                  if (qc.prefillDataUrl) {
+                    const { useCanvasStore } = require('@/stores/canvasStore');
+                    const { v4: uuidv4 } = require('uuid');
+                    const cs = useCanvasStore.getState();
+                    const genId = uuidv4();
+                    const now = Date.now();
+                    const genWidth = dims?.width || 1024;
+                    const genHeight = dims?.height || 1024;
+                    cs.addItem({
+                      type: 'generated',
+                      x: 150, y: 150,
+                      width: genWidth, height: genHeight,
+                      rotation: 0, scale: 0.5,
+                      locked: false, visible: true,
+                      src: qc.prefillDataUrl,
+                      prompt: qc.prompt || '',
+                      name: `generated-${genId.slice(0, 8)}.png`,
+                      generationMeta: {
+                        prompt: qc.prompt || '',
+                        model: 'pre-generated',
+                        seed: Math.floor(Math.random() * 1000000),
+                        width: genWidth, height: genHeight,
+                        generatedAt: now,
+                        imageVersion: 1,
+                        variations: [],
+                      },
+                    });
+                  } else {
+                    gs.setPendingAutoGenerate(true);
+                  }
+                  localStorage.removeItem('ars:quick-create');
+                }
+              }
+            } catch { /* localStorage unavailable */ }
+          }
+        };
 
         if (dashProject) {
           const userState = useUserStore.getState();
@@ -41,7 +107,7 @@ const ProjectLoader = dynamic(
             });
             useFileStore.getState().switchToProject(dashProject.name, dashProject.id);
           }
-          loadProjectWorkspaceState(projectId, dashProject.name).then(() => setLoaded(true));
+          loadProjectWorkspaceState(projectId, dashProject.name).then(afterLoad);
         } else {
           // Project not in local store — fetch from DB
           (async () => {
@@ -67,13 +133,13 @@ const ProjectLoader = dynamic(
               useFileStore.getState().switchToProject(name, projectId);
 
               await loadProjectWorkspaceState(projectId, name);
-              setLoaded(true);
+              afterLoad();
             } catch {
               router.replace('/');
             }
           })();
         }
-      }, [projectId, loaded, router]);
+      }, [projectId, loaded, router, isQuickCreate]);
 
       return null;
     }),

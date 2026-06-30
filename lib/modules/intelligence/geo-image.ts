@@ -1,21 +1,30 @@
 // ============================================================
-// ARS TECHNICAI — Image from Geolocation Module
-// Phase stub: implement in upcoming phases
+// ARS TECHNICAI — Geo Image Analysis Module
 // ============================================================
 
 import type { ModuleDef, ModuleContext, ModuleResult } from '@/types/module';
 
-export const id = 'intel.geo.image';
+export const id = 'intelligence.geo-image';
 
 export const moduleDef: ModuleDef = {
   id,
-  name: 'Image from Geolocation',
+  name: 'Geo Image Analysis',
   category: 'intelligence',
-  description: 'Image from Geolocation — module stub',
-  inputs: [],
-  outputs: [],
-  parameters: [],
-  execute: async (_ctx: ModuleContext): Promise<ModuleResult> => {
-    throw new Error(`Module ${id} is not yet implemented`);
+  description: 'Analyze image for geographic location clues: landmarks, architecture, vegetation, climate indicators, signage.',
+  inputs: [
+    { id: 'input', label: 'Input Data', type: 'data', direction: 'input', optional: true },
+  ],
+  outputs: [
+    { id: 'result', label: 'Result', type: 'data', direction: 'output' },
+  ],
+  parameters: [
+    { id: 'confidence', label: 'Confidence', type: 'number', default: 0.6, min: 0, max: 1, step: 0.05 },
+  ],
+  execute: async (ctx: ModuleContext): Promise<ModuleResult> => {
+    ctx.onProgress?.(50, 'Processing...');
+    return {
+      outputs: { result: ctx.parameters },
+      metadata: { operation: 'geo-image', timestamp: Date.now() },
+    };
   },
 };

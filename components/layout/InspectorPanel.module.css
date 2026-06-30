@@ -77,6 +77,12 @@
   background: var(--accent-primary);
 }
 
+.tabBar .toggleButton {
+  align-self: center;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
 /* ── Tab content wrapper ────────────────────────────────── */
 .tabContent {
   flex: 1;
