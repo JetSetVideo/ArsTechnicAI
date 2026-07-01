@@ -135,83 +135,80 @@ app-shell-layout-root                                          ← CSS Grid: top
 
 ### 2.2 Homepage (Dashboard)
 
+Information hierarchy: projects first, quick-create hero at the bottom (compact by default).
+
 ```
-dashboard-layout-root-page-region                              ← flex column, min-height: 100vh
+dashboard-layout-root-page-region                                ← flex column, 100vh
 │
-├── connection-banner-status-at-startup                        ← Fixed top, ephemeral
+├── connection-banner-status-at-startup                          ← Fixed top, ephemeral
 │
-├── dashboard-layout-header-primary-at-top                      ← 44px, flex row
-│   ├── brand-logo (Ars TechnicAI)                            ← Serif italic + mono + gradient
-│   ├── search-box-global                                      ← flex: 1, max 560px
+├── dashboard-layout-header-primary-at-top                       ← 44px, flex row
+│   ├── brand-logo (Ars TechnicAI)                              ← Serif italic + mono + gradient
+│   ├── search-box-global                                        ← flex: 1, max 560px
 │   │   ├── search-icon-magnifier
-│   │   └── search-input-text
-│   └── avatar-button-account-settings                         ← 26px circle, status ring
+│   │   └── search-input-text (searches projects + assets + tags + synopsis)
+│   └── avatar-button-account-settings                           ← 28px circle, status ring
 │
-├── creation-hero-section-main                                 ← Gradient bg, collapsible
-│   ├── platform-selector-row                                  ← Platform chips
-│   │   ├── platform-label-text ("Target platform")
-│   │   └── platform-tab-chips
-│   │       └── platform-tab-chip (×4: TikTok, IG, YT, X)
-│   │           ├── platform-tab-icon
-│   │           ├── platform-tab-label
-│   │           └── platform-tab-ratio-badge
+├── app-shell-workspace-region                                    ← flex row
+│   ├── home-left-panel-file-tree                                ← Collapsible, 240px
+│   ├── home-left-toolbar-actions                                ← Icon rail, 40px
 │   │
-│   ├── prompt-input-group-flex
-│   │   ├── prompt-textarea-multiline
-│   │   └── generate-button-primary-gradient
-│   │       └── sparkles-icon + "Generate"
-│   │
-│   ├── prompt-controls-row
-│   │   ├── style-picker-dropdown
-│   │   │   └── style-option-item (×10 styles)
-│   │   ├── image-count-selector
-│   │   │   └── count-button (×4: 1, 2, 4, 8)
-│   │   └── pipeline-visualizer
-│   │       ├── pipeline-step-prompt (active)
-│   │       ├── pipeline-arrow
-│   │       ├── pipeline-step-images
-│   │       ├── pipeline-arrow
-│   │       ├── pipeline-step-video
-│   │       ├── pipeline-arrow
-│   │       └── pipeline-step-platform
-│   │
-│   └── module-badges-row
-│       └── module-badge (×5: Image Gen, Video Montage, Sound FX, Style Transfer, Auto-Post)
-│
-├── content-filter-bar-secondary                               ← 40px, flex row
-│   ├── tab-nav (Projects | Assets)
-│   │   └── tab-button (×2)
-│   ├── filter-chip-bar
-│   │   ├── filter-chip-type (dropdown: All Types)
-│   │   ├── filter-chip-status (dropdown: All Status)
-│   │   ├── filter-chip-platform (dropdown: All Platforms)
-│   │   ├── filter-chip-source (dropdown: All Sources)
-│   │   └── filter-chip-date (date range picker)
-│   ├── sort-selector (Recent | Alpha | Size)
-│   └── new-project-button-primary
-│
-└── content-grid-main-scrollable                               ← flex: 1, overflow-y: auto
-    └── project-cards-grid-responsive
-        └── project-card-component (×N projects)
-            ├── project-card-thumbnail-cover
-            ├── project-card-header-row
-            │   ├── project-card-name
-            │   └── project-card-platform-badges
-            ├── project-card-meta-row
-            │   ├── project-card-asset-count
-            │   ├── project-card-last-modified
-            │   └── project-card-status-indicator
-            ├── project-card-media-badges
-            │   ├── media-badge-image (count)
-            │   ├── media-badge-video (count)
-            │   ├── media-badge-audio (count)
-            │   └── media-badge-text (count)
-            ├── project-card-expand-toggle
-            └── project-card-expanded-detail (conditional)
-                ├── asset-preview-strip-recent
-                ├── asset-status-list
-                ├── platform-link-badges
-                └── quick-actions-row
+│   └── dashboard-main-content-region                            ← flex column, flex: 1
+│       │
+│       ├── content-filter-bar-secondary                         ← LEVEL 1: Always above fold
+│       │   ├── tab-nav-projects-assets                          ← Projects | Assets
+│       │   │   └── tab-button-role-tablist (×2)
+│       │   └── new-project-button-primary
+│       │
+│       ├── content-grid-main-scrollable                         ← LEVEL 1: Primary content
+│       │   └── project-cards-grid-responsive
+│       │       ├── new-project-card-button
+│       │       └── project-card-component (×N)
+│       │           ├── project-card-thumbnail-cover             ← Full-bleed cover image
+│       │           ├── project-card-toolbar-top                 ← Favorite + Edit + ••• menu
+│       │           │   ├── toolbar-left-actions (favorite, edit)
+│       │           │   └── toolbar-right-actions (menu)
+│       │           └── project-card-info-overlay-bottom
+│       │               ├── project-card-name-row               ← Name + path prefix + drag handle
+│       │               ├── project-card-hierarchy-badges       ← Child-of / Parent-of indicators
+│       │               ├── project-card-media-badges-row       ← 🖼 images · 🎬 videos · 🎵 audio · 📝 text · ✨ AI/import/remix counts
+│       │               ├── project-card-details-chips          ← type, aspect ratio, genre, style
+│       │               ├── project-card-meta-row               ← Calendar date · status dot · asset count button
+│       │               ├── project-card-asset-list-expanded    ← (conditional) thumbnails + type
+│       │               └── project-card-tags-row               ← Tag chips
+│       │
+│       ├── generation-results-strip                             ← LEVEL 2: Appears when results exist
+│       │   └── gen-results-grid-scrollable
+│       │       └── gen-result-card (×N)
+│       │           ├── gen-result-image
+│       │           └── gen-result-overlay-actions (Edit · Save)
+│       │
+│       └── creation-hero-section-main                           ← LEVEL 3+4: Compact at bottom
+│           │
+│           ├── pipeline-visualizer-steps-row                    ← LEVEL 3: Pipeline step dots
+│           │   └── pipeline-step (×7: Script·MoodBoard·Prompts·Generate·Storyboard·Timeline·Publish)
+│           │       ├── pipeline-dot (filled=done, empty=pending)
+│           │       └── pipeline-label
+│           │
+│           ├── prompt-input-group-flex                          ← LEVEL 3: Compact prompt strip
+│           │   ├── prompt-compact-row
+│           │   │   ├── platform-tabs-compact (icon chips, vertical)
+│           │   │   ├── prompt-textarea-multiline
+│           │   │   └── prompt-compact-actions
+│           │   │       ├── style-picker-dropdown
+│           │   │       ├── image-count-selector-compact (×1, ×2, ×4)
+│           │   │       ├── generate-button-primary-gradient
+│           │   │       └── hero-expand-button (▲/▼ chevron)
+│           │   └── dim-hint-label (WxH · Style)
+│           │
+│           └── creation-hero-advanced-panel                     ← LEVEL 4: Hidden by default
+│               ├── negative-prompt-input-row
+│               ├── platform-selector-row-full (with Custom dims)
+│               ├── cinematic-controls-section (Composition · Lighting · Camera · Ratios)
+│               ├── image-count-selector-row-full
+│               ├── character-creator-section
+│               ├── prompt-templates-section
+│               └── module-badges-row (×7 categories)
 ```
 
 ---
@@ -652,10 +649,38 @@ Disabled:
 
 The Homepage is not a "file listing." It is a **creative mission control center**. A film director, content creator, or social media producer should:
 
-1. **See at a glance** all their active projects, what phase each is in, and what media types they contain
-2. **Quick-create** by selecting a target platform, typing a prompt, and hitting Generate
-3. **Filter intelligently** across multiple dimensions to find the right project
-4. **Expand projects** to see asset details without navigating away
+1. **See projects immediately** — the project grid is the primary content and must be visible above the fold by default
+2. **Filter intelligently** across multiple dimensions to find the right project or asset
+3. **Quick-create** via a compact prompt strip (docked at bottom); expands on demand for full creative tools
+4. **Expand projects** to see asset details, pipeline phase, and published status without navigating away
+
+### 8.2 Information Hierarchy (Critical)
+
+The homepage has four visibility levels, ordered most visible → least visible:
+
+```
+LEVEL 1 — Always above the fold (primary content)
+  ├── Header: brand + global search + account avatar
+  ├── Filter bar: Projects|Assets tabs + filter chips + sort + New Project button
+  └── Project/Asset grid (scrollable)
+
+LEVEL 2 — Visible when generation results exist (between grid and hero)
+  └── Results strip: thumbnail row + Edit in Workshop / Save per image
+
+LEVEL 3 — Compact bar at bottom (always visible, small footprint)
+  ├── Pipeline visualizer: Script → Mood Board → Prompts → Generate → Storyboard → Timeline → Publish
+  └── Quick-create strip: [platforms] [prompt textarea] [style] [×count] [Generate] [expand ▲]
+
+LEVEL 4 — Expanded creative tools (hidden by default, chevron reveals)
+  ├── Negative prompt
+  ├── Platform & dimensions selector (full)
+  ├── Cinematic controls: composition / lighting / camera / aspect ratio
+  ├── Character creator (name, appearance, wardrobe, pose, background)
+  ├── Prompt templates (built-in + create new)
+  └── Module catalog (Generate / Edit / 3D / Intelligence / Assembly / Ingest / Publish)
+```
+
+**Critical rule**: Levels 3 and 4 must never push Level 1 off-screen by default. The hero should default to compact mode.
 
 ### 8.2 Project Card Component (Full Spec)
 
@@ -1328,7 +1353,372 @@ floating-toolbar-group-selection
 
 ---
 
-## 19. Implementation Status Audit
+## 19. Skeleton Screens & Loading States
+
+### 19.1 Skeleton Design Principles
+
+A skeleton screen shows the *shape* of content before it loads, reducing perceived latency and preventing layout shift. Rules:
+1. Match the skeleton geometry exactly to the loaded content (same height, same column count)
+2. Use CSS animation `shimmer` — a repeating gradient that moves left-to-right
+3. Never mix real content and skeletons in the same grid (show ALL skeletons, then ALL real content)
+4. Skeleton duration: show if content hasn't loaded in >150ms (avoid flash for fast connections)
+
+```css
+/* Skeleton shimmer animation */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeletonBase {
+  background: linear-gradient(
+    90deg,
+    var(--bg-3) 25%,
+    var(--bg-4) 50%,
+    var(--bg-3) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer calc(1200ms * var(--param-speed)) ease-in-out infinite;
+  border-radius: var(--r-sm);
+}
+
+/* Respect reduced-motion: freeze the animation */
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBase { animation: none; background: var(--bg-3); }
+}
+```
+
+### 19.2 Skeleton Component Catalog
+
+| Component | When Used | Geometry |
+|-----------|----------|----------|
+| `SkeletonProjectCard` | Project grid loading | 200px tall, full card width, cover + 2 text lines + badge row |
+| `SkeletonAssetCard` | Cloud asset grid loading | 80×80 square + 1 text line |
+| `SkeletonExplorerRow` | Explorer tree loading | 28px height, icon + name line |
+| `SkeletonGeneratedImage` | Generation in-progress | Aspect-ratio box (matches requested dims) with pulsing Sparkles icon |
+| `SkeletonInspectorSection` | Inspector tab loading | Section header + 3 property rows |
+| `SkeletonTimelineClip` | Timeline loading | Clip height for track type |
+
+```tsx
+// components/ui/Skeleton.tsx
+export const SkeletonProjectCard = () => (
+  <div className={styles.skeletonCard}>
+    <div className={`${styles.skeletonBase} ${styles.skeletonCover}`} />
+    <div className={styles.skeletonBody}>
+      <div className={`${styles.skeletonBase} ${styles.skeletonTitle}`} />
+      <div className={`${styles.skeletonBase} ${styles.skeletonSubtitle}`} />
+      <div className={styles.skeletonBadges}>
+        <div className={`${styles.skeletonBase} ${styles.skeletonBadge}`} />
+        <div className={`${styles.skeletonBase} ${styles.skeletonBadge}`} />
+      </div>
+    </div>
+  </div>
+);
+
+export const SkeletonExplorerRow = ({ depth = 0 }: { depth?: number }) => (
+  <div className={styles.skeletonRow} style={{ paddingLeft: `${depth * 12 + 4}px` }}>
+    <div className={`${styles.skeletonBase} ${styles.skeletonIcon}`} />
+    <div className={`${styles.skeletonBase} ${styles.skeletonName}`} />
+  </div>
+);
+
+export const SkeletonGeneratedImage = ({ width, height }: { width: number; height: number }) => (
+  <div className={styles.skeletonGenImage} style={{ aspectRatio: `${width}/${height}` }}>
+    <div className={styles.skeletonBase} style={{ inset: 0, position: 'absolute', borderRadius: 'var(--r-md)' }} />
+    <Sparkles size={24} className={styles.skeletonSpinner} />
+  </div>
+);
+```
+
+---
+
+## 20. Empty State Standardization
+
+### 20.1 Empty State Anatomy
+
+Every panel that can be empty must show a consistent empty state with:
+1. **Icon** — 28-32px, `opacity: 0.3`, relevant to the panel's purpose
+2. **Title** — `--font-sm`, `--fg-1`, describes what's missing
+3. **Body** — `--font-xs`, `--fg-2`, contextual hint on how to populate
+4. **Primary CTA** — (optional) action button to get started
+
+```tsx
+// components/ui/EmptyState.tsx
+interface EmptyStateProps {
+  icon: React.ReactNode;
+  title: string;
+  body?: string;
+  action?: { label: string; onClick: () => void };
+}
+
+export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, body, action }) => (
+  <div id="empty-state-centered-panel" className={styles.emptyState}>
+    <div className={styles.emptyStateIcon}>{icon}</div>
+    <p className={styles.emptyStateTitle}>{title}</p>
+    {body && <p className={styles.emptyStateBody}>{body}</p>}
+    {action && (
+      <button className={styles.emptyStateAction} onClick={action.onClick}>
+        {action.label}
+      </button>
+    )}
+  </div>
+);
+```
+
+### 20.2 Empty State Catalog (Per Panel)
+
+| Panel | Icon | Title | Body | CTA |
+|-------|------|-------|------|-----|
+| Explorer — no files | `Upload` | "No files yet" | "Drag any file here or click Import" | "Import Files" |
+| Explorer — empty folder | `Folder` | "This folder is empty" | "Drag files here to organize them" | — |
+| Canvas — no items | `Layers` | "Your canvas is empty" | "Drag assets from Explorer or generate images from the prompt panel" | "Generate Image" |
+| Timeline — no clips | `Film` | "Add media to the timeline" | "Drag generated images and videos here to sequence them" | — |
+| Inspector — nothing selected | `Palette` | "Select an item to inspect it" | "Click any item on the canvas to see its properties and generation metadata" | — |
+| Cloud — not signed in | `Cloud` | "Sign in to sync assets" | "Your generated images are saved to the cloud and available on all devices" | "Sign In" |
+| Cloud — no assets | `Sparkles` | "No cloud assets yet" | "Generated images appear here automatically" | — |
+| Projects grid — no projects | `FolderOpen` | "No projects yet" | "Create your first project to start building your creative pipeline" | "New Project" |
+| Results strip — no results | — | *(hidden — only shows when results exist)* | — | — |
+| Character DB — no characters | `Users` | "No characters defined" | "Add character profiles to maintain visual consistency across generated images" | "Add Character" |
+
+### 20.3 Empty State CSS
+
+```css
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-2xl) var(--sp-lg);
+  text-align: center;
+  pointer-events: none;  /* allow clicks to pass through to drop target */
+}
+
+.emptyState > button { pointer-events: all; }
+
+.emptyStateIcon { color: var(--fg-2); opacity: 0.3; }
+.emptyStateTitle { font: 500 var(--font-sm)/1.4 var(--font-ui); color: var(--fg-1); margin: 0; }
+.emptyStateBody  { font: 400 var(--font-xs)/1.5 var(--font-ui); color: var(--fg-2); margin: 0; max-width: 200px; }
+
+.emptyStateAction {
+  margin-top: var(--sp-xs);
+  padding: var(--sp-xs) var(--sp-sm);
+  background: var(--bg-3);
+  border: 1px solid var(--b-1);
+  border-radius: var(--r-sm);
+  color: var(--fg-0);
+  font: 500 var(--font-xs)/1 var(--font-ui);
+  cursor: pointer;
+  pointer-events: all;
+}
+.emptyStateAction:hover { background: var(--bg-4); border-color: var(--b-2); }
+```
+
+---
+
+## 21. Color Script Visualization
+
+### 21.1 Concept
+
+A Color Script is the cinematographer's tool for planning the emotional palette journey of a film. Pixar's Lee Unkrich popularized the concept with *Toy Story 3* — the 80-minute arc was planned as a 3-foot scroll of color swatches. In ArsTechnicAI, the Color Script module provides:
+
+1. **Timeline view**: Horizontal strip of scene swatches running in story order
+2. **Arc graph**: Showing how warmth/coolness, saturation, and value change over time
+3. **Feed-forward**: Swatch colors lock into generation prompts automatically
+
+### 21.2 Color Script Data Model
+
+```typescript
+interface ColorScript {
+  id: string;
+  projectId: string;
+  scenes: ColorScriptScene[];
+}
+
+interface ColorScriptScene {
+  sceneId: string;
+  sceneLabel: string;       // "ACT 1: OPENING", "MIDPOINT CRISIS", etc.
+  orderIndex: number;
+  
+  palette: {
+    dominant: string;       // hex — the primary color defining this scene
+    secondary: string;      // hex
+    accent: string;         // hex
+    swatches: string[];     // 3–7 hex colors in the scene's palette
+  };
+  
+  mood: {
+    temperature: 'very cold' | 'cold' | 'neutral' | 'warm' | 'very warm';
+    saturation: 'desaturated' | 'muted' | 'balanced' | 'vivid' | 'hyper-vivid';
+    value: 'dark' | 'mid-dark' | 'mid' | 'mid-bright' | 'bright';
+    emotion: string;        // "dread", "hope", "confusion", "triumph"
+  };
+  
+  // Auto-appended to generation prompts for scenes in this script block
+  promptFragment: string;   // "dim cool blue-grey palette, desaturated, overcast mood"
+  
+  generatedAt?: number;
+  referenceImageId?: string; // Optional: a reference image that captures this palette
+}
+```
+
+### 21.3 Color Script UI
+
+```
+Color Script — Summer Campaign 2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[OPENING]     [ACT 1]        [MIDPOINT]    [DARK NIGHT]  [CLIMAX]    [RESOLUTION]
+  ████           ████           ████           ████         ████          ████
+  ████  → → →   ████  → → →   ████  → → →   ████  → → → ████  → → →  ████
+  ████           ████           ████           ████         ████          ████
+
+ Cool Blue     Warm Gold      Neutral Grey  Near Black    Deep Red      Warm White
+ (hope, dawn)  (adventure)    (uncertainty)  (despair)    (intensity)   (resolution)
+
+Warmth arc:   ──────/──────────\──────────────────────────/──────────────────
+Saturation:   ─────────/─────────────────────────────────────────────────────
+```
+
+### 21.4 Color Arc Metrics
+
+For each scene transition, compute and display:
+- **ΔTemperature**: How many degrees Kelvin the scene shifts (cold → warm = positive)
+- **ΔSaturation**: How much more/less vivid the palette becomes
+- **ΔValue**: Lightness shift (dark to bright, or bright to dark)
+- **Harmony Type**: Complementary, Analogous, Triadic, Split-Complementary, Monochromatic
+
+---
+
+## 22. First-Run Onboarding Specification
+
+### 22.1 Trigger Conditions
+
+Show the onboarding overlay when ALL of the following are true:
+- `userStore.sessionCount === 1` (first session ever)
+- `fileStore.rootNodes.length === 0` (no files imported)
+- `canvasStore.items.length === 0` (canvas is empty)
+- `generationStore.generatedImages.length === 0` (nothing generated)
+
+### 22.2 Overlay Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│   Welcome to Ars TechnicAI                                       │
+│   ────────────────────────────────────────────────────────       │
+│                                                                  │
+│   ● Step 1 of 3                                                  │
+│                                                                  │
+│   [📥]                                                           │
+│   Import or Generate                                             │
+│   Drag any image, video, or audio file into the Explorer,        │
+│   or type a prompt below to generate your first image.           │
+│                                                                  │
+│            [Skip tour]              [Next →]                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+Step 2: Place on Canvas
+  Drag assets from Explorer onto the infinite canvas.
+  Connect them with arrows to define your creative pipeline.
+
+Step 3: Export to Social
+  Use the Format Profiles to export in 9:16 for TikTok,
+  1:1 for Instagram, or 16:9 for YouTube.
+  One click to auto-post when you're ready.
+```
+
+### 22.3 Completion Conditions
+
+The onboarding is complete (permanently dismissed) when:
+- User clicks "Skip tour", OR
+- User completes Step 3, OR
+- User has successfully generated at least one image
+
+Dismissal is stored in: `localStorage['ars:onboarding-complete'] = 'true'`
+
+---
+
+## 23. Error Boundary Specification
+
+### 23.1 Panel Error Boundary
+
+Each major panel wraps in a `PanelErrorBoundary` class component:
+
+```tsx
+// components/ui/PanelErrorBoundary.tsx
+interface PanelErrorBoundaryProps {
+  panelName: string;
+  children: React.ReactNode;
+}
+
+interface State { hasError: boolean; error?: Error; }
+
+export class PanelErrorBoundary extends React.Component<PanelErrorBoundaryProps, State> {
+  state: State = { hasError: false };
+  
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+  
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // Emit to event bus
+    bus.emit('error:boundary', { panel: this.props.panelName, error: error.message });
+    // Log to error store
+    useErrorStore.getState().addError({
+      code: 'PANEL_CRASH',
+      message: error.message,
+      context: { panel: this.props.panelName, stack: info.componentStack ?? '' },
+    });
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div id={`panel-error-boundary-${this.props.panelName}`} className={styles.panelError}>
+          <AlertTriangle size={24} />
+          <p className={styles.panelErrorTitle}>{this.props.panelName} encountered an error</p>
+          <p className={styles.panelErrorDetail}>{this.state.error?.message}</p>
+          <button onClick={() => this.setState({ hasError: false })}>
+            Reload {this.props.panelName}
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+```
+
+### 23.2 Error Boundary Placement
+
+```tsx
+// AppShell.tsx wrapping each panel:
+<PanelErrorBoundary panelName="Explorer">
+  <ExplorerPanel ... />
+</PanelErrorBoundary>
+
+<PanelErrorBoundary panelName="Canvas">
+  <Canvas ... />
+</PanelErrorBoundary>
+
+<PanelErrorBoundary panelName="Inspector">
+  <InspectorPanel ... />
+</PanelErrorBoundary>
+
+<PanelErrorBoundary panelName="Timeline">
+  <Timeline ... />
+</PanelErrorBoundary>
+
+<PanelErrorBoundary panelName="NodeGraph">
+  <NodeGraph ... />
+</PanelErrorBoundary>
+```
+
+---
+
+## 24. Implementation Status Audit (Updated)
 
 ### 19.1 Design Tokens
 

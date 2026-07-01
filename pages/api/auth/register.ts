@@ -1,30 +1,41 @@
-import { createApiHandler } from '@/lib/api/handler';
-import { created } from '@/lib/api/response';
-import { ConflictError } from '@/lib/api/errors';
-import { registerSchema } from '@/lib/validation/schemas';
-import { hashPassword } from '@/lib/auth/password';
-import { prisma } from '@/lib/prisma';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import AuthService from '../../../services/auth/authService';
+import rateLimit from '../../../utils/rateLimit';
 
-export default createApiHandler(
-  { methods: ['POST'], auth: false, bodySchema: registerSchema },
-  async (req, res) => {
-    const { name, email, password } = req.body;
+const limiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) throw new ConflictError('Email already registered');
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    await limiter.check(req, res, 5, 'REGISTER_TOKEN');
 
-    const hashedPassword = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        hashedPassword,
-        role: 'USER',
-        settings: { create: {} },
-      },
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    if (req.method !== 'POST') {
+      return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    const { firstName, lastName, email, pseudonym, password } = req.body;
+
+    if (!firstName || !lastName || !email || !pseudonym || !password) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const authResult = await AuthService.register({ firstName, lastName, email, pseudonym, password });
+
+    return res.status(201).json({
+      user: authResult.user,
+      token: authResult.token,
+      expiresIn: authResult.expiresIn,
     });
-
-    return created(res, user);
+  } catch (error) {
+    console.error('Register error:', error);
+    if (error instanceof Error) {
+      if (error.message.includes('already exists') || error.message.includes('already registered')) {
+        return res.status(409).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Registration failed' });
   }
-);
+}

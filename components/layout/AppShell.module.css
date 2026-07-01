@@ -123,10 +123,8 @@
 }
 
 .moduleBar {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: 90;
+  position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -173,7 +171,7 @@
 .nodePalette {
   position: absolute;
   top: calc(100% + 8px);
-  right: 120px;
+  right: 0;
   width: 220px;
   padding: 8px;
   border: 1px solid var(--glass-border, rgba(62, 62, 74, 0.7));

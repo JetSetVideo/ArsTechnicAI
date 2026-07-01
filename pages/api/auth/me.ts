@@ -1,11 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '../../../middleware/authMiddleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../lib/prisma';
 
-const prisma = new PrismaClient();
-
-// GET /api/auth/me — verify the current session token and return user data
-async function handler(req: NextApiRequest, res: NextApiResponse, userId: string) {
+async function handler(req: NextApiRequest, res: NextApiResponse, userId: string, userRoles: string[]) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -33,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse, userId: string
       return res.status(403).json({ message: 'Account is not active' });
     }
 
-    return res.status(200).json({ user });
+    return res.status(200).json({ user: { ...user, roles: userRoles } });
   } catch (error) {
     console.error('/api/auth/me error:', error);
     return res.status(500).json({ message: 'Failed to fetch user' });

@@ -11,7 +11,9 @@ import { ActionLog } from './ActionLog';
 import { FloatingToolbar } from './FloatingToolbar';
 import type { ToolId } from './FloatingToolbar';
 import { LayersPanel } from './LayersPanel';
+import { PanelErrorBoundary } from '../ui/PanelErrorBoundary';
 import { useLogStore, useCanvasStore } from '@/stores';
+import { useToastStore } from '@/stores/toastStore';
 import { useUserStore } from '@/stores/userStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useProjectSync, saveProjectWorkspaceState, loadProjectWorkspaceState } from '@/hooks/useProjectSync';
@@ -43,12 +45,12 @@ export const AppShell: React.FC = () => {
   const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [timelineHeight, setTimelineHeight] = useState(160);
   const [activeTool, setActiveTool] = useState<ToolId>('pointer');
   const [layersOpen, setLayersOpen] = useState(false);
   const [nodePaletteOpen, setNodePaletteOpen] = useState(false);
   const log = useLogStore((s) => s.log);
+  const toast = useToastStore();
   const { setCanvasTool, activeTool: canvasTool } = useCanvasStore();
   
   // User and project management
@@ -285,24 +287,69 @@ export const AppShell: React.FC = () => {
   return (
     <div id="app-shell-layout-root" className={styles.appShellLayoutRoot}>
       <TopBar
-        currentMode={mode}
-        onModeChange={handleModeChange}
-        onToggleExplorer={() => togglePanel('explorer')}
-        onToggleInspector={() => togglePanel('inspector')}
-        onToggleTimeline={() => togglePanel('timeline')}
         onOpenSettings={() => setSettingsOpen(true)}
-        onOpenHelp={() => setHelpOpen(true)}
-        explorerVisible={layout.explorer.visible}
-        inspectorVisible={layout.inspector.visible}
-        timelineVisible={layout.timeline.visible}
         projectName={projectName}
         onProjectNameChange={setProjectName}
+        moduleActions={(
+          <div className={styles.moduleBar}>
+            <button title="AI Generate — open Inspector" onClick={() => togglePanel('inspector')}>
+              <Sparkles size={15} />
+            </button>
+            <button title="Node Graph" onClick={() => {
+              setNodePaletteOpen((open) => !open);
+            }}>
+              <GitBranch size={15} />
+            </button>
+            {nodePaletteOpen && (
+              <div className={styles.nodePalette} role="menu" aria-label="Node palette">
+                <div className={styles.nodePaletteHeader}>
+                  <span>Nodes</span>
+                  <small>Drag onto canvas</small>
+                </div>
+                {BASIC_NODE_TYPES.map((type) => {
+                  const def = NODE_DEFS[type];
+                  return (
+                    <button
+                      key={type}
+                      className={styles.nodePaletteItem}
+                      draggable
+                      onDragStart={(e) => handleNodeDragStart(e, type)}
+                      onDragEnd={() => setNodePaletteOpen(false)}
+                      style={{ '--node-color': def.color } as React.CSSProperties}
+                      title={`Drag ${def.title} onto the canvas`}
+                      type="button"
+                    >
+                      <span className={styles.nodePaletteDot} />
+                      <span>{def.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className={styles.moduleBarDivider} />
+            <button title="Video Pipeline" onClick={() => handleModeChange('timeline')}>
+              <Film size={15} />
+            </button>
+            <button title="Audio — coming soon" onClick={() => toast.addToast({ type: 'info', title: 'Audio Module', message: 'Audio generation and mixing is coming soon.', duration: 4000 })}>
+              <Music size={15} />
+            </button>
+            <div className={styles.moduleBarDivider} />
+            <button title="Export Canvas" onClick={handleExportCanvas}>
+              <Download size={15} />
+            </button>
+            <button title="Publish" onClick={() => { setSettingsInitialTab('publishing'); setSettingsOpen(true); }}>
+              <Share2 size={15} />
+            </button>
+          </div>
+        )}
       />
 
       <div id="app-shell-workspace-region" className={styles.appShellWorkspaceRegion}>
         {layout.explorer.visible ? (
           <>
-            <ExplorerPanel width={layout.explorer.width} onToggle={() => togglePanel('explorer')} />
+            <PanelErrorBoundary panelName="Explorer">
+              <ExplorerPanel width={layout.explorer.width} onToggle={() => togglePanel('explorer')} />
+            </PanelErrorBoundary>
             <div className={styles.resizeHandle} onMouseDown={handleExplorerResizeStart} />
           </>
         ) : (
@@ -317,74 +364,28 @@ export const AppShell: React.FC = () => {
 
         <div ref={mainAreaRef} className={styles.mainArea}>
           {showNodeGraph ? (
-            <NodeGraph />
+            <PanelErrorBoundary panelName="Node Graph">
+              <NodeGraph />
+            </PanelErrorBoundary>
           ) : (
             <>
-              <Canvas
-                showTimeline={layout.timeline.visible}
-                overlayTool={(['pen', 'shape', 'text'].includes(activeTool) ? activeTool : null) as 'pen' | 'shape' | 'text' | null}
-              />
+              <PanelErrorBoundary panelName="Canvas">
+                <Canvas
+                  showTimeline={layout.timeline.visible}
+                  overlayTool={(['pen', 'shape', 'text'].includes(activeTool) ? activeTool : null) as 'pen' | 'shape' | 'text' | null}
+                />
+              </PanelErrorBoundary>
               {layout.timeline.visible && (
                 <>
                   <div className={styles.resizeHandleHorizontal} onMouseDown={handleTimelineResizeStart} />
-                  <Timeline height={timelineHeight} />
+                  <PanelErrorBoundary panelName="Timeline">
+                    <Timeline height={timelineHeight} />
+                  </PanelErrorBoundary>
                 </>
               )}
               {layout.timeline.visible && (
                 <ConnectionOverlay containerRef={mainAreaRef} />
               )}
-              {/* Module action bar — top right above canvas */}
-              <div className={styles.moduleBar}>
-                <button title="AI Generate — open Inspector" onClick={() => togglePanel('inspector')}>
-                  <Sparkles size={15} />
-                </button>
-                <button title="Node Graph" onClick={() => {
-                  setNodePaletteOpen((open) => !open);
-                }}>
-                  <GitBranch size={15} />
-                </button>
-                {nodePaletteOpen && (
-                  <div className={styles.nodePalette} role="menu" aria-label="Node palette">
-                    <div className={styles.nodePaletteHeader}>
-                      <span>Nodes</span>
-                      <small>Drag onto canvas</small>
-                    </div>
-                    {BASIC_NODE_TYPES.map((type) => {
-                      const def = NODE_DEFS[type];
-                      return (
-                        <button
-                          key={type}
-                          className={styles.nodePaletteItem}
-                          draggable
-                          onDragStart={(e) => handleNodeDragStart(e, type)}
-                          onDragEnd={() => setNodePaletteOpen(false)}
-                          style={{ '--node-color': def.color } as React.CSSProperties}
-                          title={`Drag ${def.title} onto the canvas`}
-                          type="button"
-                        >
-                          <span className={styles.nodePaletteDot} />
-                          <span>{def.title}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <div className={styles.moduleBarDivider} />
-                <button title="Video Pipeline" onClick={() => handleModeChange('timeline')}>
-                  <Film size={15} />
-                </button>
-                <button title="Audio">
-                  <Music size={15} />
-                </button>
-                <div className={styles.moduleBarDivider} />
-                <button title="Export Canvas" onClick={handleExportCanvas}>
-                  <Download size={15} />
-                </button>
-                <button title="Publish" onClick={() => { setSettingsInitialTab('publishing'); setSettingsOpen(true); }}>
-                  <Share2 size={15} />
-                </button>
-              </div>
-
               {/* Floating tool bar — sits above canvas on the left */}
               <FloatingToolbar
                 activeTool={(['pen', 'shape', 'text', 'eyedropper'].includes(activeTool) ? activeTool : canvasTool) as ToolId}
@@ -399,13 +400,15 @@ export const AppShell: React.FC = () => {
         {layout.inspector.visible && !showNodeGraph ? (
           <>
             <div className={styles.resizeHandle} onMouseDown={handleInspectorResizeStart} />
-            <InspectorPanel
-              width={layout.inspector.width}
-              onOpenSettings={() => setSettingsOpen(true)}
-              onOpenPublishing={() => { setSettingsInitialTab('publishing'); setSettingsOpen(true); }}
-              onOpenLayers={() => setLayersOpen(v => !v)}
-              onToggle={() => togglePanel('inspector')}
-            />
+            <PanelErrorBoundary panelName="Inspector">
+              <InspectorPanel
+                width={layout.inspector.width}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onOpenPublishing={() => { setSettingsInitialTab('publishing'); setSettingsOpen(true); }}
+                onOpenLayers={() => setLayersOpen(v => !v)}
+                onToggle={() => togglePanel('inspector')}
+              />
+            </PanelErrorBoundary>
           </>
         ) : (
           !showNodeGraph && (

@@ -247,6 +247,8 @@ export const generateSchema = z.object({
   projectId: z.string().cuid().optional(),
   priority: z.number().int().min(0).max(10).default(0),
   apiKey: z.string().optional(),
+  referenceImages: z.array(z.string()).max(5).optional(),
+  compositionOverlay: z.string().optional(),
 });
 
 // ============================================================

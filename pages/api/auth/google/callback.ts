@@ -63,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     if (!data.id || !data.email) {
-      return res.redirect(`${appUrl}/home?auth_error=incomplete_profile`);
+      return res.redirect(`${frontendUrl}/auth/callback?auth_error=incomplete_profile`);
     }
 
     const authResult = await AuthService.googleAuth({

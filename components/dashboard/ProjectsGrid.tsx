@@ -4,7 +4,9 @@
  * Grid display of user projects with thumbnails, search, and filters.
  */
 
-import { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef } from 'react';
+import { useToastStore } from '../../stores/toastStore';
+import { SkeletonProjectCard, EmptyState } from '../ui';
 import { 
   Plus, 
   Star, 
@@ -29,6 +31,8 @@ import {
   ImageIcon,
   Check,
   Sparkles,
+  GripVertical,
+  GitBranch,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useProjectsStore } from '../../stores';
@@ -41,9 +45,20 @@ import { Button } from '../ui';
 import styles from './ProjectsGrid.module.css';
 import type { FileNode } from '../../types';
 
+type FilterPlatform = 'tiktok' | 'instagram' | 'youtube' | 'twitter';
+type FilterSource = 'ai-generated' | 'imported' | 'remixed' | 'manual';
+type FilterSort = 'recent' | 'alpha' | 'size' | 'published';
+interface ExternalFilters {
+  platform: FilterPlatform | null;
+  source: FilterSource | null;
+  sortBy: FilterSort;
+}
+
 interface ProjectsGridProps {
   onOpenProject: (projectId: string) => void;
   searchQuery?: string;
+  externalFilters?: ExternalFilters;
+  triggerNew?: number;
 }
 
 const findNodeByPath = (nodes: FileNode[], targetPath: string): FileNode | null => {
@@ -57,7 +72,7 @@ const findNodeByPath = (nodes: FileNode[], targetPath: string): FileNode | null 
   return null;
 };
 
-export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridProps) {
+export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters, triggerNew }: ProjectsGridProps) {
   const { data: session } = useSession();
   const isAuthenticated = !!session?.user;
 
@@ -80,6 +95,32 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
     setSortOrder,
     deduplicateProjects,
   } = useProjectsStore();
+
+  const toast = useToastStore();
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const pendingDeleteRef = useRef<string | null>(null);
+
+  // Sync externalFilters.sortBy → projectsStore sort state
+  useEffect(() => {
+    if (!externalFilters) return;
+    switch (externalFilters.sortBy) {
+      case 'recent':   setSortBy('modifiedAt'); setSortOrder('desc'); break;
+      case 'alpha':    setSortBy('name');       setSortOrder('asc');  break;
+      case 'size':     setSortBy('modifiedAt'); setSortOrder('desc'); break; // best proxy for asset count
+      case 'published': setSortBy('createdAt'); setSortOrder('desc'); break;
+    }
+  }, [externalFilters?.sortBy, setSortBy, setSortOrder]);
+
+  // Mark projects as loaded after first hydration tick
+  useEffect(() => {
+    const id = setTimeout(() => setIsLoadingProjects(false), 600);
+    return () => clearTimeout(id);
+  }, []);
+
+  // Open create modal when parent triggers it
+  useEffect(() => {
+    if (triggerNew && triggerNew > 0) setShowCreateModal(true);
+  }, [triggerNew]);
 
   const rootNodes = useFileStore((s) => s.rootNodes);
   const assets = useFileStore((s) => s.assets);
@@ -282,10 +323,29 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
             );
           }
         });
-    return filteredBySearch.filter((project) =>
+    let filtered = filteredBySearch.filter((project) =>
       project.assetCount >= minimumAssets
     );
-  }, [sortedProjects, deferredSearchQuery, minimumAssets, projectScope]);
+
+    // Apply external platform filter (maps to project.type)
+    if (externalFilters?.platform) {
+      filtered = filtered.filter((p) => (p as any).type === externalFilters.platform);
+    }
+
+    // Apply external source filter (project has at least one asset with matching source)
+    if (externalFilters?.source) {
+      const sourceKey = externalFilters.source === 'ai-generated' ? 'generated' : externalFilters.source;
+      filtered = filtered.filter((p) => {
+        const slug = slugifyProjectName(p.name);
+        const prefix = `/projects/${slug}/generated/`;
+        return Array.from(assets.values()).some(
+          (a) => a.path.startsWith(prefix) && (a.metadata?.source ?? 'imported') === sourceKey
+        );
+      });
+    }
+
+    return filtered;
+  }, [sortedProjects, deferredSearchQuery, minimumAssets, projectScope, externalFilters?.platform, externalFilters?.source, assets]);
   const allTags = getAllTags();
 
   const handleNewProject = () => {
@@ -344,10 +404,27 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this project?')) {
-      deleteProject(id);
-    }
     setMenuOpen(null);
+    const project = useProjectsStore.getState().getProject(id);
+    const name = project?.name ?? 'this project';
+    pendingDeleteRef.current = id;
+
+    toast.addToast({
+      type: 'warning',
+      title: `Delete "${name}"?`,
+      message: 'This removes the project record. Assets on disk are not deleted.',
+      duration: 7000,
+      action: {
+        label: 'Delete',
+        onClick: () => {
+          if (pendingDeleteRef.current === id) {
+            deleteProject(id);
+            pendingDeleteRef.current = null;
+            toast.success('Project deleted', `"${name}" was removed from your library.`);
+          }
+        },
+      },
+    });
   };
 
   const handleDuplicate = (id: string) => {
@@ -368,6 +445,65 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
 
   const [assetDrawerOpen, setAssetDrawerOpen] = useState<string | null>(null);
   const [coverPickerOpen, setCoverPickerOpen] = useState<string | null>(null);
+  const [dragProjectId, setDragProjectId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  
+  // Build parent map for hierarchy display
+  const parentMap = useMemo(() => {
+    const map = new Map<string, string>(); // childId → parentName
+    projects.forEach(p => {
+      if ((p as any).parentId) {
+        const parent = projects.find(pp => pp.id === (p as any).parentId);
+        if (parent) map.set(p.id, parent.name);
+      }
+    });
+    return map;
+  }, [projects]);
+
+  // Drag-drop project parent/child association
+  const handleDragStart = (e: React.DragEvent, projectId: string) => {
+    e.dataTransfer.setData('text/plain', projectId);
+    e.dataTransfer.effectAllowed = 'move';
+    setDragProjectId(projectId);
+  };
+  
+  const handleDragOver = (e: React.DragEvent, projectId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragProjectId && dragProjectId !== projectId) {
+      setDropTargetId(projectId);
+    }
+  };
+  
+  const handleDragLeave = () => {
+    setDropTargetId(null);
+  };
+  
+  const handleDrop = (e: React.DragEvent, targetProjectId: string) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain');
+    if (sourceId && sourceId !== targetProjectId) {
+      // Set source project's parent to target project
+      updateProject(sourceId, { parentId: targetProjectId } as any);
+      // Add source to target's children
+      const target = projects.find(p => p.id === targetProjectId);
+      if (target) {
+        const existingChildren = (target as any).childIds || [];
+        if (!existingChildren.includes(sourceId)) {
+          updateProject(targetProjectId, { 
+            childIds: [...existingChildren, sourceId] 
+          } as any);
+        }
+      }
+    }
+    setDragProjectId(null);
+    setDropTargetId(null);
+  };
+  
+  const handleDragEnd = () => {
+    setDragProjectId(null);
+    setDropTargetId(null);
+  };
 
   const getProjectAssets = useCallback((projectName: string) => {
     const projectSlug = slugifyProjectName(projectName);
@@ -457,40 +593,31 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
         </label>
       </div>
 
-      {/* Shared library summary */}
-      <div className={styles.librarySummary}>
-        <div className={styles.librarySummaryMain}>
-          <span className={styles.libraryTitle}>Shared Library</span>
-          <span className={styles.libraryMeta}>
-            <span className={styles.libraryMetaValueBold}>{libraryAssets.length}</span> <span className={styles.libraryMetaLabelNormal}>asset{libraryAssets.length !== 1 ? 's' : ''} reusable across projects</span>
-          </span>
-          <span className={styles.libraryMeta}>
-            <HardDrive size={13} /> <span className={styles.libraryMetaLabelBold}>Local path:</span> <code className={styles.libraryMetaValueNormal}>{WORKSPACE_ROOT_PATHS.library}</code>
-          </span>
-          <span className={styles.libraryMeta}>
-            <span className={styles.libraryMetaLabelBold}>Last local update:</span> <span className={styles.libraryMetaValueNormal}>{latestLibraryUpdateAt ? formatDate(latestLibraryUpdateAt) : 'No assets yet'}</span>
-          </span>
-        </div>
-        <div className={styles.librarySummaryActions}>
-          <span className={`${styles.librarySyncStatus} ${librarySyncBadgeClass}`}>
-            <Cloud size={13} />
-            {cloudSyncStatus.detail}
-          </span>
-          <button
-            type="button"
-            className={styles.filterButton}
-            onClick={() => {
-              setCloudSyncStatus({
-                state: 'checking',
-                detail: 'Re-checking backend sync status...',
-              });
-              void refreshCloudSyncStatus();
-            }}
-          >
-            <RefreshCcw size={14} />
-            Refresh status
-          </button>
-        </div>
+      {/* Library sync status — compact one-liner */}
+      <div className={styles.librarySyncRow}>
+        <HardDrive size={11} />
+        <span className={styles.librarySyncLabel}>
+          Library · <strong>{libraryAssets.length}</strong> assets
+          {latestLibraryUpdateAt ? ` · updated ${formatDate(latestLibraryUpdateAt)}` : ''}
+        </span>
+        <span className={`${styles.librarySyncBadge} ${librarySyncBadgeClass}`}>
+          <Cloud size={10} />
+          {cloudSyncStatus.state === 'synced' ? 'Synced'
+            : cloudSyncStatus.state === 'offline' ? 'Offline'
+            : cloudSyncStatus.state === 'unauthenticated' ? 'Local only'
+            : '…'}
+        </span>
+        <button
+          type="button"
+          className={styles.librarySyncRefresh}
+          title={cloudSyncStatus.detail}
+          onClick={() => {
+            setCloudSyncStatus({ state: 'checking', detail: 'Re-checking…' });
+            void refreshCloudSyncStatus();
+          }}
+        >
+          <RefreshCcw size={10} />
+        </button>
       </div>
 
       {/* Projects Grid */}
@@ -501,17 +628,37 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
           <span>New Project</span>
         </button>
 
+        {/* Skeleton placeholders during initial load */}
+        {isLoadingProjects && Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonProjectCard key={`skel-${i}`} />
+        ))}
+
         {/* Project Cards */}
-        {projects.map((project) => {
+        {!isLoadingProjects && projects.map((project) => {
           const isAssetsOpen = assetDrawerOpen === project.id;
           const projectAssets = getProjectAssets(project.name);
           const imageAssets = projectAssets.filter((a) => a.type === 'image' && a.thumbnail);
 
+          const isDragSource = dragProjectId === project.id;
+          const isDropTarget = dropTargetId === project.id;
+          const parentName = parentMap.get(project.id);
+          const childCount = ((project as any).childIds?.length) || 0;
+
           return (
             <div
               key={project.id}
-              className={styles.projectCard}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open project: ${project.name}`}
+              className={`${styles.projectCard} ${isDragSource ? styles.dragging : ''} ${isDropTarget ? styles.dropTarget : ''}`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, project.id)}
+              onDragOver={(e) => handleDragOver(e, project.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, project.id)}
+              onDragEnd={handleDragEnd}
               onClick={() => onOpenProject(project.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenProject(project.id); } }}
             >
               {/* Full-bleed thumbnail */}
               <div className={styles.thumbnail}>
@@ -626,7 +773,20 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
                 <h3 className={styles.name}>
                   <span className={styles.pathPrefix}>/projects/</span>
                   {project.name}
+                  <span className={styles.dragHandle} title="Drag to set parent project">
+                    <GripVertical size={10} />
+                  </span>
                 </h3>
+                {parentName && (
+                  <div className={styles.hierarchyBadge}>
+                    <GitBranch size={9} /> Child of <strong>{parentName}</strong>
+                  </div>
+                )}
+                {childCount > 0 && (
+                  <div className={styles.hierarchyBadge} style={{ background: 'rgba(0,212,170,0.06)', borderColor: 'rgba(0,212,170,0.2)' }}>
+                    <GitBranch size={9} /> Parent of {childCount} project{childCount > 1 ? 's' : ''}
+                  </div>
+                )}
 
                 {/* Media type badge counts */}
                 {(() => {
@@ -680,7 +840,10 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
                     {formatDate(project.modifiedAt)}
                   </span>
                   {/* Status indicator */}
-                  <span className={`${styles.statusDot} ${project.assetCount > 0 ? styles.statusActive : styles.statusEmpty}`} />
+                  <span
+                    className={`${styles.statusDot} ${project.assetCount > 0 ? styles.statusActive : styles.statusEmpty}`}
+                    title={project.assetCount > 0 ? 'Has assets' : 'No assets yet'}
+                  />
                   <button
                     className={`${styles.assetButton} ${isAssetsOpen ? styles.assetButtonActive : ''}`}
                     onClick={(e) => {
@@ -731,13 +894,20 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '' }: ProjectsGridPr
         })}
       </div>
 
-      {projects.length === 0 && (
-        <div className={styles.empty}>
-          <p>No projects found</p>
-          <Button variant="primary" onClick={handleNewProject}>
-            Create your first project
-          </Button>
-        </div>
+      {!isLoadingProjects && projects.length === 0 && (
+        <EmptyState
+          icon={<FolderOpen size={28} />}
+          title={externalFilters?.platform || externalFilters?.source
+            ? 'No matching projects'
+            : 'No projects yet'}
+          body={externalFilters?.platform || externalFilters?.source
+            ? 'Try removing the active filters to see all projects.'
+            : 'Create your first project and start generating.'}
+          action={!externalFilters?.platform && !externalFilters?.source
+            ? { label: 'New Project', onClick: handleNewProject, icon: <Plus size={13} /> }
+            : undefined}
+          className={styles.emptyState}
+        />
       )}
 
       {showCreateModal && (

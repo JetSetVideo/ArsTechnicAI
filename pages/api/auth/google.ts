@@ -24,5 +24,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   const url = `${GOOGLE_AUTH_URL}?${params.toString()}`;
-  return res.status(200).json(url);
+  return res.status(200).json({ url });
 }

@@ -451,7 +451,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
     : cloudAssets;
 
   return (
-    <aside className={styles.explorer} style={{ width }} data-density="compact">
+    <aside id="explorer-panel-left-sidebar" className={styles.explorer} style={{ width }} data-density="compact">
       <div className={styles.header}>
         <div className={styles.headerTitleRow}>
           <button 
@@ -476,7 +476,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
       </div>
 
       {/* Tab switcher */}
-      <div className={styles.tabs}>
+      <div id="explorer-tab-bar" className={styles.tabs}>
         <button
           className={`${styles.tab} ${tab === 'local' ? styles.tabActive : ''}`}
           onClick={() => setTab('local')}
@@ -496,7 +496,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
         </button>
       </div>
 
-      <div className={styles.filterBar}>
+      <div id="explorer-search-bar-with-filter-chips" className={styles.filterBar}>
         <Input
           placeholder={tab === 'cloud' ? 'Filter by name or prompt…' : 'Filter files…'}
           value={filter}
@@ -533,7 +533,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
 
       {/* Local tab */}
       {tab === 'local' && (
-        <div className={styles.tree}>
+        <div id="explorer-file-tree-virtualized" className={styles.tree}>
           {filteredNodes.map((node) => (
             <FileTreeItemWrapper key={node.id} node={node} depth={0} />
           ))}
@@ -551,7 +551,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
 
       {/* Cloud tab */}
       {tab === 'cloud' && (
-        <div className={styles.cloudGrid}>
+        <div id="explorer-cloud-grid-assets" className={styles.cloudGrid}>
           {!session?.user && (
             <div className={styles.empty}>
               <Cloud size={24} style={{ opacity: 0.3 }} />

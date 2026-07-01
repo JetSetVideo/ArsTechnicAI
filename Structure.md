@@ -99,7 +99,13 @@
 │   │   ├── ConnectionStatus.tsx       # Status indicator with halo
 │   │   ├── ConnectionStatus.module.css
 │   │   ├── AuthModal.tsx              # Login + Register modal
-│   │   └── AuthModal.module.css
+│   │   ├── AuthModal.module.css
+│   │   ├── PanelErrorBoundary.tsx     # React class boundary: wraps each major panel
+│   │   ├── PanelErrorBoundary.module.css
+│   │   ├── EmptyState.tsx             # Standardized empty panel state (icon + title + CTA)
+│   │   ├── EmptyState.module.css
+│   │   ├── Skeleton.tsx               # Shimmer skeletons: ProjectCard, AssetCard, ExplorerRow, GenImage, InspectorSection
+│   │   └── Skeleton.module.css
 │   └── dashboard/
 │       ├── ProjectsGrid.tsx           # Project cards grid
 │       ├── AssetsGrid.tsx             # Asset grid view
@@ -140,6 +146,15 @@
 │   ├── ai/
 │   │   └── providers/
 │   │       └── google-imagen.ts       # Google Imagen REST client
+│   ├── services/                      # Service layer (business logic, isolated from React)
+│   │   ├── GenerationService.ts       # PLANNED: wraps generation jobs + event emission
+│   │   ├── ProjectService.ts          # PLANNED: create, archive, restore, snapshot, duplicate
+│   │   └── ExportService.ts           # PLANNED: PNG, video bundle, .arsproj export
+│   ├── events/                        # Typed event bus for cross-cutting communication
+│   │   └── bus.ts                     # PLANNED: createEventBus<DomainEventMap>()
+│   ├── middleware/                    # API route middleware
+│   │   ├── rateLimit.ts               # PLANNED: Redis-backed rate limiting
+│   │   └── csrf.ts                    # PLANNED: CSRF token validation
 │   ├── modules/                       # Module registry + processing modules
 │   │   ├── registry.ts                # ModuleRegistry with all module IDs
 │   │   ├── ingest/                    # 14 import/read modules (Phase 1)
@@ -208,6 +223,7 @@
 - Resizable panels (explorer, inspector, timeline) via drag handles
 - Keyboard shortcuts: Cmd+1/2/3 (panels), Cmd+, (settings)
 - Auto-save every 15 seconds + beforeunload sendBeacon
+- **Panel Error Boundaries** (implemented): Each panel (Explorer, Canvas, Inspector, Timeline, NodeGraph) is wrapped in `<PanelErrorBoundary panelName="...">`. A crash in one panel shows a recovery UI without killing the rest of the app. Error is logged to errorStore and emitted to the event bus.
 
 ### 2. Explorer (`components/layout/ExplorerPanel.tsx`)
 - **Local tab**: file tree from `fileStore`; drag assets to canvas
@@ -263,12 +279,19 @@
 - **NEEDS**: ffmpeg.wasm integration, waveform rendering, J/K/L shuttle, transitions
 
 ### 8. Homepage (`components/layout/DashboardLayout.tsx`)
-- Quick-create flow: select platform → enter prompt → Generate
-- Project grid with search and filter
-- Platform selector (TikTok, Instagram, YouTube, Twitter/X)
-- Style picker (10 AI art styles)
-- Pipeline visualizer (Prompt → Images → Video → Platform)
-- **NEEDS**: expanded project cards with media badges, faceted filter system
+- **Information hierarchy (redesigned)**: Filter bar + project grid visible first; quick-create hero docked at bottom, compact by default
+- **Compact prompt strip**: Platform chips + prompt textarea + style picker + count + generate (single row)
+- **Pipeline visualizer**: `Script → Mood Board → Prompts → Generate → Storyboard → Timeline → Publish` with completion-state dot indicators
+- **Expand hero**: chevron button reveals negative prompt, cinematic controls (composition/lighting/camera), character creator, prompt templates, full module catalog
+- **Faceted filter bar** (implemented): Platform (TikTok / IG / YouTube / X) + Source (AI Generated / Imported / Remixed / Manual) + Sort (Recent / A–Z / By Size / Most Published) — chip UI with dropdown, Escape to close, clear-all pill
+- Filter state: `ActiveFilters { platform, source, sortBy }` stored in component state; dropdowns close on outside click via `useEffect` + `data-filter-drop` attrs
+- Project grid (Projects | Assets tabs) with search, tag filters, sort, favorites
+- Generated results strip: docked between grid and hero; drag to reorder, Edit in Workshop / Save actions
+- Character creator: name, appearance, wardrobe, pose, background
+- Prompt templates: 6 built-in + create new
+- Module catalog: Generate, Edit, 3D/Spatial, Intelligence, Assembly, Ingest, Publish
+- Semantic HTML IDs: `dashboard-layout-header-primary-at-top`, `creation-hero-section-main`, `content-filter-bar-secondary`, `faceted-filter-chips-row`, `content-grid-main-scrollable`, `pipeline-visualizer-steps-row`, `prompt-input-group-flex`, `generate-button-primary-gradient`, `module-badges-row`
+- **NEEDS**: wire filter state to ProjectsGrid (currently visual only), expanded project cards with pipeline phase indicator, Synopsis/Logline field in project creation
 
 ### 9. Settings (`components/layout/SettingsModal.tsx`)
 - 8 tabs: Account, API Keys, Appearance, Shortcuts, Publishing, Usage, Help, About
@@ -286,45 +309,105 @@
 
 ## Module Status Audit (Complete)
 
+### Pre-Production Modules (Phase 0 — Planned)
+
 | Module ID | Category | Status | Description |
 |-----------|----------|--------|-------------|
-| `import-file` | ingest | ✅ Live | Universal file importer |
-| `decode-image` | ingest | ✅ Live | Image metadata + thumbnail |
-| `decode-video` | ingest | ✅ Live | Video probe + filmstrip |
-| `decode-audio` | ingest | ✅ Live | Audio waveform + metadata |
-| `decode-text` | ingest | ✅ Live | SRT/JSON/CSV/MD parser |
-| `decode-3d` | ingest | ⬜ Stub | GLTF/OBJ loader |
-| `decode-splat` | ingest | ⬜ Stub | Gaussian splat loader |
-| `generate-image` | generate | ✅ Live | Google Imagen + placeholder |
-| `generate-video` | generate | ⬜ Stub | Runway/Pika/Kling |
-| `generate-audio` | generate | ⬜ Stub | ElevenLabs/MusicGen |
-| `generate-3d` | generate | ⬜ Stub | Rodin/Luma |
-| `generate-prompt` | generate | ⬜ Stub | LLM prompt assistance |
-| `edit-inpaint` | edit | ⬜ Stub | Mask-based inpainting |
-| `edit-outpaint` | edit | ⬜ Stub | Canvas expansion |
-| `edit-upscale` | edit | ⬜ Stub | Super-resolution |
-| `edit-crop` | edit | ⬜ Stub | Canvas cropping |
-| `edit-resize` | edit | ✅ Live | Canvas item resize |
-| `edit-rotate` | edit | ✅ Live | Canvas item rotation |
-| `edit-remove-bg` | edit | ⬜ Stub | Background removal (RMBG/SAM) |
-| `edit-color-grade` | edit | ⬜ Stub | LUT application |
-| `edit-draw` | edit | ⬜ Stub | Freehand drawing on images |
-| `edit-text-overlay` | edit | ⬜ Stub | Text/write on images |
-| `edit-color-analysis` | edit | ⬜ Stub | Color palette extraction |
-| `edit-segment` | edit | ⬜ Stub | Element identification + silhouettes |
-| `edit-mask` | edit | ⬜ Stub | Manual/auto masking |
-| `spatial-3d-scene` | spatial | ⬜ Stub | Simple 3D scene editor |
-| `spatial-camera-rig` | spatial | ⬜ Stub | Camera movement recording |
-| `spatial-puppet` | spatial | ⬜ Stub | Skeletal animation puppets |
-| `spatial-render` | spatial | ⬜ Stub | 3D → 2D render pass |
-| `intelligence-tag` | intelligence | ⬜ Stub | Auto-tagging via vision AI |
-| `intelligence-storyboard` | intelligence | ⬜ Stub | Script → storyboard |
-| `intelligence-character` | intelligence | ⬜ Stub | Character consistency |
-| `assembly-sequence` | assembly | ⬜ Stub | Image sequence from start/end |
-| `assembly-transition` | assembly | ⬜ Stub | Between-clip transitions |
-| `assembly-composite` | assembly | ⬜ Stub | Multi-layer compositing |
-| `publish-social` | publish | ⬜ Stub | Platform API posting |
-| `publish-format` | publish | ⬜ Stub | Format transcoding |
+| `script-editor` | pre-production | ⬜ Planned | Screenplay editor (sluglines, action, dialogue) |
+| `script-to-shots` | pre-production | ⬜ Planned | Parse script scenes → generate shot list |
+| `character-db` | pre-production | ⬜ Planned | Character profiles (name, appearance, voice, wardrobe) |
+| `location-manager` | pre-production | ⬜ Planned | Location definitions with reference images + time-of-day |
+| `mood-board` | pre-production | ⬜ Planned | Reference image grid + color palette per scene |
+| `storyboard-editor` | pre-production | ⬜ Planned | Canvas shot nodes with camera spec + dialogue cues |
+| `animatic-sequencer` | pre-production | ⬜ Planned | Order storyboard frames into rough animatic with timing |
+| `color-script` | pre-production | ⬜ Planned | Per-scene mood swatch progression (color arc) |
+| `vocab-library` | pre-production | ⬜ Stub | Camera/lens/lighting/composition/materials/FX presets |
+| `prompt-template-engine` | pre-production | ⬜ Stub | Templates with typed variables + provider capability map |
+
+### Ingest Modules (Phase 1 — Complete)
+
+| Module ID | Category | Status | Description |
+|-----------|----------|--------|-------------|
+| `import-file` | ingest | ✅ Live | Universal file importer (drag-drop or picker) |
+| `decode-image` | ingest | ✅ Live | Image metadata extraction + thumbnail generation |
+| `decode-video` | ingest | ✅ Live | Video probe (duration, fps, codec) + filmstrip |
+| `decode-audio` | ingest | ✅ Live | Audio waveform + metadata (duration, channels, sample rate) |
+| `decode-text` | ingest | ✅ Live | SRT/JSON/CSV/MD/VTT parser → text asset |
+| `decode-3d` | ingest | ⬜ Stub | GLTF/OBJ loader + thumbnail render |
+| `decode-splat` | ingest | ⬜ Stub | Gaussian splat PLY loader + viewport preview |
+| `import-url` | ingest | ⬜ Stub | Fetch remote URL → asset (with CORS handling) |
+| `palette-extract` | ingest | ⬜ Stub | Extract dominant color palette from any image |
+| `inspiration-tagger` | ingest | ⬜ Stub | Auto-classify imported assets as inspiration vs. deliverable |
+
+### Generation Modules (Phase 2+ — In Progress)
+
+| Module ID | Category | Status | Description |
+|-----------|----------|--------|-------------|
+| `generate-image` | generate | ✅ Live | Google Imagen REST client + placeholder fallback |
+| `generate-video` | generate | ⬜ Stub | Runway Gen-3 / Pika / Kling adapter |
+| `generate-audio-sfx` | generate | ⬜ Stub | ElevenLabs SFX generation |
+| `generate-audio-music` | generate | ⬜ Stub | Suno / MusicGen background score |
+| `generate-tts` | generate | ⬜ Stub | ElevenLabs TTS with character voice profiles |
+| `generate-3d` | generate | ⬜ Stub | Rodin / Luma / Meshy 3D model generation |
+| `generate-prompt-assist` | generate | ⬜ Stub | LLM-assisted prompt expansion from short descriptions |
+| `generate-storyboard-ai` | generate | ⬜ Stub | Script scene → storyboard panel image (auto-prompt + generate) |
+
+### Edit Modules (Phase 2 — Target Q3 2026)
+
+| Module ID | Category | Status | Description |
+|-----------|----------|--------|-------------|
+| `edit-resize` | edit | ✅ Live | Canvas item resize (8 handles, direction-aware math) |
+| `edit-rotate` | edit | ✅ Live | Canvas item rotation (±15° per click) |
+| `edit-remove-bg` | edit | ⬜ Planned | Background removal via RMBG / SAM model |
+| `edit-inpaint` | edit | ⬜ Stub | Mask-based inpainting (fill selection region) |
+| `edit-outpaint` | edit | ⬜ Stub | Canvas expansion (extend beyond image bounds) |
+| `edit-upscale` | edit | ⬜ Stub | Super-resolution (2×/4× via Real-ESRGAN or similar) |
+| `edit-crop` | edit | ⬜ Stub | Non-destructive canvas cropping |
+| `edit-color-grade` | edit | ⬜ Stub | LUT application (upload .cube / .3dl) |
+| `edit-color-analysis` | edit | ⬜ Stub | Palette extraction + precision slider (0=granular, 100=few) |
+| `edit-draw` | edit | ⬜ Stub | Freehand pen drawing on canvas items |
+| `edit-text-overlay` | edit | ⬜ Stub | Add styled text/titles/captions directly on images |
+| `edit-segment` | edit | ⬜ Stub | Identify elements → silhouettes → element list panel |
+| `edit-mask` | edit | ⬜ Stub | Manual brush + auto-mask from segmentation |
+| `edit-style-transfer` | edit | ⬜ Stub | Apply reference image style to generated output |
+
+### Spatial / 3D Modules (Phase 5 — Target Q1 2027)
+
+| Module ID | Category | Status | Description |
+|-----------|----------|--------|-------------|
+| `spatial-3d-scene` | spatial | ⬜ Stub | Simple 3D scene editor with primitives (Three.js) |
+| `spatial-camera-rig` | spatial | ⬜ Stub | Keyframed camera path recording |
+| `spatial-puppet` | spatial | ⬜ Stub | Skeletal animation puppet with pose library |
+| `spatial-render` | spatial | ⬜ Stub | 3D → 2D render pass for pipeline integration |
+
+### Intelligence Modules (Phase 6 — Target Q2 2027)
+
+| Module ID | Category | Status | Description |
+|-----------|----------|--------|-------------|
+| `intelligence-tag` | intelligence | ⬜ Stub | Auto-tagging via vision AI (CLIP / GPT-4V) |
+| `intelligence-storyboard` | intelligence | ⬜ Stub | Script scene → storyboard panel (camera + prompt) |
+| `intelligence-character` | intelligence | ⬜ Stub | Character consistency across multiple generated images |
+| `intelligence-shot-to-image` | intelligence | ⬜ Stub | Convert shot list entry → ready-to-run generation prompt |
+| `intelligence-scene-analysis` | intelligence | ⬜ Stub | Analyze imported footage → extract shot descriptions |
+
+### Assembly Modules (Phase 4 — Target Q4 2026)
+
+| Module ID | Category | Status | Description |
+|-----------|----------|--------|-------------|
+| `assembly-sequence` | assembly | ⬜ Stub | Image sequence interpolation (start frame → end frame → N frames) |
+| `assembly-transition` | assembly | ⬜ Stub | Cross-fade, dissolve, wipe, L-cut, J-cut between clips |
+| `assembly-composite` | assembly | ⬜ Stub | Multi-layer image compositing with blend modes |
+| `assembly-captions` | assembly | ⬜ Stub | Auto-generate captions (whisper.cpp) + style editor |
+| `assembly-comic-layout` | assembly | ⬜ Stub | Panel grid templates for comic page assembly |
+
+### Publish Modules (Phase 8 — Target Q4 2027)
+
+| Module ID | Category | Status | Description |
+|-----------|----------|--------|-------------|
+| `publish-social` | publish | ⬜ Stub | Platform API posting (TikTok, Instagram, YouTube, X, LinkedIn) |
+| `publish-format` | publish | ⬜ Stub | Format transcoding via ffmpeg to platform-specific specs |
+| `publish-schedule` | publish | ⬜ Stub | Post scheduling with platform calendar integration |
+| `publish-analytics` | publish | ⬜ Stub | Views, likes, shares aggregated per platform post |
 
 ---
 

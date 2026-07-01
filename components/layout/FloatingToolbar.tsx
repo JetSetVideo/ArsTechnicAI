@@ -110,7 +110,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   const tooltipSide = side === 'right' ? styles.tooltipLeft : styles.tooltipRight;
 
   return (
-    <div className={`${styles.toolbar} ${side === 'right' ? styles.toolbarRight : styles.toolbarLeft}`}>
+    <div id="floating-toolbar-vertical-left" className={`${styles.toolbar} ${side === 'right' ? styles.toolbarRight : styles.toolbarLeft}`}>
       {/* Unified selection cycle button */}
       <button
         className={`${styles.toolBtn} ${isSelectionTool ? styles.toolBtnActive : ''}`}

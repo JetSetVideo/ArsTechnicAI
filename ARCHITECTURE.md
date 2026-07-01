@@ -502,6 +502,125 @@ Rule 4: Module execution is audited: input hash → module id → output hash
 
 ---
 
+## 1.8 Cross-Cutting Patterns & Vocabulary
+
+### Resilience Patterns
+
+| Pattern | Definition | Where Applied in ArsTechnicAI |
+|---------|-----------|-------------------------------|
+| **Circuit Breaker** | Fails fast when a downstream service is known-bad; reopens after a cooldown. Prevents request pile-up against a degraded AI provider. | `lib/ai/providers/` — each adapter should track consecutive failures; after N failures, reject new requests for T seconds |
+| **Bulkhead** | Isolates failure domains so a failure in one area cannot drain resources from another. | Panel-level React Error Boundaries ensure a Canvas crash doesn't kill Inspector or Timeline |
+| **Retry with Exponential Backoff** | Retry failed operations with increasing wait times (1s, 2s, 4s, 8s...) + jitter. | Offline queue in `ars:offline-queue`; SSE reconnect logic in `useConnectionStatus` |
+| **Idempotency Key** | A client-generated UUID sent with write requests. The server deduplicates by key, so retries are safe. | POST `/api/generate` should require `X-Idempotency-Key` header; stored with the `GenerationJob` |
+| **Dead Letter Queue (DLQ)** | Failed items that exceed max retries are moved to a DLQ for inspection rather than dropped silently. | `ars:offline-dlq` localStorage key; items > 5 retries move here and surface in Settings → Debug |
+| **Optimistic Locking** | A record includes a `version` counter; updates must supply the current version or they fail. Prevents lost updates in concurrent multi-device edits. | `ProjectVersion.version` counter; `PATCH /api/projects/[id]` checks version before write |
+
+### Architectural Patterns
+
+| Pattern | Definition | Status |
+|---------|-----------|--------|
+| **CQRS** | Command Query Responsibility Segregation: reads and writes use separate code paths (and optionally separate data stores). Reads are cheap; writes are validated and version-stamped. | ❌ Not implemented — all routes mix read + write in one handler |
+| **Event Sourcing** | Store a log of immutable domain events (what happened) instead of just current state (what is). State is derived by replaying the event log. Enables time-travel debugging and audit trails. | ❌ Not implemented — action log exists but is not replayable |
+| **Saga Pattern** | Manage distributed transactions (sequences of steps across services) with compensating transactions for rollback. | ❌ Planned for multi-step publish jobs (format → upload → schedule → post) |
+| **Repository Pattern** | Abstracts data access behind an interface. Components call a repository method, not a raw Prisma query. Enables switching storage backends without touching components. | ◐ Partial — Prisma is the implicit repository, accessed directly |
+| **Domain Event** | A named fact about something that happened in the domain (e.g., `GenerationCompleted`, `ProjectArchived`). Domain events are the currency of the event bus. | ❌ Not yet typed or dispatched |
+
+### Event Bus Specification (Proposed)
+
+The event bus provides typed, loosely-coupled communication between modules, stores, and services:
+
+```typescript
+// lib/events/bus.ts
+type DomainEventMap = {
+  // Generation lifecycle
+  'generation:queued':    { jobId: string; prompt: string; provider: string };
+  'generation:started':   { jobId: string; estimatedMs: number };
+  'generation:completed': { jobId: string; assetId: string; thumbnailUrl: string };
+  'generation:failed':    { jobId: string; error: string; retryable: boolean };
+  'generation:cancelled': { jobId: string };
+
+  // Project lifecycle
+  'project:created':    { projectId: string; name: string };
+  'project:saved':      { projectId: string; versionId: string };
+  'project:archived':   { projectId: string };
+  'project:deleted':    { projectId: string };
+
+  // Sync lifecycle
+  'sync:started':    { scope: 'project' | 'settings' | 'assets' };
+  'sync:completed':  { scope: string; itemCount: number };
+  'sync:failed':     { scope: string; error: string };
+  'sync:conflict':   { scope: string; conflictType: string };
+
+  // Health
+  'health:degraded': { service: 'db' | 'redis' | 'ai-provider'; message: string };
+  'health:restored': { service: string };
+  'health:offline':  {};
+  'health:online':   {};
+
+  // Error
+  'error:unhandled':  { code: string; message: string; context: Record<string, unknown> };
+  'error:boundary':   { panel: string; error: string };
+};
+
+// Usage (consumer)
+import { bus } from '@/lib/events/bus';
+useEffect(() => {
+  const unsub = bus.on('generation:completed', ({ jobId, assetId }) => {
+    addToCanvas(assetId);
+  });
+  return unsub;
+}, []);
+
+// Usage (producer)
+bus.emit('generation:completed', { jobId, assetId, thumbnailUrl });
+```
+
+### Service Layer Specification (Proposed)
+
+Services encapsulate business logic that is currently split between components and stores:
+
+```typescript
+// lib/services/GenerationService.ts
+export class GenerationService {
+  constructor(
+    private providerRegistry: ProviderRegistry,
+    private jobQueue: JobQueue,
+    private eventBus: EventBus<DomainEventMap>,
+  ) {}
+
+  async generate(request: GenerationRequest): Promise<GenerationJob> {
+    const job = await this.jobQueue.enqueue(request);
+    this.eventBus.emit('generation:queued', { jobId: job.id, ... });
+    const result = await this.providerRegistry
+      .get(request.provider)
+      .generateImage(request);
+    this.eventBus.emit('generation:completed', { jobId: job.id, assetId: result.assetId, ... });
+    return result;
+  }
+
+  async cancel(jobId: string): Promise<void> { ... }
+  async getStatus(jobId: string): Promise<JobStatus> { ... }
+}
+
+// lib/services/ProjectService.ts
+export class ProjectService {
+  async create(draft: ProjectDraft): Promise<Project> { ... }
+  async archive(projectId: string): Promise<void> { ... }
+  async restore(projectId: string): Promise<void> { ... }  // un-soft-delete
+  async snapshot(projectId: string, label: string): Promise<Version> { ... }
+  async duplicate(projectId: string): Promise<Project> { ... }
+}
+
+// lib/services/ExportService.ts
+export class ExportService {
+  async exportPNG(canvasItems: CanvasItem[]): Promise<Blob> { ... }
+  async exportVideo(timeline: Timeline, profile: FormatProfile): Promise<Blob> { ... }
+  async exportBundle(projectId: string): Promise<Blob> { ... }
+}
+```
+
+---
+
 ## 2. Data Architecture Deep Dive
 
 ### 2.1 Persistence Strategy

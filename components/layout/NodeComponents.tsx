@@ -16,8 +16,16 @@ import styles from './NodeGraph.module.css';
 // ─── Port colors ────────────────────────────────────────────────────────────
 export const PORT_COLORS: Record<PortType, string> = {
   image: '#a855f7',
+  video: '#3b82f6',
+  audio: '#f59e0b',
+  '3d': '#22c55e',
   text: '#6366f1',
-  number: '#f59e0b',
+  data: '#94a3b8',
+  mask: '#ec4899',
+  number: '#f97316',
+  latent: '#8b5cf6',
+  conditioning: '#06b6d4',
+  model: '#ef4444',
 };
 
 // ─── Banana Icon ────────────────────────────────────────────────────────────

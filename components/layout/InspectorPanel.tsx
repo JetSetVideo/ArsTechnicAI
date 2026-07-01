@@ -46,6 +46,7 @@ import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
 import type { GenerationResult, GenerationMeta, CanvasItem } from '@/types';
 import { saveProjectWorkspaceState } from '@/hooks/useProjectSync';
 import { saveToDisk } from '@/hooks/useDiskSave';
+import { bus } from '@/lib/events/bus';
 import styles from './InspectorPanel.module.css';
 
 interface InspectorPanelProps {
@@ -1348,21 +1349,21 @@ const BananaIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 // ─── Tag config & helpers ─────────────────────────────────────────────────────
 const TAG_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
-  generated: { label: 'Generated', color: '#00d4aa', bg: 'rgba(0,212,170,0.12)', border: 'rgba(0,212,170,0.4)', icon: <Sparkles size={10} /> },
-  image: { label: 'Image', color: '#a855f7', bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.4)', icon: <Palette size={10} /> },
-  video: { label: 'Video', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.4)', icon: <Film size={10} /> },
-  audio: { label: 'Audio', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)', icon: <Headphones size={10} /> },
-  text: { label: 'Text', color: '#10b981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.4)', icon: <FileText size={10} /> },
-  placeholder: { label: 'Placeholder', color: '#6b7280', bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.4)', icon: <Layers size={10} /> },
+  generated: { label: 'Generated', color: 'var(--success)', bg: 'hsla(160,80%,45%,0.12)', border: 'hsla(160,80%,45%,0.4)', icon: <Sparkles size={10} /> },
+  image: { label: 'Image', color: 'var(--accent-secondary)', bg: 'hsla(270,75%,60%,0.12)', border: 'hsla(270,75%,60%,0.4)', icon: <Palette size={10} /> },
+  video: { label: 'Video', color: 'var(--accent-tertiary)', bg: 'hsla(215,90%,60%,0.12)', border: 'hsla(215,90%,60%,0.4)', icon: <Film size={10} /> },
+  audio: { label: 'Audio', color: 'var(--warning)', bg: 'hsla(38,95%,50%,0.12)', border: 'hsla(38,95%,50%,0.4)', icon: <Headphones size={10} /> },
+  text: { label: 'Text', color: 'var(--success)', bg: 'hsla(160,80%,45%,0.12)', border: 'hsla(160,80%,45%,0.4)', icon: <FileText size={10} /> },
+  placeholder: { label: 'Placeholder', color: 'var(--text-muted)', bg: 'hsla(215,15%,50%,0.12)', border: 'hsla(215,15%,50%,0.4)', icon: <Layers size={10} /> },
 };
 
 const SIZE_PRESETS: { label: string; w: number; h: number; color: string }[] = [
   { label: '512 × 512', w: 512, h: 512, color: 'var(--accent-primary)' },
-  { label: '768 × 768', w: 768, h: 768, color: '#a855f7' },
-  { label: '1024 × 1024', w: 1024, h: 1024, color: '#3b82f6' },
-  { label: '1024 × 1792', w: 1024, h: 1792, color: '#f59e0b' },
-  { label: '1792 × 1024', w: 1792, h: 1024, color: '#ef4444' },
-  { label: '2048 × 2048', w: 2048, h: 2048, color: '#ec4899' },
+  { label: '768 × 768', w: 768, h: 768, color: 'var(--accent-secondary)' },
+  { label: '1024 × 1024', w: 1024, h: 1024, color: 'var(--accent-tertiary)' },
+  { label: '1024 × 1792', w: 1024, h: 1792, color: 'var(--warning)' },
+  { label: '1792 × 1024', w: 1792, h: 1024, color: 'var(--error)' },
+  { label: '2048 × 2048', w: 2048, h: 2048, color: 'var(--accent-primary)' },
 ];
 
 const formatRelativeTime = (timestamp: number): string => {
@@ -1751,6 +1752,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     toast.info('Generation Started', `Creating: "${prompt.slice(0, 50)}${prompt.length > 50 ? '…' : ''}"`, 3000);
 
     const job = startGeneration({ prompt, negativePrompt, width: genWidth, height: genHeight, model: currentModel });
+    bus.emit('generation:started', { jobId: job.id, prompt, width: genWidth, height: genHeight, model: currentModel });
 
     try {
       const body: Record<string, unknown> = {
@@ -1900,11 +1902,28 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
       if (projectId) {
         markDirty();
         saveProjectWorkspaceState(projectId, projectName || 'Untitled');
+
+        // Keep projectsStore in sync: increment assetCount and set thumbnail on first image
+        try {
+          const { useProjectsStore } = await import('@/stores/projectsStore');
+          const existingProject = useProjectsStore.getState().getProject(projectId);
+          if (existingProject) {
+            const updates: Record<string, unknown> = {
+              assetCount: (existingProject.assetCount ?? 0) + 1,
+              modifiedAt: now,
+            };
+            if (!existingProject.thumbnail && (result.dataUrl || result.imageUrl)) {
+              updates.thumbnail = result.dataUrl || result.imageUrl;
+            }
+            useProjectsStore.getState().updateProject(projectId, updates as any);
+          }
+        } catch { /* non-fatal: store unavailable in this context */ }
       }
 
       const cloudSaved = isAuthenticated && !!result.assetId;
       log('generation_complete', `Generated: ${filename}${cloudSaved ? ' (saved to cloud)' : ''}`, { prompt, filename, seed: genSeed, assetId: result.assetId });
 
+      bus.emit('generation:completed', { jobId: job.id, assetId: result.assetId, seed: genSeed, filePath: result.filePath });
       toast.success('Image Generated', `Saved as ${filename}`, 5000);
 
       if (settings.autoSavePrompts) {
@@ -1913,6 +1932,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       failJob(job.id, message);
+      bus.emit('generation:failed', { jobId: job.id, error: message });
       log('generation_fail', `Generation failed: ${message}`, { error: message });
       toast.error('Generation Failed', message, 8000);
     }
@@ -1945,10 +1965,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   const hasApiKey = !!localApiKey;
 
   return (
-    <aside className={styles.inspector} style={{ width }}>
+    <aside id="inspector-panel-right-sidebar" className={styles.inspector} style={{ width }}>
       <div className={styles.header}>
         <div className={styles.headerTitleRow}>
-          <div className={styles.tabBar}>
+          <div id="inspector-tab-bar" className={styles.tabBar}>
             <button
               className={`${styles.tabButton} ${activeTab === 'inspector' ? styles.tabButtonActive : ''}`}
               onClick={() => setActiveTab('inspector')}
@@ -1983,10 +2003,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
         </div>
       </div>
 
-      <div className={styles.content}>
+      <div id="inspector-content-scrollable" className={styles.content}>
         {/* ─── INSPECTOR TAB ─── */}
         {activeTab === 'inspector' && (
-          <div className={styles.tabContent}>
+          <div id="inspector-tab-properties" className={styles.tabContent}>
             {/* Empty state */}
             {selectedItems.length === 0 && (
               <div className={styles.emptyInspector}>
@@ -2454,7 +2474,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
 
         {/* ─── PROMPT TAB — Normal prompt mode ─── */}
         {activeTab === 'prompt' && promptMode === 'prompt' && (
-          <div className={styles.mainGenerator}>
+          <div id="inspector-tab-prompt-generator" className={styles.mainGenerator}>
             <div className={styles.formGroup} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div className={styles.promptHeader}>
                 <label className={styles.promptLabel}>Prompt</label>

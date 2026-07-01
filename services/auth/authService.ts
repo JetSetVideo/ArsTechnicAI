@@ -12,6 +12,7 @@ export interface SafeUser {
   lastName: string | null;
   pseudonym: string | null;
   profileImage: string | null;
+  roles: string[];
 }
 
 interface AuthResult {
@@ -37,7 +38,7 @@ interface GoogleAuthInput {
 }
 
 // Derive a safe user object (never exposes password hash or internal fields)
-function toSafeUser(user: User): SafeUser {
+function toSafeUser(user: UserWithRoles): SafeUser {
   return {
     id: user.id,
     email: user.email,
@@ -45,6 +46,7 @@ function toSafeUser(user: User): SafeUser {
     lastName: user.lastName ?? null,
     pseudonym: user.pseudonym ?? null,
     profileImage: user.profileImage ?? null,
+    roles: (user.roles || []).map((r) => r.name),
   };
 }
 

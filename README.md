@@ -55,15 +55,33 @@
 
 ## What It Is
 
-Ars TechnicAI is a **multi-modal creative IDE** that enables users to:
+Ars TechnicAI is a **multi-modal creative IDE** that bridges the gap between an author's raw vision and a finished, published media deliverable. It covers the complete creative arc:
 
-1. **Ingest any media** — images, videos, audio, 3D models, Gaussian splats, text, subtitles, URL references
+### The Author's Vision Pipeline
+
+```
+PRE-PRODUCTION                PRODUCTION               POST-PRODUCTION
+────────────────              ─────────────            ────────────────
+Script / Logline         →    Prompt Authoring    →    Timeline Assembly
+Character Profiles       →    Image Generation   →    Transitions & FX
+World Building           →    Video Generation   →    Audio Mix
+Mood Board               →    Audio (TTS/Music)  →    Color Grade
+Shot List / Storyboard   →    Node Graph (Canvas) →   Export & Publish
+```
+
+The system is designed so that **inspiration assets** (reference images, sketches, imported footage, color palettes) feed directly into **prompt engineering** (templates, vocabulary libraries, character injection), which drives **AI generation** (images, video, audio), which assembles into **final deliverables** (platform-formatted video, comic pages, social posts).
+
+### Core Capabilities
+
+1. **Ingest any media** — images, videos, audio, 3D models, Gaussian splats, text, subtitles, URL references, sketches, mood boards
 2. **Generate new media** via AI providers — image (DALL·E, Imagen, Stable Diffusion, Midjourney, Flux), video (Runway, Pika, Sora), audio (ElevenLabs, Suno, MusicGen), 3D (Rodin, Luma)
-3. **Edit non-destructively** — every transform is a node in a graph; source assets are never mutated
-4. **Assemble on a timeline** — multi-track sequencing with transitions, audio, captions, effects
-5. **Export to any format** — 9:16 mobile short, 1:1 Instagram, 16:9 YouTube, 2.35:1 cinematic, with platform presets
-6. **Publish directly** — auto-post to TikTok, Instagram, YouTube, Twitter/X via platform APIs
-7. **Track provenance** — every pixel traces back to a prompt, seed, model, and version
+3. **Author prompts** — structured templates with named variables, cinematography vocabulary libraries, character profile injection, style transfer from reference images
+4. **Build storyboards** — canvas-based shot nodes with camera specs, dialogue cues, and ordered animatics
+5. **Edit non-destructively** — every transform is a node in a graph; source assets are never mutated
+6. **Assemble on a timeline** — multi-track sequencing with transitions, audio, captions, effects
+7. **Export to any format** — 9:16 mobile short, 1:1 Instagram, 16:9 YouTube, 2.35:1 cinematic, with platform presets
+8. **Publish directly** — auto-post to TikTok, Instagram, YouTube, Twitter/X via platform APIs
+9. **Track provenance** — every pixel traces back to a prompt, seed, model, version, and inspiration source
 
 ### Core Panels
 

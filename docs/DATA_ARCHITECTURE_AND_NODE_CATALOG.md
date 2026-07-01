@@ -183,19 +183,49 @@ type PortType =
 
 ```typescript
 type AssetType =
-  // Media
+  // Media (deliverables)
   | 'image' | 'video' | 'audio' | 'text'
-  // 3D
+  // 3D / Spatial
   | 'model_3d' | 'splat'
-  // Derived
+  // Derived / Processing Artifacts
   | 'waveform' | 'filmstrip' | 'subtitle' | 'lut'
-  // Knowledge
+  // Prompt Engineering
   | 'prompt' | 'vocabulary' | 'preset' | 'template'
-  // Creative
-  | 'character' | 'scene' | 'script' | 'storyboard'
+  // Pre-Production (Author's Vision Inputs)
+  | 'script'        // Screenplay, treatment, or dialogue text
+  | 'storyboard'    // Ordered shot frames or animatic
+  | 'shot'          // Individual shot node (camera spec + action + dialogue cue)
+  | 'character'     // Character profile: appearance, voice, wardrobe, arc
+  | 'scene'         // Location + time-of-day + atmosphere + props
+  | 'mood_board'    // Reference image grid + color palette per chapter/scene
+  | 'color_script'  // Per-scene mood swatch progression showing atmosphere arc
+  | 'reference'     // Inspiration image / style frame (non-deliverable)
+  | 'palette'       // Extracted or manually created color palette
   // Organizational
   | 'folder' | 'project' | 'blueprint';
 ```
+
+### 2.5 Asset Origin (`AssetOrigin`)
+
+Every asset carries an `origin` field used for color-coding across all views (Explorer, Canvas, Layers Panel, Timeline):
+
+```typescript
+type AssetOrigin =
+  | 'inspiration'  // Imported for reference, not a deliverable (amber: --a-tertiary)
+  | 'manual'       // Created directly by the author (blue: --e-original)
+  | 'imported'     // From external filesystem or URL (green: --e-imported)
+  | 'generated'    // AI output with provenance metadata (lavender: --t-prompt)
+  | 'remixed'      // Derived/edited from a generated asset (red: --e-user-added)
+  | 'assembled';   // Composed from multiple sources in the timeline (purple: --t-video)
+```
+
+**Origin in practice**:
+- When a user drags a reference photo from their Desktop → `origin: 'inspiration'`
+- When a user sketches in the draw tool → `origin: 'manual'`
+- When a user imports a stock photo they licensed → `origin: 'imported'`
+- When Imagen generates an image → `origin: 'generated'`
+- When a user inpaints a generated image → `origin: 'remixed'`
+- When a project is exported as a final video → `origin: 'assembled'`
 
 ### 2.5 Media Format Matrix
 
@@ -296,25 +326,44 @@ User ───1:N──▶ Project
 
 ```
 MyProject.arsproj/
-├── manifest.json           # Version, app build, checksums, created/modified dates
-├── workspace.json          # Panel layout, mode, viewport state
-├── canvas.json             # All CanvasItems: id, type, x, y, w, h, rotation, zIndex, asset references
-├── timeline.json           # Tracks, clips, markers, transitions
-├── graph.json              # Node graph: nodes, edges (rework mode)
-├── project.json            # Project metadata: name, type, synopsis, tags, aspect ratio
+├── manifest.json               # Version, app build, checksums, created/modified dates
+├── workspace.json              # Panel layout, mode, viewport state
+├── canvas.json                 # All CanvasItems: id, type, x, y, w, h, rotation, zIndex, asset references
+├── timeline.json               # Tracks, clips, markers, transitions
+├── graph.json                  # Node graph: nodes, edges (rework mode)
+├── project.json                # Project metadata: name, type, synopsis, logline, tags, aspect ratio, genre
+│
+├── pre-production/             # Author's Vision Pipeline inputs
+│   ├── script.md              # Screenplay or treatment (formatted Markdown)
+│   ├── shot-list.json         # Array of shot nodes: camera, action, duration, dialogue cue
+│   ├── storyboard.json        # Ordered storyboard frames referencing generated images
+│   ├── animatic.json          # Rough sequence of storyboard frames with timing
+│   ├── color-script.json      # Per-scene mood swatch array
+│   ├── characters/            # Character profile JSONs
+│   │   └── {name}.character.json   # name, appearance, voice, wardrobe, arc, reference images
+│   └── locations/             # Location definition JSONs
+│       └── {name}.location.json    # description, time-of-day, props, reference images
+│
+├── inspiration/               # Inspiration Assets (non-deliverables)
+│   ├── mood-boards/           # Reference image grids per scene/chapter
+│   ├── style-references/      # Images whose style to transfer to generation
+│   ├── color-palettes/        # Extracted or manual palette JSONs
+│   └── sketches/              # Author-drawn reference images
+│
 ├── assets/
-│   ├── index.json          # Asset registry: all assets with id, type, MIME, size, provenance
-│   ├── generated/          # AI-generated binaries
+│   ├── index.json             # Asset registry: all assets with id, type, MIME, size, origin, provenance
+│   ├── generated/             # AI-generated binaries
 │   │   ├── gen_001.png
-│   │   ├── gen_001.meta.json   # Sidecar: prompt, seed, model, generatedAt
+│   │   ├── gen_001.meta.json  # Sidecar: prompt, seed, model, generatedAt, inspirationIds
 │   │   └── ...
-│   ├── imports/            # User-imported files
-│   ├── exports/            # Final renders
-│   ├── audio/              # Audio assets
-│   ├── prompts/            # Saved prompt templates
-│   └── characters/         # Character profile JSONs
-└── versions/               # Snapshot versions (optional)
-    ├── v1.json
+│   ├── imports/               # User-imported deliverable files
+│   ├── exports/               # Final renders
+│   ├── audio/                 # Audio assets (TTS, music, SFX)
+│   ├── prompts/               # Saved prompt templates (.prompt.json)
+│   └── vocabulary/            # Cinematography vocab presets (.vocab.json)
+│
+└── versions/                  # Named snapshots
+    ├── v1.json                # Canvas + timeline + graph at a point in time
     └── v2.json
 ```
 
@@ -408,15 +457,186 @@ EXPORT FORMAT (Platform Preset)
 
 ### 6.2 Soft Delete Pattern
 
-All major models should support soft delete:
+All major models must support soft delete. Hard deletion is prohibited in production:
 
+```sql
+-- ❌ NEVER: irrecoverable, breaks audit trails
+DELETE FROM "Project" WHERE id = '...';
+
+-- ✅ ALWAYS: soft delete preserves referential integrity + enables recovery
+UPDATE "Project" SET "deletedAt" = NOW() WHERE id = '...';
+
+-- Query all active records (add to every Prisma query)
+WHERE "deletedAt" IS NULL
+
+-- Recovery (undo delete within 30 days)
+UPDATE "Project" SET "deletedAt" = NULL WHERE id = '...';
+
+-- Hard purge (run via nightly cron after 30-day grace period)
+DELETE FROM "Project" WHERE "deletedAt" < NOW() - INTERVAL '30 days';
 ```
-Instead of DELETE FROM Project WHERE id = ...
-→ UPDATE Project SET deletedAt = NOW() WHERE id = ...
 
-Query all active: WHERE deletedAt IS NULL
-Recover: UPDATE Project SET deletedAt = NULL WHERE id = ...
-Purge: DELETE WHERE deletedAt < NOW() - INTERVAL '30 days'
+**Prisma schema additions** (add to ALL major models):
+```prisma
+model Project {
+  // ... existing fields ...
+  deletedAt  DateTime?  // null = active, non-null = soft-deleted
+  @@index([deletedAt])
+}
+
+model Asset {
+  // ... existing fields ...
+  deletedAt  DateTime?
+  @@index([userId, deletedAt])
+}
+
+model GenerationJob {
+  // ... existing fields ...
+  deletedAt  DateTime?
+}
+```
+
+### 6.3 Asset Relation Junction Table (Missing — Must Add)
+
+The current `parentAssetId: String?` scalar only models trees (one parent). Complex relationships require a proper junction table with typed relation kinds:
+
+```prisma
+model AssetRelation {
+  id           String       @id @default(cuid())
+  sourceId     String
+  targetId     String
+  relationType RelationType
+  strength     Float?       // 0.0–1.0 confidence or usage weight
+  metadata     Json?        // e.g., { "faceMatchScore": 0.92 }
+  createdAt    DateTime     @default(now())
+  createdBy    String?      // userId who created the relation
+
+  source Asset @relation("SourceRelations", fields: [sourceId], references: [id], onDelete: Cascade)
+  target Asset @relation("TargetRelations", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, relationType])
+  @@index([sourceId])
+  @@index([targetId])
+}
+
+enum RelationType {
+  DERIVED_FROM     // This asset was generated/inpainted/upscaled from that one
+  VARIANT_OF       // Same prompt + different seed (alternate version)
+  USED_IN          // This asset appears in that project/composition
+  REFERENCES       // Non-destructive style/inspiration reference
+  GROUPED_WITH     // Manually grouped together on canvas
+  CHARACTER_OF     // This generated image depicts that character profile
+  STYLE_SOURCE_FOR // This inspiration image's style was applied to generate that asset
+  AUDIO_FOR        // This audio track was generated/imported for that video
+  SUBTITLE_FOR     // This SRT/VTT file contains captions for that video
+  THUMBNAIL_FOR    // This image is a thumbnail representation of that asset
+}
+```
+
+**Usage examples:**
+```typescript
+// After generating a variant: source prompt image → variant
+createRelation({ sourceId: originalId, targetId: variantId, relationType: 'VARIANT_OF' });
+
+// After character injection: generated image → character profile
+createRelation({ sourceId: generatedImageId, targetId: characterProfileId, relationType: 'CHARACTER_OF' });
+
+// After inpainting: remixed asset → original
+createRelation({ sourceId: inpaintedId, targetId: originalId, relationType: 'DERIVED_FROM' });
+```
+
+### 6.4 Project Analytics Layer (Pre-Aggregated Stats)
+
+Dashboard stats should not be computed on-the-fly from raw data. A `ProjectAnalytics` materialized view is updated periodically (after each generation job, on a cron, or via DB trigger):
+
+```prisma
+model ProjectAnalytics {
+  id                 String   @id @default(cuid())
+  projectId          String   @unique
+  
+  // Generation stats
+  generationCount    Int      @default(0)
+  failedCount        Int      @default(0)
+  cancelledCount     Int      @default(0)
+  totalCostEstimate  Float    @default(0)  // USD estimate based on provider pricing
+  
+  // Asset stats
+  assetCount         Int      @default(0)
+  assetCountByType   Json?    // { "image": 12, "video": 3, "audio": 5, "script": 1 }
+  assetCountByOrigin Json?    // { "generated": 10, "imported": 2, "remixed": 3 }
+  
+  // Time stats
+  activeTimeMinutes  Int      @default(0)
+  firstActivityAt    DateTime?
+  lastActivityAt     DateTime?
+  
+  // Publish stats
+  publishedCount     Int      @default(0)
+  platformReach      Json?    // { "tiktok": 12000, "instagram": 4500 }
+  
+  calculatedAt       DateTime @default(now())
+  project            Project  @relation(fields: [projectId], references: [id])
+  
+  @@index([projectId, calculatedAt])
+}
+```
+
+**Recalculation trigger** (call after each generation job completes):
+```typescript
+async function recalculateProjectAnalytics(projectId: string): Promise<void> {
+  const [assetStats, genStats, publishStats] = await Promise.all([
+    prisma.asset.groupBy({ by: ['type', 'origin'], where: { projectId, deletedAt: null } }),
+    prisma.generationJob.groupBy({ by: ['status'], where: { projectId } }),
+    prisma.publishJob.aggregate({ where: { projectId, status: 'POSTED' }, _count: true }),
+  ]);
+
+  await prisma.projectAnalytics.upsert({
+    where: { projectId },
+    create: { projectId, ...computedStats },
+    update: { ...computedStats, calculatedAt: new Date() },
+  });
+}
+```
+
+### 6.5 Event Store (Future — Event Sourcing Foundation)
+
+For audit trails and time-travel debugging, domain events should be persisted as an append-only log:
+
+```prisma
+model DomainEvent {
+  id          String   @id @default(cuid())
+  aggregateId String   // projectId, assetId, userId, etc.
+  aggregateType String // "Project", "Asset", "GenerationJob"
+  eventType   String  // "GenerationCompleted", "AssetDeleted", "ProjectArchived"
+  eventData   Json    // Serialized event payload
+  userId      String? // Who triggered the event
+  occurredAt  DateTime @default(now())
+
+  @@index([aggregateId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@index([userId, occurredAt])
+}
+```
+
+**Event types (exhaustive catalog):**
+```typescript
+type DomainEventType =
+  // Project
+  | 'ProjectCreated' | 'ProjectRenamed' | 'ProjectArchived' | 'ProjectRestored' | 'ProjectDeleted'
+  | 'ProjectSnapshotCreated' | 'ProjectVersionRestored'
+  // Asset
+  | 'AssetImported' | 'AssetGenerated' | 'AssetEdited' | 'AssetTagged' | 'AssetDeleted'
+  | 'AssetRelationCreated' | 'AssetRelationDeleted'
+  // Generation
+  | 'GenerationQueued' | 'GenerationStarted' | 'GenerationCompleted' | 'GenerationFailed'
+  | 'GenerationCancelled' | 'GenerationRetried'
+  // Character
+  | 'CharacterCreated' | 'CharacterUpdated' | 'CharacterReferenceAdded'
+  // Publishing
+  | 'PostScheduled' | 'PostSubmitted' | 'PostPosted' | 'PostFailed'
+  | 'AnalyticsUpdated'
+  // Settings
+  | 'ApiKeyAdded' | 'ApiKeyRemoved' | 'SettingsChanged';
 ```
 
 ---

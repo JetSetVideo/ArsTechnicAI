@@ -3,39 +3,25 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
   Settings,
-  Wand2,
-  Film,
   Save,
   Loader2,
   ChevronRight,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { SearchBar } from '../ui/SearchBar';
-import { useLogStore, useCanvasStore, useProjectStore, useNodeStore } from '@/stores';
+import { useLogStore, useProjectStore } from '@/stores';
+import { useToastStore } from '@/stores/toastStore';
 import { useProjectSync, saveProjectWorkspaceState } from '@/hooks/useProjectSync';
 import { saveToDisk } from '@/hooks/useDiskSave';
 import styles from './TopBar.module.css';
-import type { WorkspaceMode, SearchScope } from '@/types';
+import type { SearchScope } from '@/types';
 
 interface TopBarProps {
-  currentMode: WorkspaceMode;
-  onModeChange: (mode: WorkspaceMode) => void;
-  onToggleExplorer: () => void;
-  onToggleInspector: () => void;
-  onToggleTimeline: () => void;
   onOpenSettings: () => void;
-  onOpenHelp?: () => void;
-  explorerVisible: boolean;
-  inspectorVisible: boolean;
-  timelineVisible: boolean;
   projectName: string;
   onProjectNameChange: (name: string) => void;
+  moduleActions?: React.ReactNode;
 }
-
-const modes: { id: WorkspaceMode; label: string; icon: React.ReactNode }[] = [
-  { id: 'creation', label: 'Creation', icon: <Wand2 size={16} /> },
-  { id: 'timeline', label: 'Timeline', icon: <Film size={16} /> },
-];
 
 function formatRelative(isoDate: string): string {
   const diff = Date.now() - new Date(isoDate).getTime();
@@ -48,22 +34,15 @@ function formatRelative(isoDate: string): string {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
-  currentMode,
-  onModeChange,
-  onToggleExplorer,
-  onToggleInspector,
-  onToggleTimeline,
   onOpenSettings,
-  onOpenHelp,
-  explorerVisible,
-  inspectorVisible,
-  timelineVisible,
   projectName,
   onProjectNameChange,
+  moduleActions,
 }) => {
   const { data: session } = useSession();
   const log = useLogStore((s) => s.log);
   const { projectId, setProject } = useProjectStore();
+  const toast = useToastStore();
   const [actionLoading, setActionLoading] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [localName, setLocalName] = useState(projectName);
@@ -147,7 +126,8 @@ export const TopBar: React.FC<TopBarProps> = ({
     }
 
     setActionLoading(false);
-  }, [projectId, projectName, isAuthenticated, saveVersion, log, onProjectNameChange, setProject]);
+    toast.addToast({ type: 'success', title: 'Saved', message: isAuthenticated ? 'Project saved locally and to cloud.' : 'Project saved locally.', duration: 2500 });
+  }, [projectId, projectName, isAuthenticated, saveVersion, log, onProjectNameChange, setProject, toast]);
 
   const handleNameBlur = () => {
     setIsEditingName(false);
@@ -164,27 +144,10 @@ export const TopBar: React.FC<TopBarProps> = ({
     }
   };
 
-  const handleModeClick = (modeId: WorkspaceMode) => {
-    onModeChange(modeId);
-    
-    if (modeId === 'creation') {
-      const { addNode } = useNodeStore.getState();
-      const { viewport } = useCanvasStore.getState();
-      
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
-      const x = (cx - viewport.x) / viewport.zoom - 130;
-      const y = (cy - viewport.y) / viewport.zoom - 100;
-      
-      addNode('prompt', x, y);
-      log('canvas_add', 'Added prompt node via Creation button');
-    }
-  };
-
   return (
-    <header className={styles.topBar}>
+    <header id="topbar-app-header-workspace" className={styles.topBar}>
       {/* Left section - Logo, Breadcrumbs, Save, Search */}
-      <div className={styles.section}>
+      <div id="topbar-section-left-brand-nav" className={styles.section}>
         <Link href="/home" className={styles.homeLink} title="Back to Dashboard">
           <div className={styles.logo}>
             <span className={styles.logoArs}>Ars</span>
@@ -247,22 +210,9 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </div>
 
-      {/* Right section - Mode Nav, Inspector Toggle, Settings */}
-      <div className={styles.section}>
-        {/* Mode switcher */}
-        <nav className={styles.modeNav}>
-          {modes.map((mode) => (
-            <button
-              key={mode.id}
-              className={`${styles.modeButton} ${currentMode === mode.id ? styles.active : ''}`}
-              onClick={() => handleModeClick(mode.id)}
-              title={mode.label}
-            >
-              {mode.icon}
-              <span>{mode.label}</span>
-            </button>
-          ))}
-        </nav>
+      {/* Right section - Module actions */}
+      <div id="topbar-section-right-modes-account" className={styles.section}>
+        {moduleActions}
       </div>
     </header>
   );

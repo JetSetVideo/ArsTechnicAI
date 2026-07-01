@@ -13,7 +13,10 @@ export type PortType =
   | 'text'
   | 'data'
   | 'mask'
-  | 'number';
+  | 'number'
+  | 'latent'
+  | 'conditioning'
+  | 'model';
 
 export type ModuleCategory =
   | 'ingest'

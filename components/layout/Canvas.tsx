@@ -66,7 +66,7 @@ function svgToDataUrl(svg: string): string {
 
 function createShapeSvg(width: number, height: number): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    <rect x="2" y="2" width="${Math.max(1, width - 4)}" height="${Math.max(1, height - 4)}" rx="10" fill="rgba(0,212,170,0.08)" stroke="#00d4aa" stroke-width="4"/>
+    <rect x="2" y="2" width="${Math.max(1, width - 4)}" height="${Math.max(1, height - 4)}" rx="10" fill="rgba(0,212,170,0.08)" stroke="var(--accent-primary)" stroke-width="4"/>
   </svg>`;
   return svgToDataUrl(svg);
 }
@@ -76,7 +76,7 @@ function createPenSvg(points: { x: number; y: number }[], width: number, height:
     .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
     .join(' ');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    <path d="${path}" fill="none" stroke="#00d4aa" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${path}" fill="none" stroke="var(--accent-primary)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
   return svgToDataUrl(svg);
 }
@@ -223,11 +223,11 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   const [orbSpinKey, setOrbSpinKey] = useState<Record<string, number>>({});
 
   const NODE_COLORS: Record<string, string> = {
-    generated: '#00d4aa',
-    image: '#a855f7',
-    video: '#3b82f6',
-    audio: '#f59e0b',
-    text: '#10b981',
+    generated: 'var(--success)',
+    image: 'var(--accent-secondary)',
+    video: 'var(--accent-tertiary)',
+    audio: 'var(--warning)',
+    text: 'var(--success)',
     placeholder: '#6b7280',
     template: '#eab308',
   };
@@ -1255,7 +1255,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   }, []);
 
   return (
-    <div className={styles.canvasWrapper}>
+    <div id="canvas-workspace-root" className={styles.canvasWrapper}>
       {/* Toolbar */}
       <div className={styles.toolbar}>
         <div
@@ -1349,6 +1349,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
       {/* Canvas */}
       <div
+        id="canvas-infinite-workspace-active"
         ref={canvasRef}
         className={`${styles.canvas} ${isDragging ? styles.dropTarget : ''} ${showGrid ? styles.showGrid : ''}`}
         style={{ cursor: getCursor() }}
@@ -1361,6 +1362,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         onContextMenu={handleContextMenu}
       >
         <div
+          id="canvas-viewport-transform-layer"
           className={styles.canvasContent}
           style={{
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,

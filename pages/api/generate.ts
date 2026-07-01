@@ -64,6 +64,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     guidanceScale,
     projectId,
     apiKey,
+    referenceImages,
+    compositionOverlay,
   } = parsed.data;
 
   const resolvedProvider: AIProvider = (provider as AIProvider) || 'GOOGLE_IMAGEN';
@@ -139,6 +141,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       steps,
       guidanceScale,
       apiKey,
+      referenceImages: referenceImages?.slice(0, 5),
+      compositionOverlay,
     });
 
     // Save generated image to disk (always) and DB (authenticated users)
