@@ -64,6 +64,38 @@
 .countMoreBtn:hover { border-color: var(--border-strong); }
 .dimHint { font-size: 0.625rem; color: var(--text-muted); font-family: var(--font-mono); margin-left: auto; }
 
+.genMetaRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.modelBadge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; background: rgba(0,212,170,0.08); border: 1px solid rgba(0,212,170,0.2); border-radius: 999px; color: var(--accent-primary); font-size: 0.625rem; font-weight: 600; }
+.modelBadge code { font-family: var(--font-mono); font-size: 0.5625rem; color: var(--text-secondary); font-weight: 500; }
+.apiKeyWarning { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); border-radius: 999px; color: var(--error); font-size: 0.625rem; padding: 3px 10px; cursor: pointer; }
+.apiKeyWarning:hover { background: rgba(239,68,68,0.12); }
+
+.genOptionsRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: flex-start; }
+.locationField { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 220px; padding: 5px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; }
+.locationField svg { color: var(--text-muted); flex-shrink: 0; }
+.locationInput { flex: 1; background: none; border: none; color: var(--text-primary); font-size: 0.6875rem; outline: none; min-width: 0; }
+.locationInput::placeholder { color: var(--text-muted); }
+
+.referenceField { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
+.referenceBtn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-secondary); font-size: 0.6875rem; cursor: pointer; white-space: nowrap; }
+.referenceBtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.referenceChips { display: flex; flex-wrap: wrap; gap: 4px; }
+.referenceChip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 2px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 999px; max-width: 160px; }
+.referenceThumb { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.referenceChipLabel { font-size: 0.5625rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.referenceChipRemove { display: flex; align-items: center; justify-content: center; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0; }
+.referenceChipRemove:hover { color: var(--error); }
+.referenceDropdown { position: absolute; top: calc(100% + 4px); right: 0; z-index: 120; min-width: 240px; max-width: 320px; max-height: 240px; overflow-y: auto; background: var(--bg-overlay); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; box-shadow: var(--shadow-lg); }
+.referenceEmpty { margin: 0; padding: 10px 12px; font-size: 0.6875rem; color: var(--text-muted); }
+.referenceOption { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; background: none; border: none; border-radius: 6px; color: var(--text-secondary); font-size: 0.6875rem; cursor: pointer; text-align: left; }
+.referenceOption:hover:not(:disabled) { background: rgba(0,212,170,0.06); color: var(--text-primary); }
+.referenceOption:disabled { opacity: 0.45; cursor: not-allowed; }
+.referenceOptionActive { background: rgba(0,212,170,0.1); color: var(--accent-primary); }
+.referenceOptionThumb { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+.referenceOptionPlaceholder { width: 28px; height: 28px; border-radius: 4px; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.referenceOptionLabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.referenceOptionCheck { color: var(--accent-primary); font-size: 0.75rem; }
+
 /* Style dropdown */
 .styleDropdown { position: absolute; top: 100%; left: 0; z-index: 100; margin-top: 4px; background: var(--bg-overlay); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; min-width: 180px; box-shadow: var(--shadow-lg); max-height: 280px; overflow-y: auto; }
 .styleOption { display: block; width: 100%; padding: 6px 12px; background: none; border: none; color: var(--text-secondary); font-size: 0.75rem; cursor: pointer; text-align: left; border-radius: 5px; }

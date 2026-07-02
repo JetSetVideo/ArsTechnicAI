@@ -988,6 +988,9 @@
 
 /* ── Prominent prompt display ────────────────────────────── */
 .promptDisplay {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   padding: 8px 10px;
   border-left: 3px solid var(--accent-primary);
   background: var(--bg-primary);
@@ -999,6 +1002,29 @@
   margin: 4px 0;
   max-height: 120px;
   overflow-y: auto;
+}
+
+.regenBtn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  color: var(--accent-primary);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  white-space: nowrap;
+}
+
+.regenBtn:hover {
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 /* ── Multi-selection summary ─────────────────────────────── */
@@ -1383,6 +1409,31 @@
   color: var(--text-primary);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+/* Clickable resolution button */
+.resolutionBtn {
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: none;
+  width: 100%;
+  transition: background 0.15s;
+}
+
+.resolutionBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.resolutionBtn:hover .mediaInfoLabel {
+  color: var(--accent-primary);
+}
+
+.resolutionValue {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-primary) !important;
 }
 
 /* ── Projects row ─────────────────────────────────────────── */

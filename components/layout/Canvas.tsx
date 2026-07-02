@@ -14,7 +14,6 @@ import {
   RotateCw,
   Lock,
   MessageSquareText,
-  Cpu,
   GitBranch,
   ChevronDown,
   ChevronUp,
@@ -26,12 +25,19 @@ import {
   Music,
   Group,
   BookOpen,
+  Link2,
+  X,
 } from 'lucide-react';
 import { useCanvasStore, useFileStore, useLogStore, useSettingsStore, useNodeStore } from '@/stores';
 import { Button } from '../ui/Button';
 import styles from './Canvas.module.css';
 import nodeStyles from './NodeGraph.module.css';
 import { NodeCard, ConnLine } from './NodeComponents';
+import { NodeEtiquette, type NodeTabId } from './NodeEtiquette';
+import { CanvasConnections } from './CanvasConnections';
+import { useCanvasPointerInteractions } from '@/hooks/useCanvasPointerInteractions';
+import { findParentItemAtPoint, attachOverlayToParent } from '@/lib/canvas/migration';
+import { exceedsDragThreshold } from '@/lib/canvas/viewport';
 import type { CanvasItem, Asset, GenerationMeta } from '@/types';
 import { NODE_DEFS, type NodeType } from '@/stores/nodeStore';
 
@@ -114,14 +120,15 @@ function getNodeTabVisibility(item: CanvasItem, meta: GenerationMeta | undefined
 }
 
 function resolveActiveNodeTab(
-  raw: 'name' | 'prompt' | 'info' | 'versions' | null | undefined,
+  raw: NodeTabId | null | undefined,
   vis: ReturnType<typeof getNodeTabVisibility>,
-): 'name' | 'prompt' | 'info' | 'versions' | null {
+): NodeTabId | null {
   if (!raw) return null;
   if (raw === 'name') return 'name';
   if (raw === 'prompt' && vis.hasPrompt) return 'prompt';
   if (raw === 'info' && vis.hasInfo) return 'info';
   if (raw === 'versions' && vis.hasVersions) return 'versions';
+  if (raw === 'layers') return 'layers';
   return null;
 }
 
@@ -148,6 +155,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     viewport,
     addItemFromAsset,
     addItem,
+    removeItem,
     removeSelected,
     updateItem,
     selectItem,
@@ -167,6 +175,18 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     groupItems,
     addItemToGroup,
     setGroupOrbit,
+    moveItemWithChildren,
+    moveSelectedItems,
+    moveManyItems,
+    showAnchors,
+    setShowAnchors,
+    startConnection,
+    anchors,
+    getChildLayers,
+    getRelatedItems,
+    focusItemInViewport,
+    cancelConnection,
+    pendingConnection,
   } = useCanvasStore();
 
   const { nodes, connections } = useNodeStore();
@@ -201,6 +221,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragItemId, setDragItemId] = useState<string | null>(null);
+  // For multi-item drag: track each selected item's starting position
+  const multiDragOrigins = useRef<Record<string, { x: number; y: number }>>({});
   const [showGrid, setShowGrid] = useState(settings.showGrid);
   const [promptOverlayItemId, setPromptOverlayItemId] = useState<string | null>(null);
   const [versionOverlayItemId, setVersionOverlayItemId] = useState<string | null>(null);
@@ -214,8 +236,10 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
+  // Keyboard shortcut overlay
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
   // Tab state for all canvas nodes: map of itemId -> activeTab
-  type NodeTabId = 'name' | 'prompt' | 'info' | 'versions';
   const [activeNodeTabs, setActiveNodeTabs] = useState<Record<string, NodeTabId | null>>({});
   // Orb expanded state: map of itemId -> boolean
   const [orbExpanded, setOrbExpanded] = useState<Record<string, boolean>>({});
@@ -317,12 +341,18 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     }));
   }, []);
 
+  // Related-asset orbit: map of sourceItemId -> array of orbitItem ids in circle
+  const [relatedOrbitSource, setRelatedOrbitSource] = useState<string | null>(null);
+
   const toggleOrb = useCallback((itemId: string) => {
     setOrbExpanded((prev) => {
-      const next = { ...prev, [itemId]: !prev[itemId] };
+      const willOpen = !prev[itemId];
+      const next = { ...prev, [itemId]: willOpen };
       if (!prev[itemId]) {
         setActiveNodeTabs((t) => ({ ...t, [itemId]: null }));
       }
+      // Toggle orbit for related assets
+      setRelatedOrbitSource(willOpen ? itemId : null);
       return next;
     });
     setOrbSpinKey((prev) => ({ ...prev, [itemId]: (prev[itemId] ?? 0) + 1 }));
@@ -344,6 +374,37 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     },
     [viewport.zoom],
   );
+
+  // Related-asset circle orbit positions (canvas units)
+  // When relatedOrbitSource is set, fan the related items in a circle around the source node.
+  const relatedOrbitPositions = useMemo<Map<string, { x: number; y: number }>>(() => {
+    if (!relatedOrbitSource) return new Map();
+    const sourceItem = items.find((i) => i.id === relatedOrbitSource);
+    if (!sourceItem) return new Map();
+
+    const related = getRelatedItems(relatedOrbitSource);
+    const parentIds = sourceItem.generationMeta?.parentIds ?? [];
+    const parentItems = items.filter((i) =>
+      parentIds.includes(i.id) || (i.assetId && parentIds.includes(i.assetId))
+    );
+    const orbitItems = [...new Map([...related, ...parentItems].map((i) => [i.id, i])).values()]
+      .filter((i) => i.id !== relatedOrbitSource);
+
+    if (orbitItems.length === 0) return new Map();
+
+    const srcCX = sourceItem.x + (sourceItem.width * sourceItem.scale) / 2;
+    const srcCY = sourceItem.y + (sourceItem.height * sourceItem.scale) / 2;
+    const orbitR = Math.max(sourceItem.width * sourceItem.scale, sourceItem.height * sourceItem.scale) * 0.7 + 220;
+
+    const map = new Map<string, { x: number; y: number }>();
+    orbitItems.forEach((orbitItem, idx) => {
+      const angle = (idx / orbitItems.length) * Math.PI * 2 - Math.PI / 2;
+      const ox = srcCX + Math.cos(angle) * orbitR - (orbitItem.width * orbitItem.scale) / 2;
+      const oy = srcCY + Math.sin(angle) * orbitR - (orbitItem.height * orbitItem.scale) / 2;
+      map.set(orbitItem.id, { x: ox, y: oy });
+    });
+    return map;
+  }, [relatedOrbitSource, items, getRelatedItems]);
 
   // Handle double-click on filename tag to start editing
   const handleTagDoubleClick = useCallback((e: React.MouseEvent, item: CanvasItem) => {
@@ -435,8 +496,15 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           selectedNodeIds.forEach(id => useNodeStore.getState().removeNode(id));
         }
       } else if (e.key === 'Escape') {
+        if (showShortcuts) {
+          setShowShortcuts(false);
+          return;
+        }
         if (contextMenu) {
           setContextMenu(null);
+        } else if (useCanvasStore.getState().pendingConnection) {
+          cancelConnection();
+          setShowAnchors(false);
         } else if (lassoPhase === 'drawing') {
           setLassoPhase('idle');
           setAutoLassoActive(false);
@@ -495,6 +563,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         zoomOut();
       } else if (e.key === '0') {
         resetViewport();
+      } else if (e.key === '?') {
+        setShowShortcuts(prev => !prev);
       }
     };
 
@@ -511,7 +581,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedIds, removeSelected, clearSelection, copy, paste, zoomIn, zoomOut, resetViewport, undo, redo, log, activeTool, lassoPhase, autoLassoActive, contextMenu, switchTool]);
+  }, [selectedIds, removeSelected, clearSelection, copy, paste, zoomIn, zoomOut, resetViewport, undo, redo, log, activeTool, lassoPhase, autoLassoActive, contextMenu, switchTool, showShortcuts]);
 
   // Handle drop from explorer
   const handleDrop = useCallback(
@@ -730,8 +800,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
   }, [viewport]);
 
   const createTextLayer = useCallback((x: number, y: number) => {
-    const item = addItem({
-      type: 'text',
+    const parentItem = findParentItemAtPoint(useCanvasStore.getState().items, x, y);
+    const draft = {
+      type: 'text' as const,
       x,
       y,
       width: 260,
@@ -742,7 +813,20 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       visible: true,
       src: 'Double-click to edit text',
       name: 'Text Layer',
-    });
+      overlayKind: 'text' as const,
+      layerRole: parentItem ? ('overlay' as const) : ('base' as const),
+    };
+    const item = addItem(
+      parentItem
+        ? {
+            ...draft,
+            ...attachOverlayToParent(
+              { id: '', x, y, width: 260, height: 72, scale: 1, rotation: 0 } as CanvasItem,
+              parentItem,
+            ),
+          }
+        : draft,
+    );
     selectItem(item.id);
     log('canvas_add', 'Added text layer');
   }, [addItem, selectItem, log]);
@@ -767,6 +851,78 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     });
     return true;
   }, [overlayTool, getCanvasPoint, createTextLayer]);
+
+  const etiquetteDragRef = useRef<{
+    itemId: string;
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    origPos: { x: number; y: number };
+    dragging: boolean;
+  } | null>(null);
+
+  const handleTagPointerDown = useCallback((e: React.PointerEvent, item: CanvasItem) => {
+    if (item.locked) return;
+    e.stopPropagation();
+    selectItem(item.id, e.shiftKey || e.metaKey || e.ctrlKey);
+    const origPos = item.etiquettePosition ?? { x: 0, y: -28 };
+    etiquetteDragRef.current = {
+      itemId: item.id,
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      origPos,
+      dragging: false,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [selectItem]);
+
+  const handleResetEtiquettePosition = useCallback((itemId: string) => {
+    snapshot();
+    useCanvasStore.getState().updateEtiquettePosition(itemId, { x: 0, y: -28 });
+  }, [snapshot]);
+
+  const handleFocusRelatedItem = useCallback((itemId: string) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    focusItemInViewport(itemId, rect?.width, rect?.height);
+  }, [focusItemInViewport]);
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const drag = etiquetteDragRef.current;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      if (!drag.dragging) {
+        if (!exceedsDragThreshold(drag.startClientX, drag.startClientY, e.clientX, e.clientY)) return;
+        drag.dragging = true;
+        snapshot();
+      }
+      const dx = (e.clientX - drag.startClientX) / viewport.zoom;
+      const dy = (e.clientY - drag.startClientY) / viewport.zoom;
+      useCanvasStore.getState().updateEtiquettePosition(drag.itemId, {
+        x: drag.origPos.x + dx,
+        y: drag.origPos.y + dy,
+      });
+    };
+    const onUp = (e: PointerEvent) => {
+      if (etiquetteDragRef.current?.pointerId === e.pointerId) {
+        etiquetteDragRef.current = null;
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [viewport.zoom, snapshot]);
+
+  const pointerInteractions = useCanvasPointerInteractions({
+    canvasRef,
+    activeTool,
+    viewport,
+    overlayTool,
+    onOverlayStart: (e) => beginOverlayDraft(e),
+  });
 
   // Item drag start — take snapshot for undo
   const handleItemMouseDown = useCallback(
@@ -793,8 +949,35 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
       snapshot(); // Snapshot before move for undo
 
-      selectItem(item.id, e.shiftKey || e.metaKey);
+      // If item is already in a multi-selection and no modifier key, preserve selection for group drag
+      const alreadyInMultiSelect = selectedIds.includes(item.id) && selectedIds.length > 1;
+      if (!alreadyInMultiSelect) {
+        selectItem(item.id, e.shiftKey || e.ctrlKey);
+      }
       bringToFront(item.id);
+      if (selectedIds.length <= 1) setShowAnchors(true);
+
+      // Capture starting positions of all currently-selected items for multi-drag.
+      // Also expand to group siblings — dragging one grouped item moves all in the group.
+      const currentItems = useCanvasStore.getState().items;
+      const baseIds = alreadyInMultiSelect
+        ? selectedIds
+        : e.shiftKey || e.ctrlKey
+          ? [...selectedIds, item.id].filter((id, i, arr) => arr.indexOf(id) === i)
+          : [item.id];
+      // Expand: if any baseId belongs to a userGroup, include all group siblings
+      const groupIds = new Set(
+        baseIds.map((id) => currentItems.find((ci) => ci.id === id)?.groupId).filter(Boolean)
+      );
+      const effectiveSelectedIds = [...new Set([
+        ...baseIds,
+        ...currentItems.filter((ci) => ci.groupId && groupIds.has(ci.groupId)).map((ci) => ci.id),
+      ])];
+      multiDragOrigins.current = {};
+      for (const id of effectiveSelectedIds) {
+        const si = currentItems.find((ci) => ci.id === id);
+        if (si) multiDragOrigins.current[id] = { x: si.x, y: si.y };
+      }
 
       setDragItemId(item.id);
       setDragStart({
@@ -830,7 +1013,25 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       if (dragItemId) {
         const newX = (e.clientX - dragStart.x) / viewport.zoom;
         const newY = (e.clientY - dragStart.y) / viewport.zoom;
-        updateItem(dragItemId, { x: newX, y: newY });
+        const currentSelectedIds = useCanvasStore.getState().selectedIds;
+        if (currentSelectedIds.length > 1 && multiDragOrigins.current[dragItemId]) {
+          // Multi-drag: move all selected items maintaining their relative positions
+          const originX = multiDragOrigins.current[dragItemId].x;
+          const originY = multiDragOrigins.current[dragItemId].y;
+          const dx = newX - originX;
+          const dy = newY - originY;
+          // Build absolute movements from stored origins to avoid frame drift
+          const movements = currentSelectedIds
+            .filter((id) => multiDragOrigins.current[id])
+            .map((id) => ({
+              id,
+              x: multiDragOrigins.current[id].x + dx,
+              y: multiDragOrigins.current[id].y + dy,
+            }));
+          moveManyItems(movements);
+        } else {
+          moveItemWithChildren(dragItemId, newX, newY);
+        }
 
         // Detect hovering over another item for drag-to-group
         const currentItems = useCanvasStore.getState().items;
@@ -923,7 +1124,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         }
       }
     },
-    [dragItemId, dragStart, viewport, isPanning, lassoPhase, overlayDraft, getCanvasPoint, updateItem, resizingItemId, resizingHandle, setViewport]
+    [dragItemId, dragStart, viewport, isPanning, lassoPhase, overlayDraft, getCanvasPoint, moveItemWithChildren, moveSelectedItems, moveManyItems, resizingItemId, resizingHandle, setViewport]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -959,8 +1160,14 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             height: Math.round(height),
           };
 
+      const overlayKind = overlayDraft.tool === 'pen' ? 'pen' : 'shape';
+      const overlayType = overlayDraft.tool === 'pen' ? 'drawing' : 'shape';
+      const centerX = itemX + src.width / 2;
+      const centerY = itemY + src.height / 2;
+      const parentItem = findParentItemAtPoint(useCanvasStore.getState().items, centerX, centerY);
+
       const item = addItem({
-        type: 'image',
+        type: overlayType as CanvasItem['type'],
         x: itemX,
         y: itemY,
         width: src.width,
@@ -971,6 +1178,12 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         visible: true,
         src: src.dataUrl,
         name: overlayDraft.tool === 'pen' ? 'Draw Layer' : 'Shape Layer',
+        overlayKind,
+        layerRole: parentItem ? 'overlay' : 'base',
+        ...(parentItem ? attachOverlayToParent(
+          { id: '', x: itemX, y: itemY, width: src.width, height: src.height, scale: 1, rotation: 0 } as CanvasItem,
+          parentItem,
+        ) : {}),
       });
       selectItem(item.id);
       log('canvas_add', `Added ${overlayDraft.tool === 'pen' ? 'draw' : 'shape'} layer`);
@@ -1056,18 +1269,31 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       return;
     }
 
-    const target = e.target as HTMLElement;
-    const isBackground = target === canvasRef.current || target.classList.contains(styles.canvasContent);
-    if (!isBackground) return;
-
+    // Hand tool: pan the canvas. Canvas items have stopPropagation, so anything
+    // reaching this handler is already a background / non-item click.
     if (activeTool === 'hand') {
       beginPan(e);
-    } else if (activeTool === 'lasso') {
-      beginMarquee(e);
-    } else if (activeTool === 'pointer') {
-      // Auto-lasso: hold-drag on empty canvas starts marquee selection
-      beginMarquee(e, true);
+      return;
     }
+
+    // Lasso tool: always start marquee on any canvas mousedown that reaches here.
+    // Items call e.stopPropagation() so they never bubble here.
+    if (activeTool === 'lasso') {
+      e.preventDefault();
+      beginMarquee(e);
+      return;
+    }
+
+    // Pointer tool: auto-lasso only when clicking the canvas background itself.
+    const target = e.target as HTMLElement;
+    const isBackground =
+      target === canvasRef.current ||
+      target.classList.contains(styles.canvasContent) ||
+      (target as HTMLElement).dataset?.canvasBackground === 'true' ||
+      (!target.closest?.('[data-canvas-item-id]') && !!target.closest?.('[data-canvas-background]'));
+
+    if (!isBackground) return;
+    beginMarquee(e, true);
   }, [overlayTool, beginOverlayDraft, activeTool, beginPan, beginMarquee]);
 
   useEffect(() => {
@@ -1266,14 +1492,52 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           onPointerUp={handleToolbarPointerUp}
           onPointerCancel={handleToolbarPointerUp}
         >
+          {/* ── Active Tools ── */}
           <div className={styles.toolbarGroup}>
-            <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo()} title="Undo (⌘Z)">
+            <button
+              className={[styles.toolBtn, activeTool === 'pointer' ? styles.toolBtnActive : ''].filter(Boolean).join(' ')}
+              style={{ '--tool-color': 'var(--accent-primary)' } as React.CSSProperties}
+              onClick={() => switchTool('pointer')}
+              title="Pointer — select & move (V)"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 2L2 11L5.5 8.5L7 12L8.5 11L7 7.5L11 7.5L2 2Z" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              className={[styles.toolBtn, activeTool === 'lasso' ? styles.toolBtnActive : ''].filter(Boolean).join(' ')}
+              style={{ '--tool-color': '#f59e0b' } as React.CSSProperties}
+              onClick={() => switchTool('lasso')}
+              title="Lasso — marquee select (L)"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="2" y="2" width="10" height="10" rx="2" strokeDasharray="3 2" />
+              </svg>
+            </button>
+            <button
+              className={[styles.toolBtn, activeTool === 'hand' ? styles.toolBtnActive : ''].filter(Boolean).join(' ')}
+              style={{ '--tool-color': '#60a5fa' } as React.CSSProperties}
+              onClick={() => switchTool('hand')}
+              title="Hand — pan canvas (H / Space)"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M6 1.5C6 1 6.5 0.5 7 0.5C7.5 0.5 8 1 8 1.5V6.5M8 2.5C8 2 8.5 1.5 9 1.5C9.5 1.5 10 2 10 2.5V6.5M10 3.5C10 3 10.5 2.5 11 2.5C11.5 2.5 12 3 12 3.5V8.5C12 10.5 10.5 13.5 7 13.5C3.5 13.5 2 11 2 8.5L4 5C4 4.5 4.5 4 5 4C5.5 4 6 4.5 6 5V6.5M4 1.5C4 1 4.5 0.5 5 0.5C5.5 0.5 6 1 6 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          <div className={styles.toolbarDivider} />
+
+          <div className={styles.toolbarGroup}>
+            <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo()} title="Undo (Ctrl+Z)">
               <Undo2 size={16} />
             </Button>
-            <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo()} title="Redo (⌘⇧Z)">
+            <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">
               <Redo2 size={16} />
             </Button>
           </div>
+
+          <div className={styles.toolbarDivider} />
 
           <div className={styles.toolbarGroup}>
             <Button variant="ghost" size="sm" onClick={zoomOut} title="Zoom Out (-)">
@@ -1291,36 +1555,55 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           <div className={styles.toolbarDivider} />
 
           <div className={styles.toolbarGroup}>
-            <Button
-              variant={showGrid ? 'secondary' : 'ghost'}
-              size="sm"
+            <button
+              className={[styles.toolBtn, showGrid ? styles.toolBtnActive : ''].filter(Boolean).join(' ')}
+              style={{ '--tool-color': 'var(--text-muted)' } as React.CSSProperties}
               onClick={() => setShowGrid(!showGrid)}
-              title="Toggle Grid"
+              title="Toggle Grid (G)"
             >
-              <Grid3X3 size={16} />
-            </Button>
+              <Grid3X3 size={14} />
+            </button>
+            <button
+              className={[styles.toolBtn, showAnchors ? styles.toolBtnActive : ''].filter(Boolean).join(' ')}
+              style={{ '--tool-color': 'var(--accent-secondary, #22d3ee)' } as React.CSSProperties}
+              onClick={() => setShowAnchors(!showAnchors)}
+              title="Toggle anchor points / connection ports (A)"
+            >
+              <Link2 size={14} />
+            </button>
           </div>
 
           {selectedIds.length > 0 && (
             <>
               <div className={styles.toolbarDivider} />
               <div className={styles.toolbarGroup}>
-                <Button variant="ghost" size="sm" onClick={handleRotateCCW} title="Rotate CCW">
+                <Button variant="ghost" size="sm" onClick={handleRotateCCW} title="Rotate CCW (Ctrl+[)">
                   <RotateCcw size={16} />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={handleRotateCW} title="Rotate CW">
+                <Button variant="ghost" size="sm" onClick={handleRotateCW} title="Rotate CW (Ctrl+])">
                   <RotateCw size={16} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => { copy(); paste(); }}
-                  title="Duplicate"
+                  title="Duplicate (Ctrl+D)"
                 >
                   <Copy size={16} />
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const sel = useCanvasStore.getState().getSelectedItems();
+                    if (sel.length > 0) updateItem(sel[0].id, { locked: !sel[0].locked });
+                  }}
+                  title="Lock / unlock"
+                >
+                  <Lock size={16} />
+                </Button>
                 <Button variant="ghost" size="sm" onClick={removeSelected} title="Delete (⌫)">
-                  <Trash2 size={16} />
+                  <Trash2 size={16} style={{ color: '#ef4444' }} />
                 </Button>
               </div>
             </>
@@ -1334,9 +1617,17 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
               size="sm"
               onClick={handleExport}
               disabled={items.length === 0}
-              title="Export as PNG"
+              title="Export canvas as PNG"
             >
               <Download size={16} />
+            </Button>
+            <Button
+              variant={showShortcuts ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setShowShortcuts(v => !v)}
+              title="Keyboard shortcuts (?)"
+            >
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.75rem' }}>?</span>
             </Button>
           </div>
         </div>
@@ -1353,21 +1644,31 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
         ref={canvasRef}
         className={`${styles.canvas} ${isDragging ? styles.dropTarget : ''} ${showGrid ? styles.showGrid : ''}`}
         style={{ cursor: getCursor() }}
-        onClick={handleCanvasClick}
+        onClick={pointerInteractions.handleCanvasClick}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onMouseDown={handleMouseDown}
+        onPointerDown={pointerInteractions.handleCanvasPointerDown}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
       >
         <div
           id="canvas-viewport-transform-layer"
           className={styles.canvasContent}
+          data-canvas-background="true"
           style={{
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
           }}
         >
+          {/* Canvas asset connections */}
+          <CanvasConnections
+            zoom={viewport.zoom}
+            svgW={svgW}
+            svgH={svgH}
+            connectionPreviewEnd={pointerInteractions.connectionPreviewEnd}
+          />
+
           {/* Node Connections Layer */}
           <svg
             className={nodeStyles.connSvg}
@@ -1384,7 +1685,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
           {/* Canvas Items */}
           {items.map((item) => {
-            const isGenerated = item.type === 'generated';
             const meta = item.generationMeta;
             const rawTab = activeNodeTabs[item.id] ?? null;
             const tabVis = getNodeTabVisibility(item, meta);
@@ -1404,10 +1704,14 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             const ugInfo = userGroupInfo.get(item.id);
             const isUserGrouped = ugInfo != null;
             const isUserGroupTop = ugInfo ? ugInfo.idx === ugInfo.total - 1 : false;
-            // Orbit position override
+            // Orbit position override — group orbit takes precedence, then related-asset orbit
             const orbitPos = groupOrbitPositions.get(item.id);
-            const displayX = orbitPos ? orbitPos.x : item.x;
-            const displayY = orbitPos ? orbitPos.y : item.y;
+            const relatedOrbitPos = relatedOrbitPositions.get(item.id);
+            // Stacked group offset: each item below top shifts slightly right so layers are countable
+            const groupStackOffset = ugInfo && !orbitPos ? ugInfo.idx * 6 : 0;
+            const displayX = orbitPos ? orbitPos.x : (relatedOrbitPos ? relatedOrbitPos.x : item.x + groupStackOffset);
+            const displayY = orbitPos ? orbitPos.y : (relatedOrbitPos ? relatedOrbitPos.y : item.y);
+            const isInRelatedOrbit = !!relatedOrbitPos;
             // Drag-to-group highlight
             const isDragGroupTarget = dragOverItemId === item.id || groupingPreview?.targetId === item.id;
             const isDragGroupSource = groupingPreview?.sourceId === item.id;
@@ -1416,9 +1720,11 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
               <div
                 key={item.id}
                 data-canvas-item-id={item.id}
+                data-item-type={item.type}
                 className={[
                   styles.canvasItem,
                   selectedIds.includes(item.id) ? styles.selected : '',
+                  selectedIds.includes(item.id) && selectedIds.length > 1 ? styles.multiSelected : '',
                   item.locked ? styles.locked : '',
                   isHighestZ ? styles.nodeFrameHighZ : '',
                   isInGroup ? styles.blueprintGrouped : '',
@@ -1426,6 +1732,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   isDragGroupTarget ? styles.dragGroupTarget : '',
                   isDragGroupSource ? styles.dragGroupSource : '',
                   orbitPos ? styles.orbitItem : '',
+                  isInRelatedOrbit ? styles.relatedOrbitItem : '',
                 ].filter(Boolean).join(' ')}
                 style={{
                   left: displayX,
@@ -1438,6 +1745,26 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   ['--orb-color' as string]: orbColor,
                   ['--zoom' as string]: String(viewport.zoom),
                   ['--group-idx' as string]: String(ugInfo?.idx ?? 0),
+                  ['--node-type-color' as string]:
+                    item.type === 'image' ? 'var(--t-image, #ec4899)'
+                    : item.type === 'video' ? 'var(--t-video, #8b5cf6)'
+                    : item.type === 'audio' ? 'var(--t-audio, #22c55e)'
+                    : item.type === 'text' ? 'var(--t-text, #60a5fa)'
+                    : item.type === 'generated' ? 'var(--t-generated, #00d4aa)'
+                    : item.type === 'template' ? 'var(--t-template, #c084fc)'
+                    : item.type === 'drawing' ? 'var(--t-drawing, #fb923c)'
+                    : item.type === 'shape' ? 'var(--t-shape, #f59e0b)'
+                    : 'var(--t-placeholder, #6b7280)',
+                  // Parametric border radius per type
+                  ['--node-r' as string]:
+                    item.type === 'image' ? '4px'
+                    : item.type === 'generated' ? '8px'
+                    : item.type === 'audio' ? '12px'
+                    : item.type === 'text' ? '3px'
+                    : item.type === 'drawing' ? '10px'
+                    : '6px',
+                  // Rotation var for source pulse animation
+                  ['--item-rotation' as string]: `${item.rotation}deg`,
                 }}
                 onMouseDown={(e) => handleItemMouseDown(e, item)}
               >
@@ -1456,377 +1783,35 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                     {ugInfo.total}
                   </div>
                 )}
-                {/* ── Node Orb ── */}
-                <div
-                  key={`orb-${orbSpinKey[item.id] ?? 0}`}
-                  className={`${styles.nodeOrb} ${isOrbOpen ? styles.nodeOrbExpanded : ''} ${orbSpinClass}`}
-                  style={{
-                    background: orbColor,
-                    transform: `scale(${1 / viewport.zoom})`,
-                    transformOrigin: 'center center',
-                  }}
-                  onClick={(e) => { e.stopPropagation(); toggleOrb(item.id); }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  title={isOrbOpen ? 'Collapse details' : 'Expand details'}
-                >
-                  {isOrbOpen ? <ChevronUp /> : <ChevronDown />}
-                </div>
-
-                {/* ── Expanded vertical tabs (from orb) ── */}
-                {isOrbOpen && (
-                  <div
-                    className={styles.nodeTabsExpanded}
-                    style={{
-                      transform: `scale(${1 / viewport.zoom})`,
-                      transformOrigin: 'top left',
-                      ['--orb-color' as string]: orbColor,
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div
-                      className={`${styles.expandedTab} ${activeTab === 'name' ? styles.expandedTabActive : ''}`}
-                      onClick={() => toggleNodeTab(item.id, 'name')}
-                    >
-                      <span className={styles.expandedTabIcon}>
-                        {isGenerated ? <Sparkles size={11} /> : item.type === 'video' ? <Film size={11} /> : item.type === 'audio' ? <Headphones size={11} /> : <ImageIcon size={11} />}
-                      </span>
-                      {item.name}
-                    </div>
-                    {tabVis.hasPrompt && (
-                      <div
-                        className={`${styles.expandedTab} ${activeTab === 'prompt' ? styles.expandedTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'prompt')}
-                      >
-                        <span className={styles.expandedTabIcon}><MessageSquareText size={11} /></span>
-                        Prompt
-                      </div>
-                    )}
-                    {tabVis.hasInfo && (
-                      <div
-                        className={`${styles.expandedTab} ${activeTab === 'info' ? styles.expandedTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'info')}
-                      >
-                        <span className={styles.expandedTabIcon}><Cpu size={11} /></span>
-                        Info
-                      </div>
-                    )}
-                    {tabVis.hasVersions && (
-                      <div
-                        className={`${styles.expandedTab} ${activeTab === 'versions' ? styles.expandedTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'versions')}
-                      >
-                        <span className={styles.expandedTabIcon}><GitBranch size={11} /></span>
-                        Versions
-                      </div>
-                    )}
+                {/* Drag-to-group ready badge */}
+                {isDragGroupTarget && groupingPreview && (
+                  <div className={styles.groupReadyBadge}>
+                    <Link2 size={9} />
+                    Group
                   </div>
                 )}
-
-                {/* ── Expanded panel content ── */}
-                {isOrbOpen && activeTab && (
-                  <div
-                    className={styles.nodeTabPanelExpanded}
-                    style={{
-                      transform: `scale(${1 / viewport.zoom})`,
-                      transformOrigin: 'top left',
-                      ['--orb-color' as string]: orbColor,
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    {activeTab === 'name' && (
-                      <>
-                        <div className={styles.nodeTabPanelLabel}>Name</div>
-                        {editingItemId === item.id ? (
-                          <input
-                            ref={editInputRef}
-                            className={styles.filenameEditInput}
-                            style={{ position: 'static', width: '100%', maxWidth: '100%' }}
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onKeyDown={handleEditKeyDown}
-                            onBlur={handleSaveName}
-                          />
-                        ) : (
-                          <div
-                            className={styles.nodeTabPanelValue}
-                            onDoubleClick={(e) => handleTagDoubleClick(e, item)}
-                            style={{ cursor: 'text' }}
-                          >
-                            {item.name}
-                          </div>
-                        )}
-                        <div className={styles.nodeTabPanelRow} style={{ marginTop: 6 }}>
-                          <span className={styles.nodeTabPanelLabel}>Type</span>
-                          <span className={styles.nodeTabPanelValue}>
-                            {isGenerated
-                              ? 'AI Generated'
-                              : item.type === 'image'
-                                ? 'Imported Image'
-                                : item.type === 'video'
-                                  ? 'Video'
-                                  : item.type === 'audio'
-                                    ? 'Audio'
-                                    : item.type === 'text'
-                                      ? 'Text'
-                                      : item.type === 'template'
-                                        ? 'Prompt Template'
-                                        : 'Placeholder'}
-                          </span>
-                        </div>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Size</span>
-                          <span className={styles.nodeTabPanelValue}>{Math.round(item.width * item.scale)} × {Math.round(item.height * item.scale)}</span>
-                        </div>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Position</span>
-                          <span className={styles.nodeTabPanelValue}>{Math.round(item.x)}, {Math.round(item.y)}</span>
-                        </div>
-                        {item.assetId && (
-                          <div className={styles.nodeTabPanelRow}>
-                            <span className={styles.nodeTabPanelLabel}>Asset ID</span>
-                            <span className={styles.nodeTabPanelValue} style={{ fontSize: '0.5625rem', opacity: 0.6 }}>{item.assetId.slice(0, 14)}…</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {activeTab === 'prompt' && (
-                      <>
-                        <div className={styles.nodeTabPanelLabel}>Prompt</div>
-                        <div className={styles.nodeTabPanelValue}>
-                          {meta?.prompt || item.prompt || '—'}
-                        </div>
-                        {meta?.negativePrompt && (
-                          <>
-                            <div className={styles.nodeTabPanelLabel} style={{ marginTop: 6 }}>Negative Prompt</div>
-                            <div className={styles.nodeTabPanelValue}>{meta.negativePrompt}</div>
-                          </>
-                        )}
-                      </>
-                    )}
-                    {activeTab === 'info' && (
-                      <>
-                        {item.type === 'video' && (
-                          <>
-                            {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0 && (
-                              <div className={styles.nodeTabPanelRow}>
-                                <span className={styles.nodeTabPanelLabel}>Duration</span>
-                                <span className={styles.nodeTabPanelValue}>
-                                  {formatMediaDuration(item.mediaMeta.duration)}
-                                </span>
-                              </div>
-                            )}
-                            {item.mediaMeta?.mimeType && (
-                              <div className={styles.nodeTabPanelRow}>
-                                <span className={styles.nodeTabPanelLabel}>MIME</span>
-                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.mimeType}</span>
-                              </div>
-                            )}
-                            {item.mediaMeta?.codec && (
-                              <div className={styles.nodeTabPanelRow}>
-                                <span className={styles.nodeTabPanelLabel}>Codec</span>
-                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.codec}</span>
-                              </div>
-                            )}
-                            {item.mediaMeta?.fps != null && (
-                              <div className={styles.nodeTabPanelRow}>
-                                <span className={styles.nodeTabPanelLabel}>FPS</span>
-                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.fps}</span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Model</span>
-                          <span className={styles.nodeTabPanelValue}>{meta?.model || '—'}</span>
-                        </div>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Seed</span>
-                          <span className={styles.nodeTabPanelValue}>{meta?.seed ?? '—'}</span>
-                        </div>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Size</span>
-                          <span className={styles.nodeTabPanelValue}>{meta?.width || item.width} × {meta?.height || item.height}</span>
-                        </div>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Generated at</span>
-                          <span className={styles.nodeTabPanelValue}>
-                            {meta?.generatedAt ? new Date(meta.generatedAt).toLocaleString() : '—'}
-                          </span>
-                        </div>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Parents</span>
-                          <span className={styles.nodeTabPanelValue}>
-                            {meta?.parentIds?.length ? meta.parentIds.length : 'None (original)'}
-                          </span>
-                        </div>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Children</span>
-                          <span className={styles.nodeTabPanelValue}>
-                            {meta?.childIds?.length ? meta.childIds.length : 'None'}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    {activeTab === 'versions' && (
-                      <>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Image Version</span>
-                          <span className={styles.nodeTabPanelValue}>v{meta?.imageVersion ?? 1}</span>
-                        </div>
-                        {meta?.filePath && (
-                          <div className={styles.nodeTabPanelRow}>
-                            <span className={styles.nodeTabPanelLabel}>File</span>
-                            <span className={styles.nodeTabPanelValue}>{meta.filePath}</span>
-                          </div>
-                        )}
-                        {meta?.variations && meta.variations.length > 0 ? (
-                          <>
-                            <div className={styles.nodeTabPanelLabel} style={{ marginTop: 4 }}>Variations</div>
-                            {meta.variations.map((v) => (
-                              <div key={v.id} className={styles.nodeTabPanelRow}>
-                                <span className={styles.nodeTabPanelValue}>{v.label}</span>
-                                {v.filePath && <span className={styles.nodeTabPanelLabel}>{v.filePath}</span>}
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className={styles.nodeTabPanelEmpty}>No variations yet</div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* ── Compact horizontal tabs (when orb is collapsed) ── */}
-                {!isOrbOpen && (() => {
-                  const showNameTab = !!(item.name.trim() || editingItemId === item.id);
-                  const showSecondary = tabVis.hasPrompt || tabVis.hasInfo || tabVis.hasVersions;
-                  if (!showNameTab && !showSecondary) return null;
-                  return (
-                  <div
-                    className={styles.nodeTabs}
-                    style={{
-                      transform: `scale(${1 / viewport.zoom})`,
-                      transformOrigin: 'bottom left',
-                      ['--tabs-max-w' as string]: `${tabsMaxW}px`,
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    {showNameTab && (
-                      editingItemId === item.id ? (
-                        <input
-                          ref={editInputRef}
-                          className={styles.filenameEditInput}
-                          style={{ position: 'static', top: 'unset', left: 'unset' }}
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          onKeyDown={handleEditKeyDown}
-                          onBlur={handleSaveName}
-                        />
-                      ) : (
-                        <div
-                          className={`${styles.nodeTab} ${!activeTab ? styles.nodeTabActive : ''}`}
-                          onDoubleClick={(e) => handleTagDoubleClick(e, item)}
-                          title={item.name}
-                        >
-                          {item.name.length > 24 ? item.name.slice(0, 22) + '…' : item.name}
-                        </div>
-                      )
-                    )}
-                    {tabVis.hasPrompt && (
-                      <div
-                        className={`${styles.nodeTab} ${activeTab === 'prompt' ? styles.nodeTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'prompt')}
-                        title="Prompt"
-                      >
-                        <MessageSquareText size={9} /> Prompt
-                      </div>
-                    )}
-                    {tabVis.hasInfo && (
-                      <div
-                        className={`${styles.nodeTab} ${activeTab === 'info' ? styles.nodeTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'info')}
-                        title="Info"
-                      >
-                        <Cpu size={9} /> Info
-                      </div>
-                    )}
-                    {tabVis.hasVersions && (
-                      <div
-                        className={`${styles.nodeTab} ${activeTab === 'versions' ? styles.nodeTabActive : ''}`}
-                        onClick={() => toggleNodeTab(item.id, 'versions')}
-                        title="Versions"
-                      >
-                        <GitBranch size={9} /> Ver
-                      </div>
-                    )}
-                  </div>
-                  );
-                })()}
-
-                {/* ── Compact tab panel (when orb is collapsed) ── */}
-                {!isOrbOpen && activeTab && (
-                  <div
-                    className={styles.nodeTabPanel}
-                    style={{
-                      transform: `scale(${1 / viewport.zoom})`,
-                      transformOrigin: 'top left',
-                      ['--orb-color' as string]: orbColor,
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    {activeTab === 'prompt' && (
-                      <>
-                        <div className={styles.nodeTabPanelLabel}>Prompt</div>
-                        <div className={styles.nodeTabPanelValue}>
-                          {meta?.prompt || item.prompt || '—'}
-                        </div>
-                      </>
-                    )}
-                    {activeTab === 'info' && (
-                      <>
-                        {item.type === 'video' && (
-                          <>
-                            {item.mediaMeta?.duration != null && item.mediaMeta.duration > 0 && (
-                              <div className={styles.nodeTabPanelRow}>
-                                <span className={styles.nodeTabPanelLabel}>Duration</span>
-                                <span className={styles.nodeTabPanelValue}>
-                                  {formatMediaDuration(item.mediaMeta.duration)}
-                                </span>
-                              </div>
-                            )}
-                            {item.mediaMeta?.mimeType && (
-                              <div className={styles.nodeTabPanelRow}>
-                                <span className={styles.nodeTabPanelLabel}>MIME</span>
-                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.mimeType}</span>
-                              </div>
-                            )}
-                            {item.mediaMeta?.codec && (
-                              <div className={styles.nodeTabPanelRow}>
-                                <span className={styles.nodeTabPanelLabel}>Codec</span>
-                                <span className={styles.nodeTabPanelValue}>{item.mediaMeta.codec}</span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Model</span>
-                          <span className={styles.nodeTabPanelValue}>{meta?.model || '—'}</span>
-                        </div>
-                        <div className={styles.nodeTabPanelRow}>
-                          <span className={styles.nodeTabPanelLabel}>Size</span>
-                          <span className={styles.nodeTabPanelValue}>{item.width} × {item.height}</span>
-                        </div>
-                      </>
-                    )}
-                    {activeTab === 'versions' && (
-                      <div className={styles.nodeTabPanelRow}>
-                        <span className={styles.nodeTabPanelLabel}>Version</span>
-                        <span className={styles.nodeTabPanelValue}>v{meta?.imageVersion ?? 1}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* ── Node Etiquette (movable tags + orb) ── */}
+                <NodeEtiquette
+                  item={item}
+                  meta={meta}
+                  zoom={viewport.zoom}
+                  orbColor={orbColor}
+                  isOrbOpen={isOrbOpen}
+                  activeTab={activeTab}
+                  tabsMaxW={tabsMaxW}
+                  editingItemId={editingItemId}
+                  editingName={editingName}
+                  editInputRef={editInputRef}
+                  onToggleOrb={() => toggleOrb(item.id)}
+                  onToggleTab={(tab) => toggleNodeTab(item.id, tab)}
+                  onTagPointerDown={(e) => handleTagPointerDown(e, item)}
+                  onResetEtiquettePosition={() => handleResetEtiquettePosition(item.id)}
+                  onFocusRelated={handleFocusRelatedItem}
+                  onTagDoubleClick={(e) => handleTagDoubleClick(e, item)}
+                  onEditNameChange={setEditingName}
+                  onEditKeyDown={handleEditKeyDown}
+                  onSaveName={handleSaveName}
+                />
 
                 {/* ── Media rendering ── */}
                 {item.type === 'video' && item.src && (
@@ -1961,18 +1946,19 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   </div>
                 )}
 
-                {/* Resize + selection handles */}
-                {selectedIds.includes(item.id) && !item.locked && (
-                  <>
-                    {(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as ResizeHandle[]).map((h) => (
-                      <div
-                        key={h}
-                        className={`${styles.handle} ${styles[`handle${h.toUpperCase().replace('-', '')}`]}`}
-                        onMouseDown={(e) => handleResizeMouseDown(e, item, h)}
-                      />
-                    ))}
-                  </>
-                )}
+                {/* Resize edge zones — always visible (even unselected), change cursor on hover */}
+                {!item.locked && (['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as ResizeHandle[]).map((h) => (
+                  <div
+                    key={h}
+                    className={[
+                      styles.edgeZone,
+                      styles[`edgeZone${h.toUpperCase()}`],
+                      selectedIds.includes(item.id) ? styles.handle : '',
+                      selectedIds.includes(item.id) ? styles[`handle${h.toUpperCase().replace('-', '')}`] : '',
+                    ].filter(Boolean).join(' ')}
+                    onMouseDown={(e) => handleResizeMouseDown(e, item, h)}
+                  />
+                ))}
 
                 {item.locked && (
                   <div className={styles.lockIndicator}>
@@ -1980,15 +1966,75 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   </div>
                 )}
 
-                {/* Connection dot — bottom center, appears on hover */}
-                <div
-                  className={styles.connectionDot}
-                  title="Drag to connect to another asset"
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    // Future: start connection line drag from this dot
-                  }}
-                />
+                {getChildLayers(item.id).length > 0 && selectedIds.includes(item.id) && (
+                  <div className={styles.overlayLayerBadge} title="Has overlay layers">
+                    {getChildLayers(item.id).length} layer{getChildLayers(item.id).length !== 1 ? 's' : ''}
+                  </div>
+                )}
+
+                {/* Connection dot — bottom center, color matches node type */}
+                {!item.locked && (() => {
+                  const linkAnchor = anchors.find(a => a.itemId === item.id && a.kind === 'link' && a.side === 'bottom')
+                    ?? anchors.find(a => a.itemId === item.id && a.kind === 'output');
+                  if (!linkAnchor) return null;
+                  return (
+                    <div
+                      className={`${styles.connectionDot} ${pointerInteractions.shakingAnchorId === linkAnchor.id ? styles.anchorShake : ''}`}
+                      style={{ background: 'var(--node-type-color)', boxShadow: `0 0 8px var(--node-type-color)` }}
+                      title="Drag to connect / drag away to break"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        pointerInteractions.handleAnchorPointerDown(e, item.id, linkAnchor.id, linkAnchor.kind);
+                      }}
+                    />
+                  );
+                })()}
+
+                {/* Anchor points — visible when selected or anchors toggled; no top anchors */}
+                {(showAnchors || selectedIds.includes(item.id)) &&
+                  anchors
+                    .filter((a) => a.itemId === item.id && a.side !== 'top')
+                    .map((anchor) => {
+                      const w = item.width * item.scale;
+                      const h = item.height * item.scale;
+                      let ax = item.x + w / 2;
+                      let ay = item.y + h / 2;
+                      if (anchor.side === 'bottom') ay = item.y + h;
+                      if (anchor.side === 'left') { ax = item.x; ay = item.y + h / 2; }
+                      if (anchor.side === 'right') { ax = item.x + w; ay = item.y + h / 2; }
+                      ax += anchor.offsetX ?? 0;
+                      ay += anchor.offsetY ?? 0;
+                      // All anchor dots use node-type-color to match their node
+                      const color = 'var(--node-type-color)';
+                      const isHoverTarget = pointerInteractions.hoverAnchorId === anchor.id;
+                      const isPendingSource = pendingConnection?.anchorId === anchor.id;
+                      return (
+                        <div
+                          key={anchor.id}
+                          className={[
+                            styles.canvasAnchor,
+                            isHoverTarget ? styles.canvasAnchorSnap : '',
+                            isPendingSource ? styles.canvasAnchorActive : '',
+                            pointerInteractions.shakingAnchorId === anchor.id ? styles.anchorShake : '',
+                          ].filter(Boolean).join(' ')}
+                          data-canvas-anchor-id={anchor.id}
+                          data-canvas-item-id={item.id}
+                          style={{
+                            position: 'absolute',
+                            left: ax - item.x,
+                            top: ay - item.y,
+                            background: color,
+                            boxShadow: (isHoverTarget || isPendingSource) ? `0 0 10px ${color}` : undefined,
+                            transform: `scale(${1 / viewport.zoom})`,
+                          }}
+                          title={`${anchor.label ?? anchor.kind} — drag to connect`}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            pointerInteractions.handleAnchorPointerDown(e, item.id, anchor.id, anchor.kind);
+                          }}
+                        />
+                      );
+                    })}
               </div>
             );
           })}
@@ -2135,7 +2181,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
               }}
             >
               <span className={styles.groupContourBadge}>
-                {selectedItems.length} selected — ⌘G to group
+                {selectedItems.length} selected — Ctrl+G to group
               </span>
             </div>
           );
@@ -2177,7 +2223,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                     }}
                   >
                     {allInSameGroup ? 'Ungroup' : 'Group'}
-                    <kbd>⌘G</kbd>
+                    <kbd>Ctrl+G</kbd>
                   </button>
                 )}
                 {anyGrouped && !allInSameGroup && (
@@ -2190,7 +2236,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                     }}
                   >
                     Ungroup all selected
-                    <kbd>⌘⇧G</kbd>
+                    <kbd>Ctrl+Shift+G</kbd>
                   </button>
                 )}
                 <div className={styles.contextMenuDivider} />
@@ -2199,7 +2245,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
                   onClick={() => { copy(); paste(); closeContextMenu(); }}
                 >
                   Duplicate
-                  <kbd>⌘D</kbd>
+                  <kbd>Ctrl+D</kbd>
                 </button>
                 <button
                   className={`${styles.contextMenuItem} ${styles.contextMenuDanger}`}
@@ -2212,6 +2258,50 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             </>
           );
         })()}
+      {/* Keyboard shortcuts overlay */}
+      {showShortcuts && (
+        <div className={styles.shortcutsOverlay} onClick={() => setShowShortcuts(false)}>
+          <div className={styles.shortcutsPanel} onClick={e => e.stopPropagation()}>
+            <div className={styles.shortcutsHeader}>
+              <span>Keyboard Shortcuts</span>
+              <button className={styles.shortcutsClose} onClick={() => setShowShortcuts(false)}>✕</button>
+            </div>
+            <div className={styles.shortcutsGrid}>
+              <div className={styles.shortcutsSection}>
+                <div className={styles.shortcutsSectionTitle}>Tools</div>
+                <div className={styles.shortcutRow}><kbd>V</kbd><span>Pointer tool</span></div>
+                <div className={styles.shortcutRow}><kbd>H</kbd><span>Hand / Pan tool</span></div>
+                <div className={styles.shortcutRow}><kbd>L</kbd><span>Lasso select</span></div>
+                <div className={styles.shortcutRow}><kbd>Space</kbd><span>Temp pan (hold)</span></div>
+              </div>
+              <div className={styles.shortcutsSection}>
+                <div className={styles.shortcutsSectionTitle}>Canvas</div>
+                <div className={styles.shortcutRow}><kbd>Ctrl+Z</kbd><span>Undo</span></div>
+                <div className={styles.shortcutRow}><kbd>Ctrl+Shift+Z</kbd><span>Redo</span></div>
+                <div className={styles.shortcutRow}><kbd>Ctrl+A</kbd><span>Select all</span></div>
+                <div className={styles.shortcutRow}><kbd>Esc</kbd><span>Deselect / Cancel</span></div>
+              </div>
+              <div className={styles.shortcutsSection}>
+                <div className={styles.shortcutsSectionTitle}>Items</div>
+                <div className={styles.shortcutRow}><kbd>Ctrl+C</kbd><span>Copy</span></div>
+                <div className={styles.shortcutRow}><kbd>Ctrl+V</kbd><span>Paste</span></div>
+                <div className={styles.shortcutRow}><kbd>Ctrl+G</kbd><span>Group selected</span></div>
+                <div className={styles.shortcutRow}><kbd>⌫</kbd><span>Delete selected</span></div>
+              </div>
+              <div className={styles.shortcutsSection}>
+                <div className={styles.shortcutsSectionTitle}>View</div>
+                <div className={styles.shortcutRow}><kbd>+</kbd><span>Zoom in</span></div>
+                <div className={styles.shortcutRow}><kbd>-</kbd><span>Zoom out</span></div>
+                <div className={styles.shortcutRow}><kbd>0</kbd><span>Reset view</span></div>
+                <div className={styles.shortcutRow}><kbd>?</kbd><span>Toggle this panel</span></div>
+              </div>
+            </div>
+            <div className={styles.shortcutsFooter}>
+              Drag the ● dot at bottom of any asset to link it — Shift+click to multi-select
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

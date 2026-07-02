@@ -86,10 +86,79 @@ export interface GenerationMeta {
   variations?: { id: UUID; label: string; filePath?: string }[];
 }
 
+export type CanvasItemType =
+  | 'image'
+  | 'generated'
+  | 'placeholder'
+  | 'video'
+  | 'audio'
+  | 'text'
+  | 'template'
+  | 'shape'
+  | 'drawing';
+
+export type CanvasLayerRole = 'base' | 'overlay' | 'prompt' | 'variant' | 'generated';
+
+export type CanvasAnchorKind = 'input' | 'output' | 'layer' | 'prompt' | 'variant' | 'link';
+
+export type CanvasTimelineRole = 'scene' | 'shot' | 'asset' | 'overlay' | 'transition' | 'none';
+
+export interface LayerOffset {
+  x: number;
+  y: number;
+  scale?: number;
+  rotation?: number;
+}
+
+export interface EtiquettePosition {
+  /** Offset from item top-left in canvas space */
+  x: number;
+  y: number;
+}
+
+export interface CanvasAnchor {
+  id: UUID;
+  itemId: UUID;
+  kind: CanvasAnchorKind;
+  side: 'top' | 'right' | 'bottom' | 'left' | 'center';
+  offsetX?: number;
+  offsetY?: number;
+  label?: string;
+}
+
+export interface CanvasConnection {
+  id: UUID;
+  sourceItemId: UUID;
+  targetItemId: UUID;
+  sourceAnchorId?: UUID;
+  targetAnchorId?: UUID;
+  kind: CanvasAnchorKind;
+  color: string;
+  label?: string;
+  createdAt: Timestamp;
+}
+
+export interface CanvasGroup {
+  id: UUID;
+  name: string;
+  itemIds: UUID[];
+  collapsed: boolean;
+  orbit: boolean;
+  parentGroupId?: UUID;
+  stackOrder: number;
+  createdAt: Timestamp;
+}
+
+export interface CanvasGraphState {
+  groups: CanvasGroup[];
+  connections: CanvasConnection[];
+  anchors: CanvasAnchor[];
+}
+
 export interface CanvasItem {
   id: UUID;
   assetId?: UUID;
-  type: 'image' | 'generated' | 'placeholder' | 'video' | 'audio' | 'text' | 'template';
+  type: CanvasItemType;
   x: number;
   y: number;
   width: number;
@@ -106,12 +175,41 @@ export interface CanvasItem {
   lineageId?: UUID;
   version?: string;
   parentAssetId?: UUID;
+  /** Parent canvas item for user-authored overlay layers */
+  parentItemId?: UUID;
+  layerRole?: CanvasLayerRole;
+  layerOffset?: LayerOffset;
+  etiquettePosition?: EtiquettePosition;
+  connectionIds?: UUID[];
+  timelineRole?: CanvasTimelineRole;
+  sceneId?: UUID;
+  stackOrder?: number;
+  overlayKind?: 'pen' | 'shape' | 'text';
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   generationMeta?: GenerationMeta;
   mediaMeta?: MediaMeta;
+  /** @deprecated use groups registry — kept for migration */
   groupId?: string;
+  /** @deprecated use groups registry — kept for migration */
   groupOrbit?: boolean;
+}
+
+/** Timeline handoff payload derived from canvas hierarchy */
+export interface CanvasTimelineNode {
+  itemId: UUID;
+  name: string;
+  type: CanvasItemType;
+  layerRole?: CanvasLayerRole;
+  timelineRole?: CanvasTimelineRole;
+  zIndex: number;
+  stackOrder?: number;
+  parentItemId?: UUID;
+  promptId?: UUID;
+  lineageId?: UUID;
+  sceneId?: UUID;
+  children: CanvasTimelineNode[];
+  connections: { targetId: UUID; kind: CanvasAnchorKind; color: string }[];
 }
 
 export interface MediaMeta {

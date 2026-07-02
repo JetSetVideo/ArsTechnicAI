@@ -4,7 +4,7 @@
  * Full-screen creation dashboard with left panel, collapsible sections,
  * character creator, templates, and comprehensive module access.
  */
-import React, { useState, useCallback, useRef, useEffect, KeyboardEvent } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo, KeyboardEvent } from 'react';
 import Link from 'next/link';
 import {
   Search, UserRound, LayoutGrid, Image as ImageIcon,
@@ -13,7 +13,7 @@ import {
   Plus, Layers, Download, ChevronUp, Settings2, Box,
   Sliders, Camera, Sun, Focus, Aperture, Users, BookOpen,
   Palette, Ruler, Grid, Eye, Move, ArrowUpDown,
-  Pencil, Eraser,
+  Pencil, Eraser, MapPin, X,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import styles from './DashboardLayout.module.css';
@@ -24,7 +24,10 @@ import { HomeLeftPanel } from '../dashboard/HomeLeftPanel';
 import { HomeLeftToolbar } from '../dashboard/HomeLeftToolbar';
 import { ThreeDViewer } from '../dashboard/ThreeDViewer';
 import { useProjectSync, saveProjectWorkspaceState } from '../../hooks/useProjectSync';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { useSettingsStore, PROVIDER_DEFAULT_MODELS } from '../../stores/settingsStore';
+import { useFileStore } from '../../stores/fileStore';
+import { validateApiKey } from '../../services/generation';
+import type { AIProviderSettings, Asset, ImageAsset } from '../../types';
 import { useUserStore } from '../../stores/userStore';
 import { useTelemetryStore } from '../../stores/telemetryStore';
 import { useProjectsStore } from '../../stores/projectsStore';
@@ -108,6 +111,40 @@ const ASPECT_RATIOS = [
   { id: '2:3', w: 1080, h: 1620 }, { id: '3:2', w: 1620, h: 1080 },
 ];
 
+const PROVIDER_LABELS: Record<string, string> = {
+  GOOGLE_IMAGEN: 'Nanobanana',
+  OPENAI_DALLE: 'OpenAI DALL·E',
+  STABILITY: 'Stability AI',
+  MIDJOURNEY: 'Midjourney',
+  REPLICATE: 'Replicate',
+  FAL: 'Fal.ai',
+  CUSTOM: 'Custom',
+};
+
+const MAX_REFERENCE_ASSETS = 5;
+
+function resolveGenerationSettings(aiProvider: AIProviderSettings) {
+  const provider = aiProvider.activeProvider ?? 'GOOGLE_IMAGEN';
+  const model =
+    aiProvider.activeModel ||
+    aiProvider.model ||
+    PROVIDER_DEFAULT_MODELS[provider] ||
+    'imagen-3.0-generate-002';
+  const apiKey = (aiProvider.apiKeys?.[provider] || aiProvider.apiKey || '').trim();
+  return { provider, model, apiKey };
+}
+
+function getReferenceImageUrl(asset: Asset): string | null {
+  if (asset.type !== 'image') return null;
+  const imageAsset = asset as ImageAsset;
+  if (imageAsset.dataUrl) return imageAsset.dataUrl;
+  if (asset.thumbnail?.startsWith('data:') || asset.thumbnail?.startsWith('http') || asset.thumbnail?.startsWith('/')) {
+    return asset.thumbnail;
+  }
+  if (asset.path.startsWith('http') || asset.path.startsWith('/')) return asset.path;
+  return null;
+}
+
 export function DashboardLayout() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,12 +153,15 @@ export function DashboardLayout() {
   // All dropdown open states grouped here so the close-on-outside effect can see them
   const [filterDropOpen, setFilterDropOpen] = useState<'platform' | 'source' | 'sort' | null>(null);
   const [styleDropOpen, setStyleDropOpen] = useState(false);
+  const [refPickerOpen, setRefPickerOpen] = useState(false);
 
   // Stable refs so the single event listener never goes stale
   const filterDropRef = useRef<typeof filterDropOpen>(null);
   const styleDropRef = useRef(false);
+  const refPickerRef = useRef(false);
   useEffect(() => { filterDropRef.current = filterDropOpen; }, [filterDropOpen]);
   useEffect(() => { styleDropRef.current = styleDropOpen; }, [styleDropOpen]);
+  useEffect(() => { refPickerRef.current = refPickerOpen; }, [refPickerOpen]);
 
   // Single stable listener attached once — closes open dropdowns on outside click / Escape
   useEffect(() => {
@@ -135,6 +175,9 @@ export function DashboardLayout() {
         if (styleDropRef.current && !target.closest('[data-style-drop]')) {
           setStyleDropOpen(false);
         }
+        if (refPickerRef.current && !target.closest('[data-ref-drop]')) {
+          setRefPickerOpen(false);
+        }
       } catch {
         // closest() can throw on detached/shadow-root nodes — safe to swallow
       }
@@ -143,6 +186,7 @@ export function DashboardLayout() {
       if (e.key === 'Escape') {
         setFilterDropOpen(null);
         setStyleDropOpen(false);
+        setRefPickerOpen(false);
       }
     };
     document.addEventListener('mousedown', handleMouseDown);
@@ -253,6 +297,8 @@ export function DashboardLayout() {
   const [selectedComposition, setSelectedComposition] = useState<string[]>([]);
   const [selectedLighting, setSelectedLighting] = useState('studio-3pt');
   const [selectedCamera, setSelectedCamera] = useState('portrait-85');
+  const [realWorldLocation, setRealWorldLocation] = useState('');
+  const [referenceAssetIds, setReferenceAssetIds] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
 
@@ -295,6 +341,45 @@ export function DashboardLayout() {
   const health = useTelemetryStore((s) => s.health);
   const addProject = useProjectsStore((s) => s.addProject);
   const toast = useToastStore();
+  const settings = useSettingsStore((s) => s.settings);
+  const fileAssets = useFileStore((s) => s.assets);
+  const getAsset = useFileStore((s) => s.getAsset);
+
+  const { provider: activeProvider, model: activeModel, apiKey: resolvedApiKey } = useMemo(
+    () => resolveGenerationSettings(settings.aiProvider),
+    [settings.aiProvider],
+  );
+  const hasApiKey = validateApiKey(resolvedApiKey).valid;
+  const providerLabel = PROVIDER_LABELS[activeProvider] ?? activeProvider;
+  const canGenerate = hasApiKey && !!prompt.trim() && !isGenerating;
+
+  const imageAssets = useMemo(
+    () => Array.from(fileAssets.values()).filter((asset): asset is ImageAsset => asset.type === 'image'),
+    [fileAssets],
+  );
+
+  const selectedReferenceAssets = useMemo(
+    () => referenceAssetIds
+      .map((id) => getAsset(id))
+      .filter((asset): asset is ImageAsset => !!asset && asset.type === 'image'),
+    [referenceAssetIds, getAsset],
+  );
+
+  const toggleReferenceAsset = useCallback((assetId: string) => {
+    setReferenceAssetIds((prev) => {
+      if (prev.includes(assetId)) return prev.filter((id) => id !== assetId);
+      if (prev.length >= MAX_REFERENCE_ASSETS) {
+        toast.addToast({
+          type: 'warning',
+          title: 'Reference limit reached',
+          message: `You can attach up to ${MAX_REFERENCE_ASSETS} reference images.`,
+          duration: 3000,
+        });
+        return prev;
+      }
+      return [...prev, assetId];
+    });
+  }, [toast]);
 
   const handleOpenProject = useCallback(
     (projectId: string) => {
@@ -353,16 +438,33 @@ export function DashboardLayout() {
       full = `${full}, ${camMap[selectedCamera] || 'professional lens'}`;
     }
 
+    if (realWorldLocation.trim()) {
+      full = `${full}, set in ${realWorldLocation.trim()}, real-world location with authentic geography and architecture`;
+    }
+
     // Quality suffix
     full = `${full}, 8K resolution, ultra detailed, professional photography`;
 
     return full;
-  }, [prompt, selectedStyle, selectedComposition, selectedLighting, selectedCamera]);
+  }, [prompt, selectedStyle, selectedComposition, selectedLighting, selectedCamera, realWorldLocation]);
 
   const handleGenerate = useCallback(async (promptOverride?: string) => {
-    const promptText = promptOverride ?? prompt;
+    const promptText = typeof promptOverride === 'string' ? promptOverride : prompt;
     if (!promptText.trim()) {
-      if (!promptOverride) promptRef.current?.focus();
+      if (typeof promptOverride !== 'string') promptRef.current?.focus();
+      return;
+    }
+
+    if (!hasApiKey) {
+      const message = 'Add an API key in Settings → API Keys to generate images.';
+      setGenError(message);
+      toast.addToast({
+        type: 'error',
+        title: 'API key required',
+        message,
+        duration: 6000,
+        action: { label: 'Settings', onClick: () => { setSettingsTab('api'); setSettingsOpen(true); } },
+      });
       return;
     }
 
@@ -372,13 +474,17 @@ export function DashboardLayout() {
     const platform = PLATFORMS.find(p => p.id === selectedPlatform) ?? PLATFORMS[0];
     const genWidth = selectedPlatform === 'custom' ? customWidth : platform.width;
     const genHeight = selectedPlatform === 'custom' ? customHeight : platform.height;
-    const fullPrompt = promptOverride ?? buildFullPrompt();
+    const fullPrompt = typeof promptOverride === 'string'
+      ? (realWorldLocation.trim()
+        ? `${promptOverride}, set in ${realWorldLocation.trim()}, real-world location with authentic geography and architecture`
+        : promptOverride)
+      : buildFullPrompt();
 
-    let apiKey = '';
-    try {
-      const raw = localStorage.getItem('ars-settings-store');
-      if (raw) apiKey = JSON.parse(raw)?.state?.settings?.aiProvider?.apiKey ?? '';
-    } catch { /* localStorage unavailable — proceed without API key */ }
+    const referenceImages = referenceAssetIds
+      .map((id) => getAsset(id))
+      .map((asset) => (asset ? getReferenceImageUrl(asset) : null))
+      .filter((url): url is string => !!url)
+      .slice(0, MAX_REFERENCE_ASSETS);
 
     type GenResult = { id: string; dataUrl: string; prompt: string; seed?: number; assetId?: string; createdAt: number };
     const results: GenResult[] = [];
@@ -392,8 +498,11 @@ export function DashboardLayout() {
           negativePrompt: negativePrompt || undefined,
           width: genWidth,
           height: genHeight,
+          apiKey: resolvedApiKey,
+          model: activeModel,
+          provider: activeProvider,
         };
-        if (apiKey) body.apiKey = apiKey;
+        if (referenceImages.length > 0) body.referenceImages = referenceImages;
 
         const resp = await fetch('/api/generate', {
           method: 'POST',
@@ -443,7 +552,23 @@ export function DashboardLayout() {
     } else if (failCount > 0) {
       toast.addToast({ type: 'error', title: 'Generation failed', message: lastError || 'All images failed. Check your API key in Settings.', duration: 7000, action: { label: 'Settings', onClick: () => { setSettingsTab('api'); setSettingsOpen(true); } } });
     }
-  }, [prompt, negativePrompt, selectedPlatform, customWidth, customHeight, imageCount, buildFullPrompt, toast]);
+  }, [
+    prompt,
+    negativePrompt,
+    selectedPlatform,
+    customWidth,
+    customHeight,
+    imageCount,
+    buildFullPrompt,
+    toast,
+    hasApiKey,
+    resolvedApiKey,
+    activeModel,
+    activeProvider,
+    realWorldLocation,
+    referenceAssetIds,
+    getAsset,
+  ]);
 
   const handleToolbarAction = useCallback((id: string) => {
     setActiveToolbarAction(id);
@@ -850,7 +975,15 @@ export function DashboardLayout() {
                     </div>
 
                     <button id="generate-button-primary-gradient" className={styles.generateBtn}
-                      onClick={handleGenerate} disabled={!prompt.trim() || isGenerating}>
+                      onClick={() => void handleGenerate()}
+                      disabled={!canGenerate}
+                      title={
+                        !hasApiKey
+                          ? 'Add an API key in Settings to generate'
+                          : !prompt.trim()
+                            ? 'Enter a prompt to generate'
+                            : undefined
+                      }>
                       <Sparkles size={15} />
                       {isGenerating ? 'Generating…' : 'Generate'}
                     </button>
@@ -862,8 +995,101 @@ export function DashboardLayout() {
                   </div>
                 </div>
 
-                {/* Dim hint */}
-                <span className={styles.dimHint}>{effectiveWidth}×{effectiveHeight} · {selectedStyle}</span>
+                {/* Model, location, and reference options */}
+                <div className={styles.genMetaRow}>
+                  <span className={styles.modelBadge} title={`Provider: ${providerLabel}`}>
+                    <Sparkles size={10} />
+                    {providerLabel} · <code>{activeModel}</code>
+                  </span>
+                  {!hasApiKey && (
+                    <button
+                      type="button"
+                      className={styles.apiKeyWarning}
+                      onClick={() => { setSettingsTab('api'); setSettingsOpen(true); }}>
+                      No API key — add one in Settings
+                    </button>
+                  )}
+                  <span className={styles.dimHint}>{effectiveWidth}×{effectiveHeight} · {selectedStyle}</span>
+                </div>
+
+                <div className={styles.genOptionsRow}>
+                  <label className={styles.locationField}>
+                    <MapPin size={11} aria-hidden="true" />
+                    <input
+                      type="text"
+                      className={styles.locationInput}
+                      placeholder="Real-world location (e.g. Tokyo Shibuya at night)"
+                      value={realWorldLocation}
+                      onChange={(e) => setRealWorldLocation(e.target.value)}
+                    />
+                  </label>
+
+                  <div className={styles.referenceField} data-ref-drop>
+                    <button
+                      type="button"
+                      className={styles.referenceBtn}
+                      onClick={() => setRefPickerOpen((open) => !open)}
+                      title="Attach reference images for Nanobanana">
+                      <ImageIcon size={11} />
+                      References ({selectedReferenceAssets.length}/{MAX_REFERENCE_ASSETS})
+                      <ChevronDown size={9} />
+                    </button>
+
+                    {selectedReferenceAssets.length > 0 && (
+                      <div className={styles.referenceChips}>
+                        {selectedReferenceAssets.map((asset) => {
+                          const preview = getReferenceImageUrl(asset);
+                          return (
+                            <span key={asset.id} className={styles.referenceChip} title={asset.name}>
+                              {preview ? (
+                                <img src={preview} alt="" className={styles.referenceThumb} />
+                              ) : (
+                                <ImageIcon size={10} />
+                              )}
+                              <span className={styles.referenceChipLabel}>{asset.name}</span>
+                              <button
+                                type="button"
+                                className={styles.referenceChipRemove}
+                                onClick={() => toggleReferenceAsset(asset.id)}
+                                aria-label={`Remove ${asset.name}`}>
+                                <X size={10} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {refPickerOpen && (
+                      <div className={styles.referenceDropdown}>
+                        {imageAssets.length === 0 ? (
+                          <p className={styles.referenceEmpty}>No image assets yet. Import images in the Assets tab.</p>
+                        ) : (
+                          imageAssets.map((asset) => {
+                            const preview = getReferenceImageUrl(asset);
+                            const selected = referenceAssetIds.includes(asset.id);
+                            return (
+                              <button
+                                key={asset.id}
+                                type="button"
+                                className={`${styles.referenceOption} ${selected ? styles.referenceOptionActive : ''}`}
+                                onClick={() => toggleReferenceAsset(asset.id)}
+                                disabled={!preview && !selected}>
+                                {preview ? (
+                                  <img src={preview} alt="" className={styles.referenceOptionThumb} />
+                                ) : (
+                                  <span className={styles.referenceOptionPlaceholder}><ImageIcon size={12} /></span>
+                                )}
+                                <span className={styles.referenceOptionLabel}>{asset.name}</span>
+                                {selected && <span className={styles.referenceOptionCheck}>✓</span>}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* ── Expanded area: all creative tools ─────────── */}
@@ -1053,7 +1279,7 @@ export function DashboardLayout() {
                           <input type="color" className={styles.charColor} value={charBgColor} onChange={e => setCharBgColor(e.target.value)} />
                         </div>
                       </div>
-                      <button className={styles.charGenerateBtn} onClick={handleGenerateCharacter} disabled={isGenerating}>
+                      <button className={styles.charGenerateBtn} onClick={handleGenerateCharacter} disabled={!canGenerate}>
                         <Sparkles size={12} /> {isGenerating ? 'Generating…' : 'Generate Character Sheet'}
                       </button>
                     </div>

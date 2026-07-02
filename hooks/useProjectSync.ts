@@ -9,6 +9,7 @@ import { useFileStore } from '@/stores/fileStore';
 import { useNodeStore } from '@/stores/nodeStore';
 import { STORAGE_KEYS, WORKSPACE_DATA_KEYS_TO_CLEAR } from '@/constants/workspace';
 import { projectPathFromName } from '@/utils/project';
+import { deserializeCanvasItem, serializeCanvasItem, serializeCanvasGraph } from '@/lib/canvas/serialization';
 import type { GenerationMeta } from '@/types';
 
 type VersionTrigger = 'MANUAL' | 'GENERATE' | 'DELETE' | 'AUTO';
@@ -32,11 +33,25 @@ function canvasStateKey(projectId: string): string {
   return `${STORAGE_KEYS.canvasStates}:${projectId}`;
 }
 
+function restoreCanvasFromApiItems(
+  rawItems: Array<Record<string, unknown>>,
+  graph?: { groups?: unknown[]; connections?: unknown[]; anchors?: unknown[] },
+) {
+  const canvasStore = useCanvasStore.getState();
+  const items = rawItems.map((item) => deserializeCanvasItem(item));
+  canvasStore.loadCanvasGraph({
+    items: items as import('@/types').CanvasItem[],
+    groups: graph?.groups as import('@/types').CanvasGroup[] | undefined,
+    connections: graph?.connections as import('@/types').CanvasConnection[] | undefined,
+    anchors: graph?.anchors as import('@/types').CanvasAnchor[] | undefined,
+  });
+}
+
 export function saveProjectWorkspaceState(projectId: string, projectName: string): void {
   if (!projectId || typeof window === 'undefined') return;
   try {
-    const { items, viewport } = useCanvasStore.getState();
-    const { nodes, connections } = useNodeStore.getState();
+    const { items, viewport, groups, connections, anchors } = useCanvasStore.getState();
+    const { nodes, connections: workflowConnections } = useNodeStore.getState();
     // Guard: don't overwrite existing saved state with empty canvas
     if (items.length === 0 && nodes.length === 0) {
       const existing = localStorage.getItem(canvasStateKey(projectId));
@@ -47,7 +62,13 @@ export function saveProjectWorkspaceState(projectId: string, projectName: string
         } catch { /* corrupt data, ok to overwrite */ }
       }
     }
-    const payload = { items, viewport, workflow: { nodes, connections }, savedAt: Date.now() };
+    const payload = {
+      items,
+      viewport,
+      ...serializeCanvasGraph(groups, connections, anchors),
+      workflow: { nodes, connections: workflowConnections },
+      savedAt: Date.now(),
+    };
     localStorage.setItem(canvasStateKey(projectId), JSON.stringify(payload));
   } catch {
     // localStorage quota or serialisation errors are non-fatal
@@ -69,7 +90,7 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
   try {
     const raw = localStorage.getItem(canvasStateKey(projectId));
     if (raw) {
-      const { items, viewport, workflow } = JSON.parse(raw);
+      const { items, viewport, workflow, groups, connections, anchors } = JSON.parse(raw);
       const canvas = useCanvasStore.getState();
       if (viewport) canvas.setViewport(viewport);
 
@@ -78,8 +99,8 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
       }
 
       if (Array.isArray(items) && items.length > 0) {
-        canvas.clearCanvas();
-        for (const item of items) canvas.addItem(item);
+        canvas.clearAll();
+        canvas.loadCanvasGraph({ items, groups, connections, anchors });
         setCanvasRestoring(false);
         return true;
       }
@@ -100,31 +121,12 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
       if (diskCanvas?.items?.length) {
         const canvasStore = useCanvasStore.getState();
         if (diskCanvas.viewport) canvasStore.setViewport(diskCanvas.viewport);
-        canvasStore.clearCanvas();
-        for (const item of diskCanvas.items) {
-          const restoredMeta: GenerationMeta | undefined =
-            item.generationMeta && typeof item.generationMeta === 'object'
-              ? (item.generationMeta as GenerationMeta)
-              : item.nodeData && typeof item.nodeData === 'object'
-                ? (item.nodeData as GenerationMeta)
-                : undefined;
-          canvasStore.addItem({
-            type: ((item.type as string)?.toLowerCase?.() ?? 'image') as 'image' | 'generated' | 'placeholder',
-            x: item.x ?? 0,
-            y: item.y ?? 0,
-            width: item.width ?? 512,
-            height: item.height ?? 512,
-            rotation: item.rotation ?? 0,
-            scale: item.scale ?? 1,
-            locked: item.locked ?? false,
-            visible: item.visible ?? true,
-            src: item.src ?? item.dataUrl ?? '',
-            name: item.name ?? 'Untitled',
-            prompt: item.prompt ?? undefined,
-            assetId: item.assetId ?? undefined,
-            generationMeta: restoredMeta,
-          });
-        }
+        canvasStore.clearAll();
+        restoreCanvasFromApiItems(diskCanvas.items, {
+          groups: diskCanvas.groups,
+          connections: diskCanvas.connections,
+          anchors: diskCanvas.anchors,
+        });
         rebuildFileTreeFromItems(diskCanvas.items);
         saveProjectWorkspaceState(projectId, _projectName);
         setCanvasRestoring(false);
@@ -154,31 +156,12 @@ export async function loadProjectWorkspaceState(projectId: string, _projectName:
     }
 
     if (Array.isArray(canvas.items) && canvas.items.length > 0) {
-      canvasStore.clearCanvas();
-      for (const item of canvas.items) {
-        const restoredMeta: GenerationMeta | undefined =
-          item.nodeData && typeof item.nodeData === 'object'
-            ? (item.nodeData as GenerationMeta)
-            : undefined;
-
-        canvasStore.addItem({
-          type: (item.type?.toLowerCase?.() ?? 'image') as 'image' | 'generated' | 'placeholder',
-          x: item.x ?? 0,
-          y: item.y ?? 0,
-          width: item.width ?? 512,
-          height: item.height ?? 512,
-          rotation: item.rotation ?? 0,
-          scale: item.scale ?? item.scaleX ?? 1,
-          locked: item.locked ?? false,
-          visible: item.visible ?? true,
-          src: item.dataUrl ?? item.src ?? '',
-          name: item.name ?? 'Untitled',
-          prompt: item.prompt ?? undefined,
-          assetId: item.assetId ?? undefined,
-          generationMeta: restoredMeta,
-        });
-      }
-
+      canvasStore.clearAll();
+      restoreCanvasFromApiItems(canvas.items, {
+        groups: canvas.groups,
+        connections: canvas.connections,
+        anchors: canvas.anchors,
+      });
       rebuildFileTreeFromItems(canvas.items);
       saveProjectWorkspaceState(projectId, _projectName);
       setCanvasRestoring(false);
@@ -251,8 +234,8 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
   const syncCanvas = useCallback(async () => {
     if (!projectId || !session?.user) return;
 
-    const { items, viewport } = useCanvasStore.getState();
-    const { nodes, connections } = useNodeStore.getState();
+    const { items, viewport, groups, connections, anchors } = useCanvasStore.getState();
+    const { nodes, connections: workflowConnections } = useNodeStore.getState();
 
     try {
       await fetch(`/api/projects/${projectId}/canvas`, {
@@ -262,25 +245,17 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
           viewportX: viewport.x,
           viewportY: viewport.y,
           viewportZoom: viewport.zoom,
-          items: items.map((item) => ({
-            type: item.type.toUpperCase(),
-            x: item.x,
-            y: item.y,
-            width: item.width,
-            height: item.height,
-            rotation: item.rotation,
-            scale: item.scale,
-            zIndex: item.zIndex,
-            visible: item.visible,
-            locked: item.locked,
-            name: item.name,
-            dataUrl: item.src ?? null,
-            prompt: item.prompt ?? null,
-            assetId: item.assetId ?? null,
-            nodeData: item.generationMeta ? JSON.parse(JSON.stringify(item.generationMeta)) : null,
+          items: items.map((item) => serializeCanvasItem(item)),
+          edges: connections.map((c) => ({
+            sourceItemId: c.sourceItemId,
+            targetItemId: c.targetItemId,
+            sourcePort: c.sourceAnchorId,
+            targetPort: c.targetAnchorId,
+            dataType: c.kind,
+            metadata: { color: c.color, id: c.id },
           })),
-          edges: [],
-          workflow: nodes.length > 0 ? { nodes, connections } : undefined,
+          ...serializeCanvasGraph(groups, connections, anchors),
+          workflow: nodes.length > 0 ? { nodes, connections: workflowConnections } : undefined,
         }),
       });
 
@@ -356,30 +331,12 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
           }
 
           if (Array.isArray(canvas.items) && canvas.items.length > 0) {
-            canvasStore.clearCanvas();
-            for (const item of canvas.items) {
-              const restoredMeta: GenerationMeta | undefined =
-                item.nodeData && typeof item.nodeData === 'object'
-                  ? (item.nodeData as GenerationMeta)
-                  : undefined;
-
-              canvasStore.addItem({
-                type: (item.type?.toLowerCase?.() ?? 'image') as 'image' | 'generated' | 'placeholder',
-                x: item.x ?? 0,
-                y: item.y ?? 0,
-                width: item.width ?? 512,
-                height: item.height ?? 512,
-                rotation: item.rotation ?? 0,
-                scale: item.scale ?? item.scaleX ?? 1,
-                locked: item.locked ?? false,
-                visible: item.visible ?? true,
-                src: item.dataUrl ?? item.src ?? '',
-                name: item.name ?? 'Untitled',
-                prompt: item.prompt ?? undefined,
-                assetId: item.assetId ?? undefined,
-                generationMeta: restoredMeta,
-              });
-            }
+            canvasStore.clearAll();
+            restoreCanvasFromApiItems(canvas.items, {
+              groups: canvas.groups,
+              connections: canvas.connections,
+              anchors: canvas.anchors,
+            });
           }
 
           const fileStore = useFileStore.getState();

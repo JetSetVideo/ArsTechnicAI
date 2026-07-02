@@ -144,8 +144,12 @@ export const reorderFileNodesSchema = z.object({
 // ============================================================
 
 export const canvasItemSchema = z.object({
-  assetId: z.string().cuid().optional().nullable(),
-  type: z.enum(['IMAGE', 'GENERATED', 'PLACEHOLDER', 'PROMPT_NODE', 'REFERENCE_SET', 'PROVIDER_CALL', 'EDIT_NODE', 'UPSCALE_NODE', 'MERGE_NODE', 'EXPORT_NODE', 'COMMENT', 'FRAME']),
+  assetId: z.string().optional().nullable(),
+  type: z.enum([
+    'IMAGE', 'GENERATED', 'PLACEHOLDER', 'VIDEO', 'AUDIO', 'TEXT', 'TEMPLATE',
+    'SHAPE', 'DRAWING', 'PROMPT_NODE', 'REFERENCE_SET', 'PROVIDER_CALL',
+    'EDIT_NODE', 'UPSCALE_NODE', 'MERGE_NODE', 'EXPORT_NODE', 'COMMENT', 'FRAME',
+  ]),
   x: z.number().default(0),
   y: z.number().default(0),
   width: z.number().default(200),
@@ -156,9 +160,67 @@ export const canvasItemSchema = z.object({
   locked: z.boolean().default(false),
   visible: z.boolean().default(true),
   name: z.string().optional(),
-  prompt: z.string().optional(),
+  prompt: z.string().optional().nullable(),
+  promptId: z.string().optional().nullable(),
+  lineageId: z.string().optional().nullable(),
+  parentAssetId: z.string().optional().nullable(),
+  parentItemId: z.string().optional().nullable(),
+  layerRole: z.enum(['base', 'overlay', 'prompt', 'variant', 'generated']).optional().nullable(),
+  layerOffset: z.object({
+    x: z.number(),
+    y: z.number(),
+    scale: z.number().optional(),
+    rotation: z.number().optional(),
+  }).optional().nullable(),
+  etiquettePosition: z.object({ x: z.number(), y: z.number() }).optional().nullable(),
+  connectionIds: z.array(z.string()).optional(),
+  timelineRole: z.enum(['scene', 'shot', 'asset', 'overlay', 'transition', 'none']).optional().nullable(),
+  sceneId: z.string().optional().nullable(),
+  stackOrder: z.number().int().optional().nullable(),
+  overlayKind: z.enum(['pen', 'shape', 'text']).optional().nullable(),
+  groupId: z.string().optional().nullable(),
+  groupOrbit: z.boolean().optional().nullable(),
   nodeData: z.record(z.unknown()).optional(),
-  dataUrl: z.string().optional(),
+  dataUrl: z.string().optional().nullable(),
+});
+
+export const canvasGroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  itemIds: z.array(z.string()),
+  collapsed: z.boolean().default(false),
+  orbit: z.boolean().default(false),
+  parentGroupId: z.string().optional().nullable(),
+  stackOrder: z.number().int().default(0),
+  createdAt: z.number(),
+});
+
+export const canvasAnchorSchema = z.object({
+  id: z.string(),
+  itemId: z.string(),
+  kind: z.enum(['input', 'output', 'layer', 'prompt', 'variant', 'link']),
+  side: z.enum(['top', 'right', 'bottom', 'left', 'center']),
+  offsetX: z.number().optional(),
+  offsetY: z.number().optional(),
+  label: z.string().optional(),
+});
+
+export const canvasConnectionSchema = z.object({
+  id: z.string(),
+  sourceItemId: z.string(),
+  targetItemId: z.string(),
+  sourceAnchorId: z.string().optional(),
+  targetAnchorId: z.string().optional(),
+  kind: z.enum(['input', 'output', 'layer', 'prompt', 'variant', 'link']),
+  color: z.string(),
+  label: z.string().optional(),
+  createdAt: z.number(),
+});
+
+export const canvasGraphSchema = z.object({
+  groups: z.array(canvasGroupSchema).optional(),
+  connections: z.array(canvasConnectionSchema).optional(),
+  anchors: z.array(canvasAnchorSchema).optional(),
 });
 
 export const updateCanvasItemSchema = canvasItemSchema.partial();

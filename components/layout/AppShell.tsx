@@ -49,6 +49,26 @@ export const AppShell: React.FC = () => {
   const [activeTool, setActiveTool] = useState<ToolId>('pointer');
   const [layersOpen, setLayersOpen] = useState(false);
   const [nodePaletteOpen, setNodePaletteOpen] = useState(false);
+
+  // First-run onboarding (Design.md §22)
+  const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0); // 0=hidden
+  const canvasItems = useCanvasStore((s) => s.items);
+  const fileNodes = useFileStore((s) => s.rootNodes ?? []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const done = localStorage.getItem('ars:onboarding-complete');
+    if (done) return;
+    if (canvasItems.length === 0 && fileNodes.length === 0) {
+      setOnboardingStep(1);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dismissOnboarding = () => {
+    localStorage.setItem('ars:onboarding-complete', 'true');
+    setOnboardingStep(0);
+  };
+
   const log = useLogStore((s) => s.log);
   const toast = useToastStore();
   const { setCanvasTool, activeTool: canvasTool } = useCanvasStore();
@@ -429,6 +449,63 @@ export const AppShell: React.FC = () => {
       <ActionLog />
 
       <SettingsModal isOpen={settingsOpen} onClose={() => { setSettingsOpen(false); setSettingsInitialTab(undefined); }} defaultTab={settingsInitialTab as 'publishing' | undefined} />
+
+      {/* First-run onboarding overlay — Design.md §22 */}
+      {onboardingStep > 0 && (
+        <div className={styles.onboardingOverlay}>
+          <div className={styles.onboardingCard}>
+            <div className={styles.onboardingHeader}>
+              <span className={styles.onboardingBrand}>Ars TechnicAI</span>
+              <button className={styles.onboardingSkip} onClick={dismissOnboarding}>Skip tour</button>
+            </div>
+
+            <div className={styles.onboardingSteps}>
+              {[1, 2, 3].map((n) => (
+                <div
+                  key={n}
+                  className={`${styles.onboardingDot} ${onboardingStep === n ? styles.onboardingDotActive : onboardingStep > n ? styles.onboardingDotDone : ''}`}
+                />
+              ))}
+            </div>
+
+            {onboardingStep === 1 && (
+              <div className={styles.onboardingBody}>
+                <div className={styles.onboardingIcon}>📥</div>
+                <h2 className={styles.onboardingTitle}>Import or Generate</h2>
+                <p className={styles.onboardingText}>Drag any image, video, or audio file into the Explorer on the left — or type a prompt in the Inspector on the right to generate your first image with AI.</p>
+              </div>
+            )}
+            {onboardingStep === 2 && (
+              <div className={styles.onboardingBody}>
+                <div className={styles.onboardingIcon}>🎨</div>
+                <h2 className={styles.onboardingTitle}>Place on Canvas</h2>
+                <p className={styles.onboardingText}>Drag assets from the Explorer onto the infinite canvas. Hover over any asset to see the ● connection dot at the bottom — drag it to another asset to link them into a pipeline.</p>
+              </div>
+            )}
+            {onboardingStep === 3 && (
+              <div className={styles.onboardingBody}>
+                <div className={styles.onboardingIcon}>🚀</div>
+                <h2 className={styles.onboardingTitle}>Export to Social</h2>
+                <p className={styles.onboardingText}>Use Format Profiles to export in 9:16 for TikTok, 1:1 for Instagram, or 16:9 for YouTube. Press <kbd>?</kbd> anytime on the canvas to see all keyboard shortcuts.</p>
+              </div>
+            )}
+
+            <div className={styles.onboardingFooter}>
+              <span className={styles.onboardingProgress}>Step {onboardingStep} of 3</span>
+              <div className={styles.onboardingActions}>
+                {onboardingStep > 1 && (
+                  <button className={styles.onboardingBack} onClick={() => setOnboardingStep((s) => (s - 1) as 0 | 1 | 2 | 3)}>← Back</button>
+                )}
+                {onboardingStep < 3 ? (
+                  <button className={styles.onboardingNext} onClick={() => setOnboardingStep((s) => (s + 1) as 0 | 1 | 2 | 3)}>Next →</button>
+                ) : (
+                  <button className={styles.onboardingNext} onClick={dismissOnboarding}>Get started →</button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

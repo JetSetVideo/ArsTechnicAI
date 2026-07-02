@@ -1357,14 +1357,47 @@ const TAG_CONFIG: Record<string, { label: string; color: string; bg: string; bor
   placeholder: { label: 'Placeholder', color: 'var(--text-muted)', bg: 'hsla(215,15%,50%,0.12)', border: 'hsla(215,15%,50%,0.4)', icon: <Layers size={10} /> },
 };
 
-const SIZE_PRESETS: { label: string; w: number; h: number; color: string }[] = [
-  { label: '512 × 512', w: 512, h: 512, color: 'var(--accent-primary)' },
-  { label: '768 × 768', w: 768, h: 768, color: 'var(--accent-secondary)' },
-  { label: '1024 × 1024', w: 1024, h: 1024, color: 'var(--accent-tertiary)' },
-  { label: '1024 × 1792', w: 1024, h: 1792, color: 'var(--warning)' },
-  { label: '1792 × 1024', w: 1792, h: 1024, color: 'var(--error)' },
-  { label: '2048 × 2048', w: 2048, h: 2048, color: 'var(--accent-primary)' },
+interface SizePreset { label: string; w: number; h: number; color: string; platform?: string; ratio?: string }
+const SIZE_PRESET_GROUPS: { group: string; color: string; items: SizePreset[] }[] = [
+  {
+    group: 'Square',
+    color: 'var(--accent-primary)',
+    items: [
+      { label: '512 × 512', w: 512, h: 512, color: 'var(--accent-primary)', ratio: '1:1' },
+      { label: '768 × 768', w: 768, h: 768, color: 'var(--accent-primary)', ratio: '1:1' },
+      { label: '1024 × 1024', w: 1024, h: 1024, color: 'var(--accent-primary)', ratio: '1:1' },
+      { label: '2048 × 2048', w: 2048, h: 2048, color: 'var(--accent-primary)', ratio: '1:1' },
+    ],
+  },
+  {
+    group: 'Social Portrait',
+    color: '#ec4899',
+    items: [
+      { label: '1080 × 1920', w: 1080, h: 1920, color: '#ec4899', platform: 'TikTok / Reels / Stories', ratio: '9:16' },
+      { label: '1080 × 1350', w: 1080, h: 1350, color: '#ec4899', platform: 'Instagram Feed', ratio: '4:5' },
+      { label: '1024 × 1792', w: 1024, h: 1792, color: '#ec4899', ratio: '9:16' },
+    ],
+  },
+  {
+    group: 'Social Landscape',
+    color: '#8b5cf6',
+    items: [
+      { label: '1920 × 1080', w: 1920, h: 1080, color: '#8b5cf6', platform: 'YouTube / 16:9 HD', ratio: '16:9' },
+      { label: '1792 × 1024', w: 1792, h: 1024, color: '#8b5cf6', ratio: '16:9' },
+      { label: '1280 × 720',  w: 1280, h: 720,  color: '#8b5cf6', platform: '720p HD', ratio: '16:9' },
+    ],
+  },
+  {
+    group: 'Cinema',
+    color: '#f59e0b',
+    items: [
+      { label: '2048 × 858',  w: 2048, h: 858,  color: '#f59e0b', platform: 'DCI 2.39:1 Scope', ratio: '2.39:1' },
+      { label: '2048 × 1107', w: 2048, h: 1107, color: '#f59e0b', platform: 'DCI 1.85:1 Flat', ratio: '1.85:1' },
+      { label: '4096 × 2160', w: 4096, h: 2160, color: '#f59e0b', platform: 'DCI 4K', ratio: '17:9' },
+    ],
+  },
 ];
+const SIZE_PRESETS: SizePreset[] = SIZE_PRESET_GROUPS.flatMap((g) => g.items);
 
 const formatRelativeTime = (timestamp: number): string => {
   const diff = Date.now() - timestamp;
@@ -1699,6 +1732,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
   const [showSizePanel, setShowSizePanel] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Auto-switch to Inspector tab when user selects a canvas item
+  const firstSelectedId = selectedItems[0]?.id ?? null;
+  useEffect(() => {
+    if (firstSelectedId) setActiveTab('inspector');
+  }, [firstSelectedId]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -2101,10 +2140,17 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
                     </div>
                     <div className={styles.mediaInfoGrid}>
                       {curW > 0 && curH > 0 && (
-                        <div className={styles.mediaInfoItem}>
+                        <button
+                          className={`${styles.mediaInfoItem} ${styles.resolutionBtn}`}
+                          onClick={() => setShowSizePanel(!showSizePanel)}
+                          title="Click to change resolution"
+                        >
                           <span className={styles.mediaInfoLabel}>Resolution</span>
-                          <span className={styles.mediaInfoValue}>{curW} × {curH}</span>
-                        </div>
+                          <span className={`${styles.mediaInfoValue} ${styles.resolutionValue}`}>
+                            {curW} × {curH}
+                            {showSizePanel ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
+                          </span>
+                        </button>
                       )}
                       {fileSize > 0 && (
                         <div className={styles.mediaInfoItem}>
@@ -2155,6 +2201,51 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
                         </div>
                       )}
                     </div>
+                    {/* Resolution dropdown panel — shown when resolution button clicked */}
+                    {showSizePanel && (
+                      <div className={styles.sizePanel} style={{ marginTop: 4, gridColumn: '1 / -1' }}>
+                        {SIZE_PRESET_GROUPS.map((group) => (
+                          <div key={group.group}>
+                            <div className={styles.sizeSectionLabel} style={{ color: group.color }}>{group.group}</div>
+                            {group.items.map((preset) => {
+                              const isActive = curW === preset.w && curH === preset.h;
+                              return (
+                                <button
+                                  key={preset.label}
+                                  className={`${styles.sizeOption} ${isActive ? styles.sizeOptionActive : ''}`}
+                                  style={{ ['--size-color' as string]: preset.color }}
+                                  onClick={() => {
+                                    updateItem(selectedItem.id, { width: preset.w, height: preset.h, scale: 1 });
+                                    setShowSizePanel(false);
+                                  }}
+                                  title={preset.platform ?? preset.ratio}
+                                >
+                                  <span className={styles.sizeOptionDot} style={{ background: preset.color }} />
+                                  <span style={{ flex: 1 }}>{preset.label}</span>
+                                  {preset.ratio && (
+                                    <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>{preset.ratio}</span>
+                                  )}
+                                  {isActive && <span style={{ fontSize: '0.5rem', color: preset.color }}>✓</span>}
+                                </button>
+                              );
+                            })}
+                            <div className={styles.sizeDivider} />
+                          </div>
+                        ))}
+                        <button
+                          className={styles.sizeAddButton}
+                          onClick={() => {
+                            const newVariation = { id: `var-${Date.now()}`, label: `${curW}×${curH} v${variations.length + 1}` };
+                            updateItem(selectedItem.id, {
+                              generationMeta: { ...(meta || { prompt: '', model: '', seed: 0, width: curW, height: curH, generatedAt: Date.now() }), variations: [...variations, newVariation] },
+                            });
+                            log('canvas_resize', `Saved ${curW}×${curH}`);
+                          }}
+                        >
+                          <Plus size={10} /> Save {curSizeLabel}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className={styles.propertyGrid}>
@@ -2185,80 +2276,33 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ width, onOpenSet
                       </div>
                     </div>
 
-                    {/* ── Size (expandable) ── */}
-                    <button
-                      className={styles.sizeButton}
-                      onClick={() => setShowSizePanel(!showSizePanel)}
-                    >
-                      <span className={styles.propertyLabel}>Size</span>
-                      <span className={styles.propertyValue}>{curSizeLabel}</span>
-                      {showSizePanel ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-                    </button>
-                    {showSizePanel && (
-                      <div className={styles.sizePanel}>
-                        {SIZE_PRESETS.map((preset) => {
-                          const isActive = curW === preset.w && curH === preset.h;
-                          return (
-                            <button
-                              key={preset.label}
-                              className={`${styles.sizeOption} ${isActive ? styles.sizeOptionActive : ''}`}
-                              style={{ ['--size-color' as string]: preset.color }}
-                              onClick={() => {
-                                updateItem(selectedItem.id, { width: preset.w, height: preset.h, scale: 1 });
-                              }}
-                            >
-                              <span
-                                className={styles.sizeOptionDot}
-                                style={{ background: preset.color }}
-                              />
-                              {preset.label}
-                            </button>
-                          );
-                        })}
-                        {variations.length > 0 && (
-                          <>
-                            <div className={styles.sizeDivider} />
-                            <div className={styles.sizeSectionLabel}>Existing variations</div>
-                            {variations.map((v) => (
-                              <div key={v.id} className={styles.sizeOption} style={{ cursor: 'default' }}>
-                                <span className={styles.sizeOptionDot} style={{ background: 'var(--text-muted)' }} />
-                                {v.label}
-                              </div>
-                            ))}
-                          </>
-                        )}
-                        <button
-                          className={styles.sizeAddButton}
-                          onClick={() => {
-                            const newW = curW;
-                            const newH = curH;
-                            const newVariation = { id: `var-${Date.now()}`, label: `${newW}×${newH} variant` };
-                            const updatedVariations = [...variations, newVariation];
-                            updateItem(selectedItem.id, {
-                              generationMeta: { ...(meta || { prompt: '', model: '', seed: 0, width: newW, height: newH, generatedAt: Date.now() }), variations: updatedVariations },
-                            });
-                            log('canvas_resize', `Added size variation ${newW}×${newH}`);
-                          }}
-                        >
-                          <Plus size={10} />
-                          Add current size as variation
-                        </button>
-                      </div>
-                    )}
-
-                    {selectedItem.rotation !== 0 && (
-                      <div className={styles.property}>
-                        <span className={styles.propertyLabel}>Rotation</span>
-                        <span className={styles.propertyValue}>{selectedItem.rotation}°</span>
-                      </div>
-                    )}
+                    <div className={styles.property}>
+                      <span className={styles.propertyLabel}>Rotation</span>
+                      <span className={styles.propertyValue}>{selectedItem.rotation}°</span>
+                    </div>
+                    <div className={styles.property}>
+                      <span className={styles.propertyLabel}>Scale</span>
+                      <span className={styles.propertyValue}>{Math.round(selectedItem.scale * 100)}%</span>
+                    </div>
 
                     {promptText && (
                       <div
                         className={styles.promptDisplay}
                         style={{ borderLeftColor: tagCfg.color }}
                       >
-                        {promptText}
+                        <div style={{ flex: 1, lineHeight: 1.4 }}>{promptText}</div>
+                        <button
+                          className={styles.regenBtn}
+                          title="Re-generate using this prompt"
+                          onClick={() => {
+                            setPrompt(promptText);
+                            if (meta?.negativePrompt) setNegativePrompt(meta.negativePrompt);
+                            setActiveTab('prompt');
+                          }}
+                        >
+                          <Sparkles size={10} />
+                          Regen
+                        </button>
                       </div>
                     )}
 

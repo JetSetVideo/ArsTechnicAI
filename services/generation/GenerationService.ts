@@ -214,8 +214,15 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
     const versionLabel = getNextVersionLabel(existingVersions);
 
     const assetId = uuidv4();
+    const generatedFolderPath = fileStore.getProjectGeneratedPath();
     const maxDim = Math.min(320, Math.round((typeof window !== 'undefined' ? window.innerWidth : 1920) * 0.2));
     const genScale = Math.min(1, maxDim / Math.max(width, height));
+
+    const canvasState = useCanvasStore.getState();
+    const parentCanvasItem = input.selectedItemAssetId
+      ? canvasState.items.find((i) => i.assetId === input.selectedItemAssetId)
+      : undefined;
+    const parentCanvasItemId = parentCanvasItem?.id;
 
     const canvasItem = addItem({
       type: 'generated',
@@ -234,10 +241,45 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
       promptId: promptAsset.id,
       lineageId,
       parentAssetId,
+      parentItemId: parentCanvasItemId,
       version: versionLabel,
+      layerRole: 'generated',
+      timelineRole: 'asset',
+      generationMeta: {
+        prompt,
+        negativePrompt: negativePrompt || undefined,
+        model: settings.aiProvider.model,
+        seed,
+        width,
+        height,
+        generatedAt: genResult.createdAt,
+        filePath: `${generatedFolderPath}/${filename}`,
+        parentIds: parentCanvasItemId ? [parentCanvasItemId] : [],
+        childIds: [],
+        imageVersion: 1,
+      },
     });
 
-    const generatedFolderPath = fileStore.getProjectGeneratedPath();
+    if (parentCanvasItemId) {
+      const parentItem = canvasState.items.find((i) => i.id === parentCanvasItemId);
+      if (parentItem) {
+        const existingChildIds = parentItem.generationMeta?.childIds ?? [];
+        useCanvasStore.getState().updateItem(parentCanvasItemId, {
+          generationMeta: {
+            ...(parentItem.generationMeta ?? {
+              prompt: parentItem.prompt ?? prompt,
+              model: settings.aiProvider.model,
+              seed,
+              width: parentItem.width,
+              height: parentItem.height,
+              generatedAt: Date.now(),
+            }),
+            childIds: [...existingChildIds, canvasItem.id],
+          },
+        });
+      }
+    }
+
     const now = Date.now();
     fileStore.addAssetToFolder(
       {
@@ -305,7 +347,7 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
         height,
         generatedAt: genResult.createdAt,
         filePath: `${generatedFolderPath}/${filename}`,
-        parentIds: parentAssetId ? [parentAssetId] : [],
+        parentIds: parentCanvasItemId ? [parentCanvasItemId] : [],
         childIds: [],
         imageVersion: 1,
         imageVersionLabel: `v${versionLabel}`,
@@ -324,7 +366,7 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
           opacity: 1,
         },
         layerAssociations: {
-          parentCanvasItemIds: parentAssetId ? [parentAssetId] : [],
+          parentCanvasItemIds: parentCanvasItemId ? [parentCanvasItemId] : [],
           childCanvasItemIds: [],
         },
         projectId: currentProject.id,

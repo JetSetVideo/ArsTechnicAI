@@ -25,11 +25,15 @@ describe('CanvasStore', () => {
     // Reset the store state
     useCanvasStore.setState({
       items: [],
+      groups: [],
+      connections: [],
+      anchors: [],
       selectedIds: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       clipboard: [],
       past: [],
       future: [],
+      pendingConnection: null,
     });
   });
 

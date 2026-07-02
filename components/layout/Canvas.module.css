@@ -6,6 +6,35 @@
   min-height: 0;
   background: var(--bg-primary);
   overflow: hidden;
+
+  /* Etiquette / node design tokens (scoped here — CSS modules disallow bare :root) */
+  --eti-r: 8px;
+  --eti-r-sm: 5px;
+  --eti-blur: 14px;
+  --eti-bg: rgba(12, 12, 16, 0.93);
+  --eti-bg-hover: rgba(20, 20, 28, 0.98);
+  --eti-border: rgba(255, 255, 255, 0.09);
+  --eti-border-active: color-mix(in srgb, var(--orb-color, #00d4aa) 45%, transparent);
+  --eti-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255,255,255,0.04) inset;
+  --eti-anim-speed: 0.18s;
+  --eti-anim-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --node-r: 6px;
+  --node-border-w: 1px;
+  --node-glow-blur: 16px;
+  --node-glow-spread: 0px;
+  --node-select-ring: 2px;
+  --t-image: #ec4899;
+  --t-video: #8b5cf6;
+  --t-audio: #22c55e;
+  --t-text: #60a5fa;
+  --t-generated: #00d4aa;
+  --t-template: #c084fc;
+  --t-shape: #f59e0b;
+  --t-drawing: #fb923c;
+  --t-placeholder: #6b7280;
+  --spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-smooth: cubic-bezier(0.25, 1, 0.5, 1);
+  --spring-snap: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .toolbar {
@@ -62,6 +91,39 @@
   text-align: center;
 }
 
+/* ── Tool buttons (active tool indicator with color coding) ── */
+.toolBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm, 5px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.toolBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.toolBtnActive {
+  background: color-mix(in srgb, var(--tool-color, var(--accent-primary)) 12%, transparent);
+  color: var(--tool-color, var(--accent-primary));
+  border-color: color-mix(in srgb, var(--tool-color, var(--accent-primary)) 35%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tool-color, var(--accent-primary)) 20%, transparent);
+}
+
+.toolBtnActive:hover {
+  background: color-mix(in srgb, var(--tool-color, var(--accent-primary)) 18%, transparent);
+  border-color: color-mix(in srgb, var(--tool-color, var(--accent-primary)) 50%, transparent);
+}
+
 .itemCount {
   flex-shrink: 0;
   padding: 0 0.5rem;
@@ -106,21 +168,74 @@
   position: absolute;
   cursor: move;
   user-select: none;
-  transition: box-shadow 0.15s ease;
+  border-radius: var(--node-r);
+  border: var(--node-border-w) solid transparent;
+  transition:
+    box-shadow var(--eti-anim-speed) ease,
+    border-color var(--eti-anim-speed) ease,
+    transform 0.08s ease;
+}
+
+/* Type-tinted inner ring using node type color */
+.canvasItem::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 var(--node-border-w) var(--node-type-color, transparent);
+  opacity: 0.28;
+  pointer-events: none;
+  transition: opacity var(--eti-anim-speed) ease;
 }
 
 .canvasItem:hover {
-  box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.3);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--node-type-color, var(--accent-primary)) 55%, transparent),
+    0 0 var(--node-glow-blur) color-mix(in srgb, var(--node-type-color, var(--accent-primary)) 18%, transparent);
+}
+
+.canvasItem:hover::before {
+  opacity: 0.6;
 }
 
 .canvasItem.selected {
-  box-shadow: 0 0 0 2px var(--accent-primary);
+  box-shadow:
+    0 0 0 var(--node-select-ring) var(--node-type-color, var(--accent-primary)),
+    0 0 var(--node-glow-blur) color-mix(in srgb, var(--node-type-color, var(--accent-primary)) 22%, transparent);
+}
+
+.canvasItem.selected::before {
+  opacity: 0;
+}
+
+/* Multi-select: dashed outer ring to distinguish from single select */
+.canvasItem.selected.multiSelected {
+  box-shadow:
+    0 0 0 var(--node-select-ring) var(--node-type-color, var(--accent-primary)),
+    0 0 28px color-mix(in srgb, var(--node-type-color, var(--accent-primary)) 25%, transparent);
+}
+
+.canvasItem.selected.multiSelected::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 1.5px dashed color-mix(in srgb, var(--node-type-color, var(--accent-primary)) 60%, transparent);
+  border-radius: calc(var(--node-r) + 5px);
+  pointer-events: none;
+  animation: multiSelectRingPulse 2s ease-in-out infinite;
+}
+
+@keyframes multiSelectRingPulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
 }
 
 .canvasItem.locked {
   cursor: not-allowed;
   opacity: 0.8;
 }
+
+/* Node type border-radius is set via --node-r inline style in Canvas.tsx */
 
 /* Tag row (legacy) */
 .tagRow {
@@ -597,6 +712,157 @@
   font-size: 0.625rem;
 }
 
+/* ── Sublayer list (layers tab) ── */
+.sublayerList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+}
+
+.sublayerRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.sublayerRow:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sublayerRowSelected {
+  background: rgba(0, 212, 170, 0.12);
+}
+
+.sublayerType {
+  font-size: 0.5625rem;
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.sublayerName {
+  flex: 1;
+  font-size: 0.6875rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sublayerActions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.sublayerRow:hover .sublayerActions {
+  opacity: 1;
+}
+
+.sublayerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.1s, color 0.1s;
+}
+
+.sublayerBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* ── Provenance display (prompt tab) ── */
+.provenanceModelRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.5625rem;
+  color: var(--accent-primary, #00d4aa);
+  margin-bottom: 4px;
+  padding: 3px 6px;
+  background: rgba(0, 212, 170, 0.08);
+  border-radius: 4px;
+}
+
+.provenanceSeed {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.provenancePromptBlock {
+  position: relative;
+}
+
+.provenanceCopyBtn {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.5625rem;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.provenanceCopyBtn:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.provenanceParents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.provenanceParentChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.5625rem;
+  color: var(--text-secondary);
+  transition: border-color 0.1s, background 0.1s;
+  max-width: 120px;
+  overflow: hidden;
+}
+
+.provenanceParentChip:hover {
+  border-color: var(--accent-primary);
+  background: rgba(0, 212, 170, 0.08);
+  color: var(--text-primary);
+}
+
+.provenanceParentThumb {
+  width: 16px;
+  height: 16px;
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    RESPONSIVE BREAKPOINTS for node UI
    ═══════════════════════════════════════════════════════════════ */
@@ -767,13 +1033,13 @@
   font-family: var(--font-mono);
 }
 
-/* Selection & resize handles */
+/* Selection & resize handles (shown when selected) */
 .handle {
   position: absolute;
   background: var(--accent-primary);
   border: 1.5px solid var(--bg-primary);
   border-radius: 2px;
-  z-index: 10;
+  z-index: 20;
 }
 
 .handleNW { width: 8px; height: 8px; top: -4px; left: -4px; cursor: nw-resize; }
@@ -785,6 +1051,22 @@
 .handleS { width: 6px; height: 6px; bottom: -3px; left: calc(50% - 3px); cursor: s-resize; }
 .handleE { width: 6px; height: 6px; right: -3px; top: calc(50% - 3px); cursor: e-resize; }
 .handleW { width: 6px; height: 6px; left: -3px; top: calc(50% - 3px); cursor: w-resize; }
+
+/* Edge zones — always present, invisible hit areas for resize cursor even unselected */
+.edgeZone {
+  position: absolute;
+  background: transparent;
+  z-index: 15;
+}
+
+.edgeZoneNW { width: 10px; height: 10px; top: 0; left: 0; cursor: nw-resize; }
+.edgeZoneNE { width: 10px; height: 10px; top: 0; right: 0; cursor: ne-resize; }
+.edgeZoneSE { width: 10px; height: 10px; bottom: 0; right: 0; cursor: se-resize; }
+.edgeZoneSW { width: 10px; height: 10px; bottom: 0; left: 0; cursor: sw-resize; }
+.edgeZoneN { height: 6px; left: 10px; right: 10px; top: 0; cursor: n-resize; }
+.edgeZoneS { height: 6px; left: 10px; right: 10px; bottom: 0; cursor: s-resize; }
+.edgeZoneE { width: 6px; top: 10px; bottom: 10px; right: 0; cursor: e-resize; }
+.edgeZoneW { width: 6px; top: 10px; bottom: 10px; left: 0; cursor: w-resize; }
 
 .lockIndicator {
   position: absolute;
@@ -926,6 +1208,785 @@
   border-color: var(--accent-primary);
   transform: translateX(-50%) scale(1.4);
   box-shadow: 0 0 8px var(--accent-primary-alpha);
+}
+
+/* ── Movable etiquette root ── */
+.etiquetteRoot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  pointer-events: auto;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  /* Sticks to the TOP of the canvas item */
+}
+
+.nodeTabDraggable {
+  cursor: grab;
+}
+
+.nodeTabDraggable:active {
+  cursor: grabbing;
+}
+
+.etiquetteDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  max-width: 280px;
+  background: var(--bg-3, #1a1a24);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-radius: var(--r-md, 8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 6px 0;
+  z-index: 30;
+}
+
+.etiquetteDropdownLabel {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 4px 10px 2px;
+}
+
+.etiquetteDropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 10px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.6875rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.etiquetteDropdownItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.etiquetteDropdownActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px 4px;
+  border-top: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  margin-top: 4px;
+}
+
+.etiquetteDropdownAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-radius: var(--r-sm, 4px);
+  color: var(--text-secondary);
+  font-size: 0.5625rem;
+  cursor: pointer;
+}
+
+.etiquetteDropdownAction:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.etiquetteDropdownDanger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   REDESIGNED NODE ETIQUETTE — full-width title + expandable panel
+   Design system: --eti-r=8px radius, --eti-blur=14px glass blur
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Title bar (always visible, full-width, draggable) ── */
+.etiquetteTitleBar {
+  position: relative;
+  width: var(--eti-title-w, 100%);  /* spans full node width */
+  height: 28px;      /* FIXED height — used in top: -(28/zoom) math in NodeEtiquette */
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  background: var(--eti-bg);
+  border: 1px solid var(--eti-border);
+  border-bottom: 1.5px solid var(--eti-border-active);
+  border-radius: var(--eti-r) var(--eti-r) 0 0;
+  backdrop-filter: blur(var(--eti-blur));
+  -webkit-backdrop-filter: blur(var(--eti-blur));
+  box-shadow: var(--eti-shadow);
+  cursor: default;
+  pointer-events: auto;
+  user-select: none;
+  transition: background var(--eti-anim-speed), border-color var(--eti-anim-speed);
+}
+
+.etiquetteTitleBar:hover {
+  background: var(--eti-bg-hover);
+}
+
+.etiquetteTitleBar:active {
+  cursor: grabbing;
+}
+
+.etiquetteTitleDot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transition: box-shadow 0.2s;
+}
+
+.etiquetteTitleBar:hover .etiquetteTitleDot {
+  box-shadow: 0 0 8px var(--orb-color, #00d4aa);
+}
+
+.etiquetteTitleTypeIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+}
+
+.etiquetteTitleName {
+  flex: 1;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.etiquetteTitleInput {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--eti-border-active);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text-primary);
+  font-size: 0.625rem;
+  outline: none;
+  min-width: 0;
+}
+
+.etiquetteTitleActions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--eti-anim-speed);
+}
+
+.etiquetteTitleBar:hover .etiquetteTitleActions {
+  opacity: 1;
+}
+
+.etiquetteTitleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.etiquetteTitleBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.etiquetteTitleBtnActive {
+  color: var(--orb-color, var(--accent-primary));
+  background: color-mix(in srgb, var(--orb-color, #00d4aa) 12%, transparent);
+}
+
+/* ── Round expand orb ── */
+.etiquetteOrb {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25);
+  cursor: pointer;
+  transition:
+    box-shadow var(--eti-anim-speed) ease,
+    border-color var(--eti-anim-speed) ease,
+    transform var(--eti-anim-speed) var(--spring-bounce, ease);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.etiquetteOrb:hover {
+  border-color: rgba(255,255,255,0.6);
+  transform: scale(1.12);
+}
+
+.etiquetteOrbOpen {
+  border-color: rgba(255,255,255,0.7);
+  transform: scale(1.05);
+}
+
+/* ── Expanded detail panel ── */
+@keyframes etiPanelOpen {
+  from { opacity: 0; transform: scaleY(0.88) translateY(-6px); }
+  to   { opacity: 1; transform: scaleY(1) translateY(0); }
+}
+
+.etiquettePanel {
+  position: relative;
+  background: var(--eti-bg);
+  border: 1px solid var(--eti-border);
+  border-top: none;
+  border-radius: 0 0 var(--eti-r) var(--eti-r);
+  backdrop-filter: blur(var(--eti-blur));
+  -webkit-backdrop-filter: blur(var(--eti-blur));
+  box-shadow: var(--eti-shadow);
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 420px;  /* scrollable when content is tall */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+  pointer-events: auto;
+  transform-origin: top center;
+  animation: etiPanelOpen var(--eti-anim-speed) var(--eti-anim-spring) both;
+  max-height: min(420px, 55vh);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+/* ── Collapsible sections inside panel ── */
+.etiquetteSection {
+  border-bottom: 1px solid var(--eti-border);
+}
+
+.etiquetteSection:last-child {
+  border-bottom: none;
+}
+
+.etiquetteSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, color 0.1s;
+}
+
+.etiquetteSectionHeader:hover {
+  background: rgba(255,255,255,0.04);
+  color: var(--text-primary);
+}
+
+.etiquetteSectionIcon {
+  display: flex;
+  align-items: center;
+  color: var(--orb-color, var(--accent-primary));
+  opacity: 0.8;
+}
+
+.etiquetteSectionLabel {
+  flex: 1;
+}
+
+.etiquetteSectionBadge {
+  background: color-mix(in srgb, var(--orb-color, #00d4aa) 20%, transparent);
+  color: var(--orb-color, var(--accent-primary));
+  border-radius: 10px;
+  padding: 0 5px;
+  font-size: 0.5rem;
+  min-width: 14px;
+  text-align: center;
+}
+
+.etiquetteSectionChevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.etiquetteSectionBody {
+  padding: 4px 8px 8px;
+}
+
+/* ── Prompt display in section ── */
+.etiquetteModelRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.5625rem;
+  color: var(--orb-color, var(--accent-primary));
+  margin-bottom: 4px;
+  padding: 2px 5px;
+  background: color-mix(in srgb, var(--orb-color, #00d4aa) 8%, transparent);
+  border-radius: 4px;
+}
+
+.etiquetteSeed {
+  margin-left: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.5rem;
+  color: var(--text-muted);
+}
+
+.etiquettePromptText {
+  font-size: 0.625rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  margin: 0 0 4px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  max-height: 100px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.etiquetteNegText {
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0 0 4px;
+  font-style: italic;
+  word-break: break-word;
+}
+
+.etiquetteCopyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.5625rem;
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px solid var(--eti-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.etiquetteCopyBtn:hover {
+  color: var(--orb-color, var(--accent-primary));
+  border-color: var(--orb-color, var(--accent-primary));
+}
+
+/* ── Related assets grid ── */
+.etiquetteRelLabel {
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.etiquetteRelGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.etiquetteRelThumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--eti-border);
+  border-radius: 5px;
+  cursor: pointer;
+  width: 48px;
+  transition: border-color 0.1s, background 0.1s;
+  font-size: 0.5rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+
+.etiquetteRelThumb:hover {
+  border-color: var(--orb-color, var(--accent-primary));
+  background: color-mix(in srgb, var(--orb-color, #00d4aa) 8%, transparent);
+  color: var(--text-primary);
+}
+
+.etiquetteRelThumb img {
+  width: 40px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.etiquetteRelPlaceholder {
+  width: 40px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.04);
+  border-radius: 3px;
+  color: var(--text-muted);
+}
+
+/* ── Add layer button ── */
+.etiquetteAddLayerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.5625rem;
+  margin-top: 4px;
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px dashed var(--eti-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.etiquetteAddLayerBtn:hover {
+  color: var(--orb-color, var(--accent-primary));
+  border-color: var(--orb-color, var(--accent-primary));
+  border-style: solid;
+}
+
+/* ── Info rows ── */
+.etiquetteInfoRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 0.5625rem;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: var(--text-secondary);
+}
+
+.etiquetteInfoRow:last-child {
+  border-bottom: none;
+}
+
+.etiquetteInfoRow > span:first-child {
+  color: var(--text-muted);
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.etiquetteInfoRow > span:last-child {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.5625rem;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+/* ── Panel footer actions ── */
+.etiquettePanelFooter {
+  display: flex;
+  gap: 4px;
+  padding: 5px 8px;
+  border-top: 1px solid var(--eti-border);
+  flex-wrap: wrap;
+}
+
+.etiquetteFooterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  font-size: 0.5625rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--eti-border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.etiquetteFooterBtn:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+}
+
+.etiquetteFooterBtnDanger:hover {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.35);
+  color: #ef4444;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INLINE NODE NAME BAR (overlaid at bottom of node image)
+   Always visible even when etiquette is off-screen
+   ══════════════════════════════════════════════════════════════════ */
+.nodeNameBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  background: linear-gradient(to top, rgba(8,8,12,0.92) 0%, rgba(8,8,12,0.6) 100%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+  transform-origin: bottom left;
+  z-index: 8;
+  width: 100%;
+  min-height: 22px;
+  cursor: grab;
+}
+
+.nodeNameBar:active { cursor: grabbing; }
+
+.nodeNameBarDot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.nodeNameBarText {
+  flex: 1;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.nodeNameBarInput {
+  flex: 1;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: #fff;
+  font-size: 0.5625rem;
+  outline: none;
+  min-width: 0;
+}
+
+.nodeNameBarToggle {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  border-radius: 3px;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.nodeNameBar:hover .nodeNameBarToggle {
+  opacity: 1;
+}
+
+.nodeNameBarToggle:hover {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DRAG-TO-GROUP SHIMMER — glowing pulse when node overlaps another
+   ══════════════════════════════════════════════════════════════════ */
+
+@keyframes dragGroupShimmer {
+  0%   {
+    box-shadow: 0 0 0 2px var(--node-type-color),
+                0 0 12px color-mix(in srgb, var(--node-type-color) 30%, transparent),
+                0 0 0 4px color-mix(in srgb, var(--node-type-color) 10%, transparent);
+    outline-offset: 2px;
+  }
+  40%  {
+    box-shadow: 0 0 0 3px var(--node-type-color),
+                0 0 32px color-mix(in srgb, var(--node-type-color) 60%, transparent),
+                0 0 0 8px color-mix(in srgb, var(--node-type-color) 20%, transparent),
+                0 0 60px color-mix(in srgb, var(--node-type-color) 15%, transparent);
+    outline-offset: 4px;
+  }
+  70%  {
+    box-shadow: 0 0 0 2px var(--node-type-color),
+                0 0 20px color-mix(in srgb, var(--node-type-color) 40%, transparent),
+                0 0 0 5px color-mix(in srgb, var(--node-type-color) 12%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 2px var(--node-type-color),
+                0 0 12px color-mix(in srgb, var(--node-type-color) 25%, transparent),
+                0 0 0 4px color-mix(in srgb, var(--node-type-color) 8%, transparent);
+  }
+}
+
+@keyframes dragGroupSourcePulse {
+  0%, 100% { opacity: 0.75; transform: rotate(var(--item-rotation, 0deg)) scale(0.98); }
+  50%       { opacity: 1;    transform: rotate(var(--item-rotation, 0deg)) scale(1.02); }
+}
+
+@keyframes groupReadyPop {
+  0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  65%  { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+.dragGroupTarget {
+  animation: dragGroupShimmer 0.65s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  z-index: 99 !important;
+  outline: 1px dashed var(--node-type-color);
+}
+
+.dragGroupSource {
+  animation: dragGroupSourcePulse 0.65s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.4), 0 0 24px rgba(255,255,255,0.15);
+}
+
+/* "Group" ready badge shown when dragging one node over another */
+.groupReadyBadge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: var(--node-type-color, var(--accent-primary));
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 100;
+  white-space: nowrap;
+  animation: groupReadyPop 0.28s var(--spring-bounce) forwards;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.5), 0 0 12px var(--node-type-color, var(--accent-primary));
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* ── Canvas anchor points ── */
+.canvasAnchor {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  z-index: 25;
+  cursor: crosshair;
+  pointer-events: auto;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.canvasAnchor:hover {
+  box-shadow: 0 0 10px currentColor;
+  transform: translate(-50%, -50%) scale(1.3) !important;
+}
+
+.canvasAnchorActive {
+  transform: translate(-50%, -50%) scale(1.45) !important;
+  box-shadow: 0 0 14px currentColor, 0 0 0 3px rgba(255, 255, 255, 0.35);
+  animation: anchorPulse 0.9s ease-in-out infinite alternate;
+}
+
+.canvasAnchorSnap {
+  transform: translate(-50%, -50%) scale(1.55) !important;
+  box-shadow: 0 0 16px #fff, 0 0 0 4px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes anchorPulse {
+  from { opacity: 0.85; }
+  to { opacity: 1; }
+}
+
+/* Breakable connection shake animation */
+@keyframes anchorShakeAnim {
+  0%   { transform: translate(-50%, -50%) scale(1.2) translateX(0); }
+  15%  { transform: translate(-50%, -50%) scale(1.3) translateX(-5px); }
+  30%  { transform: translate(-50%, -50%) scale(1.3) translateX(5px); }
+  45%  { transform: translate(-50%, -50%) scale(1.3) translateX(-4px); }
+  60%  { transform: translate(-50%, -50%) scale(1.3) translateX(4px); }
+  75%  { transform: translate(-50%, -50%) scale(1.2) translateX(-2px); }
+  90%  { transform: translate(-50%, -50%) scale(1.1) translateX(2px); }
+  100% { transform: translate(-50%, -50%) scale(1) translateX(0); }
+}
+
+.anchorShake {
+  animation: anchorShakeAnim 0.4s ease !important;
+  box-shadow: 0 0 20px #fff, 0 0 40px currentColor !important;
+}
+
+.connPreview {
+  pointer-events: none;
+}
+
+.connTrail {
+  filter: drop-shadow(0 0 3px currentColor);
+}
+
+.overlayLayerBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill, 999px);
+  background: rgba(239, 68, 68, 0.85);
+  color: #fff;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  z-index: 12;
+  pointer-events: none;
+  transform: scale(calc(1 / var(--zoom, 1)));
+  transform-origin: top right;
+}
+
+.canvasConnSvg {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 5;
+}
+
+.canvasConnSvg path[style*="pointer-events: stroke"] {
+  pointer-events: stroke;
 }
 
 /* ── Group contour (around multi-selected items) ── */
@@ -1391,29 +2452,19 @@
 }
 
 /* ── User Group Stacking ─────────────────────────────────── */
+/* Items are offset via displayX += groupStackOffset * idx in Canvas.tsx */
+/* The border reflects group membership — amber color-mix on top of node-type-color */
 
-.userGrouped::before,
-.userGrouped::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.userGrouped::before {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--accent-tertiary, #f59e0b);
-  transform: translate(7px, -7px);
-  opacity: 0.45;
-}
-
-.userGrouped::after {
-  background: var(--bg-secondary);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  transform: translate(14px, -14px);
-  opacity: 0.2;
+.userGrouped {
+  outline: 2px solid color-mix(in srgb, #f59e0b 60%, var(--node-type-color, #00d4aa));
+  outline-offset: 0;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    0 0 0 1px color-mix(in srgb, #f59e0b 40%, transparent);
+  transition:
+    left var(--spring-smooth, 0.3s ease),
+    top var(--spring-smooth, 0.3s ease),
+    outline-color 0.2s ease;
 }
 
 /* Group badge: amber pill with group icon, click toggles orbit */
@@ -1445,33 +2496,7 @@
   box-shadow: 0 2px 12px rgba(245, 158, 11, 0.75);
 }
 
-/* ── Drag-to-group Highlights ───────────────────────────── */
-
-.dragGroupTarget {
-  box-shadow:
-    0 0 0 2px var(--accent-tertiary, #f59e0b),
-    0 0 20px rgba(245, 158, 11, 0.5) !important;
-  animation: groupShine 0.7s ease-in-out infinite alternate;
-}
-
-.dragGroupSource {
-  box-shadow:
-    0 0 0 2px rgba(245, 158, 11, 0.5),
-    0 0 10px rgba(245, 158, 11, 0.25) !important;
-}
-
-@keyframes groupShine {
-  from {
-    box-shadow:
-      0 0 0 2px var(--accent-tertiary, #f59e0b),
-      0 0 12px rgba(245, 158, 11, 0.35);
-  }
-  to {
-    box-shadow:
-      0 0 0 3px var(--accent-tertiary, #f59e0b),
-      0 0 30px rgba(245, 158, 11, 0.7);
-  }
-}
+/* drag-to-group rules moved to shimmer section above */
 
 /* ── Orbit Mode ─────────────────────────────────────────── */
 
@@ -1480,6 +2505,20 @@
     left 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
     top  0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+/* Related-asset orbit: items orbit in a circle around the source node */
+.relatedOrbitItem {
+  transition:
+    left 0.55s var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1)),
+    top  0.55s var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1)),
+    opacity 0.3s ease;
+  opacity: 0.92;
+  outline: 2px dashed rgba(255,255,255,0.25);
+  outline-offset: 4px;
+  z-index: 50 !important;
+}
+
+.relatedOrbitItem:hover { opacity: 1; }
 
 /* ── Context Menu ───────────────────────────────────────── */
 
@@ -1553,4 +2592,108 @@
   height: 1px;
   background: var(--border-color, #27272a);
   margin: 4px 0;
+}
+
+/* ── Keyboard shortcuts overlay ── */
+.shortcutsOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.shortcutsPanel {
+  background: var(--bg-elevated, #222228);
+  border: 1px solid var(--border-color, #27272a);
+  border-radius: var(--r-lg, 14px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  min-width: 520px;
+  max-width: 640px;
+  overflow: hidden;
+}
+
+.shortcutsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #27272a);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary, #fafafc);
+}
+
+.shortcutsClose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #52525b);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  transition: background 0.1s, color 0.1s;
+}
+.shortcutsClose:hover {
+  background: var(--bg-tertiary, #1a1a1f);
+  color: var(--text-primary, #fafafc);
+}
+
+.shortcutsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 8px;
+}
+
+.shortcutsSection {
+  padding: 8px;
+}
+
+.shortcutsSectionTitle {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #52525b);
+  margin-bottom: 6px;
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.shortcutRow kbd {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border: 1px solid var(--border-color, #27272a);
+  background: var(--bg-tertiary, #1a1a1f);
+  border-radius: 4px;
+  color: var(--text-primary, #fafafc);
+  white-space: nowrap;
+  min-width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.shortcutsFooter {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-color, #27272a);
+  font-size: 0.6875rem;
+  color: var(--text-muted, #52525b);
+  text-align: center;
 }
