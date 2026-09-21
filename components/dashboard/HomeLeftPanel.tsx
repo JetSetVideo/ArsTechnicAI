@@ -7,10 +7,11 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   FolderOpen, FolderPlus, FileText, Image, Film, Music,
   ChevronRight, ChevronDown, Plus, Trash2, Copy,
-  Users, BookOpen, Palette, RefreshCw,
+  Users, BookOpen, Palette, RefreshCw, FolderClock,
 } from 'lucide-react';
 import { useFileStore } from '../../stores/fileStore';
 import { useProjectsStore } from '../../stores/projectsStore';
+import { WorkflowMenu } from '../workshop/WorkflowMenu';
 import styles from './HomeLeftPanel.module.css';
 import type { FileNode, Asset } from '../../types';
 
@@ -235,6 +236,14 @@ export const HomeLeftPanel: React.FC<HomeLeftPanelProps> = ({
           <button className={styles.quickAction} onClick={onOpenTemplate}>
             <BookOpen size={12} /> New Template
           </button>
+          <WorkflowMenu
+            scope="global"
+            renderTrigger={({ toggle }) => (
+              <button className={styles.quickAction} onClick={toggle}>
+                <FolderClock size={12} /> Workflows
+              </button>
+            )}
+          />
         </div>
 
         <div className={styles.panelDivider} />

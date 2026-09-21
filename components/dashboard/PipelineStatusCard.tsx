@@ -20,8 +20,8 @@ export const PipelineStatusCard: React.FC = () => {
   const { currentProject } = useUserStore();
 
   useEffect(() => {
-    void usePipelineStore.getState().loadForProject(currentProject.id);
-  }, [currentProject.id]);
+    void usePipelineStore.getState().loadForProject(currentProject.id, currentProject.name);
+  }, [currentProject.id, currentProject.name]);
 
   // Avoid a one-frame flash of the previous project's node count while the
   // newly-selected project's pipeline is loading.

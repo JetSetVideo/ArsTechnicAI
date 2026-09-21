@@ -114,9 +114,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const snapshotId = uuidv4();
       const now = Date.now();
+      // No pretty-print — this file can carry base64 node/variant images and
+      // is machine-written/read only; `null, 2` roughly doubles write size
+      // and CPU for no benefit.
       await fs.writeFile(snapshotFile(projectId, snapshotId), JSON.stringify({
         projectId, name, nodes, edges, viewport, collapsedStages, scenes, paramTemplates, savedAt: now,
-      }, null, 2), 'utf-8');
+      }), 'utf-8');
 
       const meta: SnapshotMeta = {
         id: snapshotId, name, createdAt: now, updatedAt: now,

@@ -15,6 +15,7 @@ import { getAnchorColor, getDefaultAnchorsForItem } from '@/lib/canvas/anchors';
 import { attachOverlayToParent, migrateCanvasPayload } from '@/lib/canvas/migration';
 import { buildCanvasTimelineHierarchy, getRelatedItemIds } from '@/lib/canvas/hierarchy';
 import { viewportToCenterItem } from '@/lib/canvas/viewport';
+import { STORAGE_KEYS } from '@/constants/workspace';
 
 const MAX_HISTORY = 50;
 const DEBOUNCE_MS = 2000;
@@ -46,7 +47,10 @@ function schedulePersist() {
       if (!projectId) return;
       const { items, viewport, groups, connections, anchors } = useCanvasStore.getState();
       if (items.length === 0) return;
-      const key = `ars:canvas-states:${projectId}`;
+      // Must match hooks/useProjectSync.ts's canvasStateKey() exactly — these
+      // used to be two different literal strings, so this debounced write was
+      // silently going to a key the load path never read.
+      const key = `${STORAGE_KEYS.canvasStates}:${projectId}`;
       localStorage.setItem(
         key,
         JSON.stringify({ items, viewport, groups, connections, anchors, savedAt: Date.now() }),

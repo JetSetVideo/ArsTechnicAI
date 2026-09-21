@@ -8,7 +8,7 @@ import { useLogStore } from '@/stores/logStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useProjectsStore } from '@/stores/projectsStore';
-import { useCanvasStore } from '@/stores/canvasStore';
+import { usePipelineStore } from '@/stores/pipelineStore';
 import { useTelemetryStore } from '@/stores/telemetryStore';
 import { gatherStorageEstimate, gatherFromStores } from '@/services/telemetry/gather';
 import { digestGatheredData } from '@/services/telemetry/digest';
@@ -46,7 +46,10 @@ export function TelemetryProvider({ children }: { children: React.ReactNode }) {
         fileStore: useFileStore.getState(),
         settingsStore: useSettingsStore.getState(),
         projectsStore: useProjectsStore.getState(),
-        canvasStore: useCanvasStore.getState(),
+        // Field kept as "canvasStore"/"items" for DB-column compatibility —
+        // now sourced from the Workshop pipeline's node count (see
+        // services/telemetry/gather.ts).
+        canvasStore: { items: usePipelineStore.getState().nodes },
       });
 
       const fullGathered = { ...gathered, storage, features: gathered.features };

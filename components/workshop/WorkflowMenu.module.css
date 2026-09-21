@@ -23,10 +23,9 @@
 .trigger:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
 
 .panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 340px;
+  /* position/top/left/width are set inline (portaled to <body>, positioned
+     from the trigger's bounding rect — see WorkflowMenu.tsx) so this popover
+     is never clipped by a scrolling ancestor like the home page's left panel. */
   max-height: 420px;
   overflow-y: auto;
   background: rgba(16, 16, 30, 0.97);

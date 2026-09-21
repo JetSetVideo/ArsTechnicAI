@@ -42,13 +42,15 @@ interface Props {
   apiKey: string;
 }
 
-export const PipelineNodeCard: React.FC<Props> = ({ node, zoom, apiKey }) => {
+export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNodeCard({ node, zoom, apiKey }) {
   const def = PIPELINE_NODE_DEFS[node.type];
   const stage = STAGES[node.stage];
-  const {
-    select, selectedId, startEdge, completeEdge, pendingEdge, runNode,
-    toggleDeck, setNodePosition, moveNodeToSlot, resetNodePosition,
-  } = usePipelineStore();
+  // Only `selectedId` needs to be a reactive subscription (it drives the
+  // `isSelected` render below) — the rest are stable action functions and a
+  // click-time-only flag, read live via getState() instead of subscribing.
+  // Previously this whole-store-destructured, so editing ANY node's params
+  // re-rendered EVERY node card on the canvas, not just the edited one.
+  const selectedId = usePipelineStore((s) => s.selectedId);
 
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
   const [dragging, setDragging] = React.useState(false);
@@ -61,10 +63,10 @@ export const PipelineNodeCard: React.FC<Props> = ({ node, zoom, apiKey }) => {
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('[data-port], [data-deck], button')) return;
     e.stopPropagation();
-    select(node.id);
+    usePipelineStore.getState().select(node.id);
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, [node.id, pos.x, pos.y, select]);
+  }, [node.id, pos.x, pos.y]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -74,25 +76,19 @@ export const PipelineNodeCard: React.FC<Props> = ({ node, zoom, apiKey }) => {
     if (!d.moved && Math.hypot(dx, dy) < 4) return;
     d.moved = true;
     setDragging(true);
-    setNodePosition(node.id, d.origX + dx, d.origY + dy);
-  }, [node.id, zoom, setNodePosition]);
+    usePipelineStore.getState().setNodePosition(node.id, d.origX + dx, d.origY + dy);
+  }, [node.id, zoom]);
 
   const handlePointerUp = useCallback(() => {
-    const d = dragRef.current;
     dragRef.current = null;
     setDragging(false);
-    if (!d?.moved) return;
-    // Snap into the nearest stage lane and slot — groups reform automatically
-    const state = usePipelineStore.getState();
-    const dropped = state.nodes.find((n) => n.id === node.id);
-    if (!dropped || dropped.x === undefined || dropped.y === undefined) return;
-    const laneSpan = 340 + 90; // LANE_WIDTH + LANE_GAP
-    const stageIdx = Math.max(0, Math.min(8, Math.round((dropped.x - 24) / laneSpan)));
-    const stageId = (Object.values(STAGES).find((s) => s.order === stageIdx) ?? stage).id;
-    const slot = Math.max(0, Math.round((dropped.y - 76) / (NODE_H + 56)));
-    moveNodeToSlot(node.id, stageId, slot);
-    resetNodePosition(node.id);
-  }, [node.id, stage, moveNodeToSlot, resetNodePosition]);
+    // Deliberately no snap-back-into-lane here: `handlePointerMove` already
+    // live-updated the node's x/y via setNodePosition, and it now just stays
+    // wherever it was dropped — matching the "put it anywhere" freedom the
+    // old freeform Canvas had, on the same node graph instead of a second,
+    // incompatible editor. The node's `stage` (and its lane-grouping/
+    // execution-order membership) is unaffected by where it's dragged.
+  }, []);
 
   if (!def) return null;
 
@@ -182,7 +178,7 @@ export const PipelineNodeCard: React.FC<Props> = ({ node, zoom, apiKey }) => {
           <button
             className={`${styles.nodeBtn} ${styles.nodeBtnPrimary}`}
             disabled={isRunning}
-            onClick={(e) => { e.stopPropagation(); void runNode(node.id, apiKey); }}
+            onClick={(e) => { e.stopPropagation(); void usePipelineStore.getState().runNode(node.id, apiKey); }}
             title={def.execution.startsWith('banana') ? 'Generate with banana2' : 'Apply / snapshot'}
           >
             {isRunning ? <Loader2 size={11} className={styles.spin} /> : <Play size={11} />}
@@ -191,7 +187,7 @@ export const PipelineNodeCard: React.FC<Props> = ({ node, zoom, apiKey }) => {
           <button
             data-deck
             className={styles.variantBadge}
-            onClick={(e) => { e.stopPropagation(); toggleDeck(node.id); }}
+            onClick={(e) => { e.stopPropagation(); usePipelineStore.getState().toggleDeck(node.id); }}
             title="Layers · versions · info"
           >
             <Layers size={10} />
@@ -213,11 +209,13 @@ export const PipelineNodeCard: React.FC<Props> = ({ node, zoom, apiKey }) => {
             onPointerDown={(e) => e.stopPropagation()}
             onPointerUp={(e) => {
               e.stopPropagation();
-              if (pendingEdge) completeEdge(node.id, port.id, port.type);
+              const s = usePipelineStore.getState();
+              if (s.pendingEdge) s.completeEdge(node.id, port.id, port.type);
             }}
             onClick={(e) => {
               e.stopPropagation();
-              if (pendingEdge) completeEdge(node.id, port.id, port.type);
+              const s = usePipelineStore.getState();
+              if (s.pendingEdge) s.completeEdge(node.id, port.id, port.type);
             }}
           >
             <span className={styles.portLabel}>{port.label}</span>
@@ -236,7 +234,7 @@ export const PipelineNodeCard: React.FC<Props> = ({ node, zoom, apiKey }) => {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              startEdge(node.id, port.id, port.type);
+              usePipelineStore.getState().startEdge(node.id, port.id, port.type);
             }}
           >
             <span className={styles.portLabel}>{port.label}</span>
@@ -253,4 +251,4 @@ export const PipelineNodeCard: React.FC<Props> = ({ node, zoom, apiKey }) => {
       )}
     </div>
   );
-};
+});

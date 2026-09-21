@@ -190,10 +190,16 @@ const FieldWidget: React.FC<{
 
 export const NodeInspector: React.FC<Props> = ({ node, apiKey }) => {
   const def = PIPELINE_NODE_DEFS[node.type];
+  // Only `paramTemplates` needs to be a reactive subscription (it drives
+  // `nodeTemplates` below) — the rest are stable action functions (zustand
+  // never changes their reference), so reading them via getState() instead
+  // of destructuring the whole store avoids re-rendering this Inspector on
+  // every unrelated pipeline change (e.g. another node finishing a run).
+  const paramTemplates = usePipelineStore((s) => s.paramTemplates);
   const {
     setParam, select, renameNode, runNode, removeNode, addVariant,
-    openEditor, selectVariant, paramTemplates, saveTemplate, applyTemplate,
-  } = usePipelineStore();
+    openEditor, selectVariant, saveTemplate, applyTemplate,
+  } = usePipelineStore.getState();
   const [templateName, setTemplateName] = useState('');
   const nodeTemplates = paramTemplates.filter((t) => t.nodeType === node.type);
   const stage = STAGES[node.stage];

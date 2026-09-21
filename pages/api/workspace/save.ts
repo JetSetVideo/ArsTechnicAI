@@ -29,7 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
 
-    // Save canvas state
+    // These three can carry base64 image data (canvas items, pipeline
+    // variants, file-tree asset thumbnails) and are machine-written/read
+    // only — pretty-printing (`null, 2`) roughly doubles write size and CPU
+    // for files nobody hand-edits.
     if (canvas && projectId) {
       const canvasFile = path.join(DATA_DIR, `canvas-${projectId}.json`);
       await fs.writeFile(canvasFile, JSON.stringify({
@@ -38,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         savedAt: Date.now(),
         viewport: canvas.viewport,
         items: canvas.items,
-      }, null, 2), 'utf-8');
+      }), 'utf-8');
     }
 
     // Save Workshop pipeline draft (per-project — see stores/pipelineStore.ts)
@@ -54,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         collapsedStages: pipeline.collapsedStages,
         scenes: pipeline.scenes,
         paramTemplates: pipeline.paramTemplates,
-      }, null, 2), 'utf-8');
+      }), 'utf-8');
     }
 
     // Save file tree state
@@ -65,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         projectName: projectName || 'Untitled',
         savedAt: Date.now(),
         ...fileState,
-      }, null, 2), 'utf-8');
+      }), 'utf-8');
     }
 
     // Save projects list

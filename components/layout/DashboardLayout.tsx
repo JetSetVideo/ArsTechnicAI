@@ -22,7 +22,6 @@ import { ConnectionBanner } from '../ui/ConnectionBanner';
 import { SettingsModal } from './SettingsModal';
 import { HomeLeftPanel } from '../dashboard/HomeLeftPanel';
 import { PipelineStatusCard } from '../dashboard/PipelineStatusCard';
-import { WorkflowMenu } from '../workshop/WorkflowMenu';
 import { HomeLeftToolbar } from '../dashboard/HomeLeftToolbar';
 import { ThreeDViewer } from '../dashboard/ThreeDViewer';
 import { useProjectSync, saveProjectWorkspaceState } from '../../hooks/useProjectSync';
@@ -665,7 +664,6 @@ export function DashboardLayout() {
           <input type="text" placeholder="Search projects, assets, tags…" value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)} className={styles.searchInput} />
         </div>
-        <WorkflowMenu scope="global" />
         <div className={styles.topBarRight}>
           <button className={styles.avatarBtn} onClick={() => { setSettingsTab('account'); setSettingsOpen(true); }}>
             <div className={`${styles.avatar} ${connectedClass}`}><UserRound size={13} /></div>

@@ -36,7 +36,7 @@ const ProjectLoader = dynamic(
 
         const dashProject = useProjectsStore.getState().getProject(projectId);
 
-        const afterLoad = () => {
+        const afterLoad = async () => {
           setLoaded(true);
           if (isQuickCreate) {
             try {
@@ -54,35 +54,34 @@ const ProjectLoader = dynamic(
                   if (qc.prompt) gs.setPrompt(qc.prompt);
                   const dims = PLATFORM_DIMS[qc.platform ?? ''];
                   if (dims) gs.setDimensions(dims.width, dims.height);
-                  
-                  // If a pre-generated image URL is provided, add it to canvas immediately
+
+                  // If a pre-generated image URL is provided, add it as a
+                  // pipeline node immediately (the Workshop is the only
+                  // editor now — this used to add a freeform Canvas item).
                   if (qc.prefillDataUrl) {
-                    const { useCanvasStore } = require('@/stores/canvasStore');
-                    const { v4: uuidv4 } = require('uuid');
-                    const cs = useCanvasStore.getState();
-                    const genId = uuidv4();
-                    const now = Date.now();
+                    const { usePipelineStore } = require('@/stores/pipelineStore');
+                    const { useUserStore: useUserStoreInner } = require('@/stores/userStore');
+                    const current = useUserStoreInner.getState().currentProject;
+                    // Ensure the pipeline store has finished loading (or
+                    // reset for) THIS project before we add to it — otherwise
+                    // WorkshopFlow's own loadForProject effect could wipe
+                    // this node if it hasn't run yet.
+                    await usePipelineStore.getState().loadForProject(current.id, current.name);
+                    const ps = usePipelineStore.getState();
                     const genWidth = dims?.width || 1024;
                     const genHeight = dims?.height || 1024;
-                    cs.addItem({
-                      type: 'generated',
-                      x: 150, y: 150,
-                      width: genWidth, height: genHeight,
-                      rotation: 0, scale: 0.5,
-                      locked: false, visible: true,
-                      src: qc.prefillDataUrl,
-                      prompt: qc.prompt || '',
-                      name: `generated-${genId.slice(0, 8)}.png`,
-                      generationMeta: {
-                        prompt: qc.prompt || '',
-                        model: 'pre-generated',
+                    const node = ps.addNode('image-import');
+                    if (node) {
+                      ps.renameNode(node.id, 'Quick create');
+                      ps.addVariant(node.id, {
+                        label: 'Quick create',
+                        image: qc.prefillDataUrl,
                         seed: Math.floor(Math.random() * 1000000),
-                        width: genWidth, height: genHeight,
-                        generatedAt: now,
-                        imageVersion: 1,
-                        variations: [],
-                      },
-                    });
+                        paramsSnapshot: qc.prompt ? { __prompt: qc.prompt } : undefined,
+                        meta: { model: 'pre-generated', width: genWidth, height: genHeight },
+                      });
+                      ps.setParam(node.id, 'file', qc.prefillDataUrl);
+                    }
                   } else {
                     gs.setPendingAutoGenerate(true);
                   }

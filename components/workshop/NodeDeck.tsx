@@ -14,7 +14,9 @@ type DeckTab = 'variants' | 'layers' | 'retouch' | 'info';
  * the layer stack of the active picture, and its full metadata.
  */
 export const NodeDeck: React.FC<{ node: PipelineNode; below?: boolean }> = ({ node, below }) => {
-  const { selectVariant, removeVariant, pinVariant, toggleDeck, openEditor } = usePipelineStore();
+  // All five are stable action functions — read via getState() rather than
+  // subscribing, so an open deck doesn't re-render on unrelated store changes.
+  const { selectVariant, removeVariant, pinVariant, toggleDeck, openEditor, resetNodePosition } = usePipelineStore.getState();
   const { settings } = useSettingsStore();
   const apiKey = settings.aiProvider.apiKeys?.GOOGLE_IMAGEN || settings.aiProvider.apiKey || '';
   const [tab, setTab] = useState<DeckTab>(node.variants.some((v) => v.image) ? 'retouch' : 'variants');
@@ -123,6 +125,16 @@ export const NodeDeck: React.FC<{ node: PipelineNode; below?: boolean }> = ({ no
             <VariantInfoBody node={node} variant={variant} />
           ) : (
             <div className={styles.layerEmptyHint}>No version selected.</div>
+          )}
+          {node.x !== undefined && node.y !== undefined && (
+            <button
+              className={styles.tbtn}
+              style={{ marginTop: 8 }}
+              onClick={() => resetNodePosition(node.id)}
+              title="Return this node to its auto-organized lane position"
+            >
+              Reset to lane position
+            </button>
           )}
         </div>
       )}

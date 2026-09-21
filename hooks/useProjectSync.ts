@@ -200,11 +200,18 @@ export function clearAllWorkspaceData(): void {
   for (const key of WORKSPACE_DATA_KEYS_TO_CLEAR) {
     localStorage.removeItem(key);
   }
-  // Also clear per-project canvas snapshots
+  // Also clear per-project canvas snapshots, pipeline drafts, and file-state
+  // blobs (all keyed as `<baseKey>:<projectId>`, not covered by the flat list
+  // above).
+  const perProjectPrefixes = [
+    `${STORAGE_KEYS.canvasStates}:`,
+    `${STORAGE_KEYS.fileStates}:`,
+    'ars:pipeline-workshop:',
+  ];
   const toRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k?.startsWith(`${STORAGE_KEYS.canvasStates}:`)) toRemove.push(k);
+    if (k && perProjectPrefixes.some((prefix) => k.startsWith(prefix))) toRemove.push(k);
   }
   for (const k of toRemove) localStorage.removeItem(k);
 }
@@ -220,6 +227,11 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
   const savingRef = useRef(false);
 
   const { markSynced, markDirty } = useProjectStore();
+  // Dirty-check for the 30s AUTO-save interval below: skip creating a DB
+  // version + PUTting the canvas when nothing has changed since the last
+  // sync (reference equality is enough — canvasStore only produces a new
+  // `items`/`connections` array reference when they actually change).
+  const lastAutoSyncedRef = useRef<{ items: unknown; connections: unknown } | null>(null);
 
   const syncCanvas = useCallback(async () => {
     if (!projectId || !session?.user) return;
@@ -287,6 +299,10 @@ export function useProjectSync(projectId?: string | null): ProjectSyncState {
     if (!projectId || !session?.user) return;
 
     const id = setInterval(() => {
+      const { items, connections } = useCanvasStore.getState();
+      const prev = lastAutoSyncedRef.current;
+      if (prev && prev.items === items && prev.connections === connections) return; // nothing changed
+      lastAutoSyncedRef.current = { items, connections };
       saveVersion('AUTO', 'Autosave');
     }, AUTOSAVE_INTERVAL_MS);
 

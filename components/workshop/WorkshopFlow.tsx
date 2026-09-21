@@ -17,30 +17,38 @@ import { WorkflowMenu } from './WorkflowMenu';
 import { inputPortPos, outputPortPos, edgePath, PORT_COLORS } from './geometry';
 import styles from './WorkshopFlow.module.css';
 
-const PIPELINE_AUTOSAVE_MS = 15000;
-
 export const WorkshopFlow: React.FC = () => {
+  // Only subscribe to the fields this component actually renders from —
+  // previously this whole-store-destructured, so e.g. a scene-strip edit or
+  // a paramTemplate save (fields never read here) would re-render the whole
+  // canvas anyway. `collapsedStages` is included because `groups()` reads it
+  // internally and this component calls `groups()` directly in render.
+  const nodes = usePipelineStore((s) => s.nodes);
+  const edges = usePipelineStore((s) => s.edges);
+  const viewport = usePipelineStore((s) => s.viewport);
+  const selectedId = usePipelineStore((s) => s.selectedId);
+  const pendingEdge = usePipelineStore((s) => s.pendingEdge);
+  const isRunning = usePipelineStore((s) => s.isRunning);
+  usePipelineStore((s) => s.collapsedStages);
   const {
-    nodes, edges, viewport, setViewport, selectedId, select, pendingEdge,
-    cancelEdge, removeEdge, addNode, runAll, stopRun, isRunning, clearAll,
-    seedStarterFlow, groups, toggleGroupCollapsed, moveNodeToSlot, addVariant,
-  } = usePipelineStore();
+    setViewport, select, cancelEdge, removeEdge, addNode, runAll, stopRun,
+    clearAll, seedStarterFlow, groups, toggleGroupCollapsed, moveNodeToSlot, addVariant,
+  } = usePipelineStore.getState();
   const { settings } = useSettingsStore();
   const { currentProject } = useUserStore();
 
   // Workshop state is scoped per-project (stores/pipelineStore.ts) — load the
-  // right project's nodes/scenes on mount/switch, and autosave on an interval
-  // plus on unmount/project-switch so nothing is lost when leaving the Workshop.
+  // right project's nodes/scenes on mount/switch. Saving is handled by the
+  // store's own dirty-checked, debounced autosave (fires only when something
+  // actually changed — see the `usePipelineStore.subscribe` at the bottom of
+  // pipelineStore.ts); we only need a final flush on unmount/project-switch
+  // so nothing written in the last debounce window is lost.
   useEffect(() => {
-    void usePipelineStore.getState().loadForProject(currentProject.id);
-  }, [currentProject.id]);
+    void usePipelineStore.getState().loadForProject(currentProject.id, currentProject.name);
+  }, [currentProject.id, currentProject.name]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      usePipelineStore.getState().saveForProject(currentProject.id, currentProject.name);
-    }, PIPELINE_AUTOSAVE_MS);
     return () => {
-      clearInterval(interval);
       usePipelineStore.getState().saveForProject(currentProject.id, currentProject.name);
     };
   }, [currentProject.id, currentProject.name]);
@@ -138,24 +146,37 @@ export const WorkshopFlow: React.FC = () => {
         if (src) sources.push({ src, name: asset.name ?? 'Explorer asset', kind: 'explorer' });
       } catch { /* not an asset payload */ }
     }
-    for (const file of Array.from(e.dataTransfer.files ?? [])) {
-      if (!file.type.startsWith('image/')) continue;
-      const dataUrl = await new Promise<string>((resolve) => {
+    // Read all dropped files concurrently instead of one at a time — each
+    // FileReader read is already async, so a sequential `for` loop was
+    // needlessly waiting for file N before even starting to read file N+1.
+    const imageFiles = Array.from(e.dataTransfer.files ?? []).filter((f) => f.type.startsWith('image/'));
+    const fileSources = await Promise.all(imageFiles.map((file) =>
+      new Promise<{ src: string; name: string; kind: 'file' }>((resolve) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
+        reader.onload = () => resolve({ src: reader.result as string, name: file.name, kind: 'file' });
         reader.readAsDataURL(file);
-      });
-      sources.push({ src: dataUrl, name: file.name, kind: 'file' });
-    }
+      })
+    ));
+    sources.push(...fileSources);
 
+    // Create+slot every node up front (synchronous, order-sensitive), then
+    // ingest all of them concurrently — ingestImage's image-decode step is
+    // genuinely async even though the final canvas encode is main-thread,
+    // so dropping several images no longer serializes decode-then-encode
+    // one full image at a time.
+    const created: { nodeId: string; source: (typeof sources)[number] }[] = [];
     for (const source of sources) {
       const node = addNode('image-import');
       if (!node) continue;
       usePipelineStore.getState().renameNode(node.id, source.name.replace(/\.[a-z0-9]+$/i, ''));
       moveNodeToSlot(node.id, stage, 999);
+      created.push({ nodeId: node.id, source });
+    }
+
+    await Promise.all(created.map(async ({ nodeId, source }) => {
       try {
         const result = await ingestImage(source.src, { name: source.name, sourceKind: source.kind });
-        addVariant(node.id, {
+        addVariant(nodeId, {
           label: source.name,
           image: result.dataUrl,
           meta: {
@@ -166,11 +187,11 @@ export const WorkshopFlow: React.FC = () => {
             },
           },
         });
-        usePipelineStore.getState().setParam(node.id, 'file', result.dataUrl);
+        usePipelineStore.getState().setParam(nodeId, 'file', result.dataUrl);
       } catch {
-        usePipelineStore.getState().removeNode(node.id);
+        usePipelineStore.getState().removeNode(nodeId);
       }
-    }
+    }));
   }, [toScene, addNode, moveNodeToSlot, addVariant]);
 
   // Payload telemetry: how heavy the workshop media currently is

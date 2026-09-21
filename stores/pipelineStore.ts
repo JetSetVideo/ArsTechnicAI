@@ -61,8 +61,10 @@ interface PipelineState {
 
   // per-project persistence (Workshop state is scoped to whichever project is open)
   currentProjectId: string | null;
+  currentProjectName: string;
   isLoadingProject: boolean;
-  loadForProject: (projectId: string) => Promise<void>;
+  loadForProject: (projectId: string, projectName?: string) => Promise<void>;
+  /** Forces an immediate (non-debounced) save — use for unmount/beforeunload. */
   saveForProject: (projectId: string, projectName: string) => void;
 
   // named workflow snapshots (the "workflow submenu" — save/restore multiple
@@ -171,6 +173,52 @@ async function callBanana(req: BananaRequest): Promise<BananaResponse> {
 
 const EMPTY_VIEWPORT: PipelineViewport = { x: 60, y: 40, zoom: 0.85 };
 
+// ── Debounced, dirty-checked autosave ───────────────────────────────────────
+// Mirrors stores/canvasStore.ts's schedulePersist: only serialize+write when
+// something persisted-relevant actually changed, and coalesce rapid changes
+// (e.g. dragging a node, typing a param) into one write every DEBOUNCE_MS
+// instead of firing on a blind interval regardless of activity.
+const PERSIST_DEBOUNCE_MS = 2000;
+let _pipelinePersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+function buildPersistPayload(s: PipelineState) {
+  return {
+    nodes: s.nodes.map((n) => ({ ...n, status: 'idle' as const })),
+    edges: s.edges,
+    viewport: s.viewport,
+    collapsedStages: s.collapsedStages,
+    scenes: s.scenes,
+    paramTemplates: s.paramTemplates,
+  };
+}
+
+/** Writes localStorage + disk from ONE serialized payload (not two). */
+function persistNow(projectId: string, projectName: string, payload: ReturnType<typeof buildPersistPayload>) {
+  if (typeof window === 'undefined') return;
+  const serialized = JSON.stringify(payload);
+  try {
+    localStorage.setItem(pipelineStorageKey(projectId), serialized);
+  } catch {
+    // Quota errors are non-fatal — the disk save below still runs.
+  }
+  fetch('/api/workspace/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, projectName, pipeline: payload }),
+  }).catch(() => {});
+}
+
+function schedulePipelinePersist() {
+  if (typeof window === 'undefined') return;
+  if (_pipelinePersistTimer) clearTimeout(_pipelinePersistTimer);
+  _pipelinePersistTimer = setTimeout(() => {
+    _pipelinePersistTimer = null;
+    const s = usePipelineStore.getState();
+    if (s.isLoadingProject || !s.currentProjectId) return;
+    persistNow(s.currentProjectId, s.currentProjectName, buildPersistPayload(s));
+  }, PERSIST_DEBOUNCE_MS);
+}
+
 export const usePipelineStore = create<PipelineState>()(
     (set, get) => ({
       nodes: [],
@@ -182,16 +230,18 @@ export const usePipelineStore = create<PipelineState>()(
       runningNodeIds: [],
       collapsedStages: [],
       currentProjectId: null,
+      currentProjectName: '',
       isLoadingProject: false,
 
-      loadForProject: async (projectId) => {
+      loadForProject: async (projectId, projectName) => {
         if (!projectId || get().currentProjectId === projectId) return;
         // Reset first so a project switch never bleeds the previous project's
         // nodes/scenes into the new one while the async load is in flight.
         set({
           nodes: [], edges: [], viewport: EMPTY_VIEWPORT, collapsedStages: [],
           scenes: [], paramTemplates: [], selectedId: null,
-          currentProjectId: projectId, isLoadingProject: true,
+          currentProjectId: projectId, currentProjectName: projectName ?? '',
+          isLoadingProject: true,
         });
         try {
           if (typeof window !== 'undefined') {
@@ -233,25 +283,10 @@ export const usePipelineStore = create<PipelineState>()(
         // Guard against writing another project's in-memory state under this
         // key if loadForProject(projectId) hasn't completed/run yet.
         if (get().currentProjectId !== projectId) return;
-        const s = get();
-        const payload = {
-          nodes: s.nodes.map((n) => ({ ...n, status: 'idle' as const })),
-          edges: s.edges,
-          viewport: s.viewport,
-          collapsedStages: s.collapsedStages,
-          scenes: s.scenes,
-          paramTemplates: s.paramTemplates,
-        };
-        try {
-          localStorage.setItem(pipelineStorageKey(projectId), JSON.stringify(payload));
-        } catch {
-          // Quota errors are non-fatal — the disk save below still runs.
-        }
-        fetch('/api/workspace/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, projectName, pipeline: payload }),
-        }).catch(() => {});
+        // Flush immediately (unmount/beforeunload path) — cancel any pending
+        // debounced write since this supersedes it.
+        if (_pipelinePersistTimer) { clearTimeout(_pipelinePersistTimer); _pipelinePersistTimer = null; }
+        persistNow(projectId, projectName, buildPersistPayload(get()));
       },
 
       listSnapshots: async (projectId) => {
@@ -946,27 +981,33 @@ export const usePipelineStore = create<PipelineState>()(
         if (get().isRunning) return;
         set({ isRunning: true });
         try {
-          // Topological order over edges; ties broken by stage order then slot
+          // Topological order over edges; ties within a layer broken by
+          // stage order then slot. Each whole layer of independent,
+          // simultaneously-ready nodes runs concurrently via Promise.all —
+          // previously this awaited one node at a time even when several had
+          // no dependency on each other (e.g. seedStarterFlow's parallel
+          // moodboard/logline/location branches), needlessly serializing
+          // real network round-trips to the generation API.
           const { nodes, edges } = get();
           const indeg: Record<string, number> = {};
           nodes.forEach((n) => (indeg[n.id] = 0));
           edges.forEach((e) => { if (indeg[e.to] !== undefined) indeg[e.to]++; });
-          const ready = () =>
+          const doneIds = new Set<string>();
+          const readyBatch = () =>
             get().nodes
-              .filter((n) => indeg[n.id] === 0)
+              .filter((n) => !doneIds.has(n.id) && indeg[n.id] === 0)
               .sort((a, b) => STAGES[a.stage].order - STAGES[b.stage].order || a.slot - b.slot);
-          const done = new Set<string>();
-          let queue = ready();
-          while (queue.length > 0 && get().isRunning) {
-            const node = queue.shift()!;
-            if (done.has(node.id)) continue;
-            done.add(node.id);
-            indeg[node.id] = -1;
-            await get().runNode(node.id, apiKey);
-            edges.filter((e) => e.from === node.id).forEach((e) => {
-              if (indeg[e.to] > 0) indeg[e.to]--;
+
+          let batch = readyBatch();
+          while (batch.length > 0 && get().isRunning) {
+            batch.forEach((n) => { doneIds.add(n.id); indeg[n.id] = -1; });
+            await Promise.all(batch.map((node) => get().runNode(node.id, apiKey)));
+            batch.forEach((node) => {
+              edges.filter((e) => e.from === node.id).forEach((e) => {
+                if (indeg[e.to] > 0) indeg[e.to]--;
+              });
             });
-            queue = ready().filter((n) => !done.has(n.id));
+            batch = readyBatch();
           }
         } finally {
           set({ isRunning: false });
@@ -1045,3 +1086,21 @@ export const usePipelineStore = create<PipelineState>()(
         set({ nodes: [], edges: [], selectedId: null, pendingEdge: null, isRunning: false, runningNodeIds: [], collapsedStages: [] }),
     })
 );
+
+// Dirty-check: zustand only creates new array/object references for a field
+// when it actually changes, so comparing references (not deep-equality) is a
+// cheap, reliable way to know whether anything persisted-relevant moved —
+// avoids blindly re-serializing base64-heavy variant images on a timer
+// regardless of whether the user did anything (the prior behavior).
+usePipelineStore.subscribe((state, prev) => {
+  if (
+    state.nodes !== prev.nodes ||
+    state.edges !== prev.edges ||
+    state.viewport !== prev.viewport ||
+    state.collapsedStages !== prev.collapsedStages ||
+    state.scenes !== prev.scenes ||
+    state.paramTemplates !== prev.paramTemplates
+  ) {
+    schedulePipelinePersist();
+  }
+});

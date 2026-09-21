@@ -54,6 +54,9 @@ export function gatherFromStores(stores: {
   fileStore: { currentProjectPath: string; rootNodes: unknown[]; assets: Map<string, unknown> };
   settingsStore: { settings: { appearance?: { fontSize?: string }; aiProvider?: { provider?: string }; showGrid?: boolean } };
   projectsStore: { projects: unknown[]; recentProjectIds: string[] };
+  /** Kept as `canvasStore`/`items` for DB-column/schema compatibility
+   *  (`canvasItems`, see pages/api/telemetry/snapshot.ts) — now sourced from
+   *  the Workshop pipeline node count since the freeform Canvas is retired. */
   canvasStore: { items: unknown[] };
 }): Omit<GatheredData, 'storage'> {
   const { userStore, logStore, fileStore, settingsStore, projectsStore, canvasStore } = stores;

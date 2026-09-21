@@ -133,21 +133,64 @@ const SHARED_ASSET_PREFIXES = [
   `${WORKSPACE_ROOT_PATHS.prompts}/`,
 ];
 
-function loadSavedFileStates(): Record<string, SavedProjectFileState> {
+function projectFileStateKey(projectId: string): string {
+  return `${FILE_STATES_STORAGE_KEY}:${projectId}`;
+}
+
+/**
+ * Per-project file-state storage. Previously this read/wrote ONE combined
+ * blob under a single key holding every project's state — meaning saving one
+ * project's file tree meant JSON.parse+JSON.stringify-ing every OTHER
+ * project's state too, on every autosave tick, forever growing with the
+ * user's total project history. Each project now gets its own key.
+ */
+function readProjectFileState(projectId: string): SavedProjectFileState | null {
   try {
-    const raw = localStorage.getItem(FILE_STATES_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const raw = localStorage.getItem(projectFileStateKey(projectId));
+    if (raw) return JSON.parse(raw);
+    // One-time fallback for state saved before the per-project key migration.
+    const legacyRaw = localStorage.getItem(FILE_STATES_STORAGE_KEY);
+    if (!legacyRaw) return null;
+    const legacyStates = JSON.parse(legacyRaw) as Record<string, SavedProjectFileState>;
+    return legacyStates[projectId] ?? null;
   } catch {
-    return {};
+    return null;
   }
 }
 
-function saveSavedFileStates(states: Record<string, SavedProjectFileState>) {
+function saveProjectFileStateRaw(projectId: string, snapshot: SavedProjectFileState) {
   try {
-    localStorage.setItem(FILE_STATES_STORAGE_KEY, JSON.stringify(states));
+    localStorage.setItem(projectFileStateKey(projectId), JSON.stringify(snapshot));
   } catch (error) {
     console.warn('[FileStore] Failed to persist project file state:', error);
   }
+}
+
+/** Downscales a data URL to a small JPEG thumbnail (matches the video-import
+ *  thumbnail path) instead of storing the full-resolution image a second
+ *  time under `thumbnail` — halves the persisted size of every image asset. */
+function createImageThumbnail(dataUrl: string, maxDim = 320): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(dataUrl); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch {
+      resolve(dataUrl);
+    }
+  });
 }
 
 const normalizePath = (path: string) => path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
@@ -738,15 +781,12 @@ export const useFileStore = create<FileState>()(
 
       saveProjectFileState: (projectId, projectName) => {
         if (!projectId || typeof window === 'undefined') return;
-        const states = loadSavedFileStates();
-        states[projectId] = get().exportProjectFileState(projectName);
-        saveSavedFileStates(states);
+        saveProjectFileStateRaw(projectId, get().exportProjectFileState(projectName));
       },
 
       loadProjectFileState: (projectId, projectName) => {
         if (!projectId || typeof window === 'undefined') return false;
-        const states = loadSavedFileStates();
-        const snapshot = states[projectId];
+        const snapshot = readProjectFileState(projectId);
         if (!snapshot) return false;
         get().applyProjectFileState(projectName, snapshot);
         return true;
@@ -824,6 +864,7 @@ export const useFileStore = create<FileState>()(
               img.onerror = () => resolve({ width: 0, height: 0 });
               img.src = dataUrl;
             });
+            const thumbnail = await createImageThumbnail(dataUrl);
 
             const asset: ImageAsset = {
               id: uuidv4(),
@@ -833,7 +874,7 @@ export const useFileStore = create<FileState>()(
               size: file.size,
               createdAt: Date.now(),
               modifiedAt: Date.now(),
-              thumbnail: dataUrl,
+              thumbnail,
               width: dimensions.width,
               height: dimensions.height,
               dataUrl,

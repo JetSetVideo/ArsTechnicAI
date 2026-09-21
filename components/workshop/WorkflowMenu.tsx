@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
 import { FolderClock, ChevronDown, Save, Trash2, Pencil, Check, X, FolderOpen } from 'lucide-react';
 import { usePipelineStore, type PipelineSnapshotMeta } from '@/stores/pipelineStore';
@@ -23,6 +24,14 @@ interface WorkflowMenuProps {
   scope: 'project' | 'global';
   projectId?: string;
   projectName?: string;
+  /**
+   * Renders a caller-supplied trigger element instead of the default pill
+   * button — used to make this fit visually into a different toolbar (e.g.
+   * the home page's left panel quick-actions list). The panel still opens as
+   * a positioned popover (portaled to <body>, so it's never clipped by a
+   * scrolling ancestor) anchored to whatever this renders.
+   */
+  renderTrigger?: (props: { open: boolean; toggle: () => void }) => React.ReactNode;
 }
 
 function timeAgo(ts: number): string {
@@ -33,10 +42,11 @@ function timeAgo(ts: number): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, projectName }) => {
+export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, projectName, renderTrigger }) => {
   const router = useRouter();
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null);
   const [snapshots, setSnapshots] = useState<PipelineSnapshotMeta[]>([]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,6 +54,19 @@ export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, pr
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const PANEL_WIDTH = 340;
+
+  const toggle = useCallback(() => {
+    setOpen((v) => {
+      const next = !v;
+      if (next && triggerRef.current) {
+        const rect = triggerRef.current.getBoundingClientRect();
+        const left = Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 12);
+        setPanelPos({ top: rect.bottom + 6, left: Math.max(8, left) });
+      }
+      return next;
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -67,9 +90,13 @@ export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, pr
     if (open) void refresh();
   }, [open, refresh]);
 
+  const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideTrigger = triggerRef.current?.contains(target);
+      const insidePanel = panelRef.current?.contains(target);
+      if (!insideTrigger && !insidePanel) {
         setOpen(false);
         setShowSaveInput(false);
         setRenamingId(null);
@@ -113,13 +140,22 @@ export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, pr
     setOpen(false);
   };
 
-  return (
-    <div ref={wrapRef} className={styles.wrap}>
-      <button className={styles.trigger} onClick={() => setOpen((v) => !v)} title="Saved workflows (JSON)">
-        <FolderClock size={15} /> Workflows <ChevronDown size={11} />
-      </button>
-      {open && (
-        <div className={styles.panel}>
+  const panel = open && panelPos && (
+    createPortal(
+      <div
+        ref={panelRef}
+        className={styles.panel}
+        style={{ position: 'fixed', top: panelPos.top, left: panelPos.left, width: PANEL_WIDTH }}
+      >
+        {renderPanelBody()}
+      </div>,
+      document.body,
+    )
+  );
+
+  function renderPanelBody() {
+    return (
+      <>
           {scope === 'project' ? (
             <>
               <div className={styles.panelHeader}>
@@ -204,8 +240,22 @@ export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, pr
               ))}
             </>
           )}
-        </div>
-      )}
-    </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div ref={triggerRef} className={styles.wrap}>
+        {renderTrigger ? (
+          renderTrigger({ open, toggle })
+        ) : (
+          <button className={styles.trigger} onClick={toggle} title="Saved workflows (JSON)">
+            <FolderClock size={15} /> Workflows <ChevronDown size={11} />
+          </button>
+        )}
+      </div>
+      {panel}
+    </>
   );
 };

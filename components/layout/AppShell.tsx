@@ -1,29 +1,22 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/router';
 import { TopBar } from './TopBar';
 import { ExplorerPanel } from './ExplorerPanel';
-import { InspectorPanel } from './InspectorPanel';
-import { Canvas } from './Canvas';
 import { WorkshopFlow } from '../workshop/WorkshopFlow';
-import { Timeline } from './Timeline';
-import { ConnectionOverlay } from './ConnectionOverlay';
 import { SettingsModal } from './SettingsModal';
 import { ActionLog } from './ActionLog';
-import { FloatingToolbar } from './FloatingToolbar';
-import type { ToolId } from './FloatingToolbar';
-import { LayersPanel } from './LayersPanel';
 import { PanelErrorBoundary } from '../ui/PanelErrorBoundary';
-import { useLogStore, useCanvasStore } from '@/stores';
+import { useLogStore } from '@/stores';
 import { useToastStore } from '@/stores/toastStore';
 import { useUserStore } from '@/stores/userStore';
 import { useFileStore } from '@/stores/fileStore';
+import { usePipelineStore } from '@/stores/pipelineStore';
 import { useProjectSync, saveProjectWorkspaceState, loadProjectWorkspaceState } from '@/hooks/useProjectSync';
 import { useSettingsSync } from '@/hooks/useSettingsSync';
 import { useDiskReconciliation } from '@/hooks/useDiskReconciliation';
 import { saveToDisk } from '@/hooks/useDiskSave';
-import { PanelLeft, PanelRight, Sparkles, Film, Music, Download, Share2, GitBranch } from 'lucide-react';
+import { PanelLeft, Music, Share2 } from 'lucide-react';
 import styles from './AppShell.module.css';
-import type { WorkspaceMode, WorkspaceLayout } from '@/types';
+import type { WorkspaceLayout } from '@/types';
 
 const DEFAULT_LAYOUT: WorkspaceLayout = {
   explorer: { visible: true, width: 260, collapsed: false },
@@ -33,37 +26,28 @@ const DEFAULT_LAYOUT: WorkspaceLayout = {
 
 const MIN_PANEL_WIDTH = 200;
 const MAX_PANEL_WIDTH = 500;
-const MIN_TIMELINE_HEIGHT = 100;
-const MAX_TIMELINE_HEIGHT = 400;
 
-// All modes use canvas now (create+rework merged into creation)
+// The project page is always the Workshop pipeline editor now — Canvas (the
+// old freeform per-item editor) and the `?workshop=1` mode-switch it required
+// are retired; every project opens the same UI regardless of how it's
+// reached (project card, green banner, or a direct link), which is the
+// entire point of the Canvas/Workshop merge.
 
 export const AppShell: React.FC = () => {
-  const [mode, setMode] = useState<WorkspaceMode>('creation');
   const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
-  const [timelineHeight, setTimelineHeight] = useState(160);
-  const [activeTool, setActiveTool] = useState<ToolId>('pointer');
-  const [layersOpen, setLayersOpen] = useState(false);
-  const [showWorkshop, setShowWorkshop] = useState(false);
-
-  // Deep link from the project home page: /project/<id>?workshop=1
-  const router = useRouter();
-  useEffect(() => {
-    if (router.query.workshop === '1') setShowWorkshop(true);
-  }, [router.query.workshop]);
 
   // First-run onboarding (Design.md §22)
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0); // 0=hidden
-  const canvasItems = useCanvasStore((s) => s.items);
+  const pipelineNodeCount = usePipelineStore((s) => s.nodes.length);
   const fileNodes = useFileStore((s) => s.rootNodes ?? []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const done = localStorage.getItem('ars:onboarding-complete');
     if (done) return;
-    if (canvasItems.length === 0 && fileNodes.length === 0) {
+    if (pipelineNodeCount === 0 && fileNodes.length === 0) {
       setOnboardingStep(1);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -75,8 +59,7 @@ export const AppShell: React.FC = () => {
 
   const log = useLogStore((s) => s.log);
   const toast = useToastStore();
-  const { setCanvasTool, activeTool: canvasTool } = useCanvasStore();
-  
+
   // User and project management
   const { currentProject, updateProject, refreshDeviceInfo, deviceInfo } = useUserStore();
   const { setCurrentProject } = useFileStore();
@@ -98,39 +81,20 @@ export const AppShell: React.FC = () => {
     void loadProjectWorkspaceState(currentProject.id, currentProject.name);
   }, [currentProject.id, currentProject.name, refreshDeviceInfo, setCurrentProject]);
 
-  // Auto-save to localStorage (fast) + disk (durable) periodically and on unmount
+  // Auto-save periodically and on unmount. The pipeline store already
+  // debounces + dirty-checks its own persistence (see the
+  // `usePipelineStore.subscribe` at the bottom of stores/pipelineStore.ts) —
+  // this interval's job is just the disk safety net for the file-explorer
+  // tree, plus a final flush of both on unmount/unload.
   useEffect(() => {
     const interval = setInterval(() => {
-      void saveProjectWorkspaceState(currentProject.id, currentProject.name);
       void saveToDisk();
     }, 15000);
 
     const handleBeforeUnload = () => {
-      saveProjectWorkspaceState(currentProject.id, currentProject.name);
+      usePipelineStore.getState().saveForProject(currentProject.id, currentProject.name);
       try {
-        const { usePipelineStore } = require('@/stores/pipelineStore');
-        usePipelineStore.getState().saveForProject(currentProject.id, currentProject.name);
-      } catch { /* best effort */ }
-      // Use sendBeacon for reliable save on page unload
-      try {
-        const { useCanvasStore } = require('@/stores/canvasStore');
-        const { useSettingsStore } = require('@/stores/settingsStore');
-        const { useProjectsStore } = require('@/stores/projectsStore');
-        const { useFileStore } = require('@/stores/fileStore');
-        const { items, viewport } = useCanvasStore.getState();
-        const settings = useSettingsStore.getState().settings;
-        const projects = useProjectsStore.getState().projects;
-        const fileState = useFileStore.getState().exportProjectFileState(currentProject.name);
-        if (items.length > 0) {
-          navigator.sendBeacon('/api/workspace/save', JSON.stringify({
-            projectId: currentProject.id,
-            projectName: currentProject.name,
-            canvas: { viewport, items: items.map((item: any) => ({ ...item, dataUrl: item.src })) },
-            fileState: { projectPath: fileState.projectPath, selectedPath: fileState.selectedPath, expandedPaths: fileState.expandedPaths, projectAssets: fileState.projectAssets },
-            settings,
-            projects: projects.map((p: any) => ({ id: p.id, name: p.name, createdAt: p.createdAt, modifiedAt: p.modifiedAt, assetCount: p.assetCount, tags: p.tags, isFavorite: p.isFavorite, thumbnail: p.thumbnail })),
-          }));
-        }
+        useFileStore.getState().saveProjectFileState(currentProject.id, currentProject.name);
       } catch { /* best effort */ }
     };
 
@@ -154,41 +118,21 @@ export const AppShell: React.FC = () => {
   // Sync settings with DB
   useSettingsSync();
 
-  const mainAreaRef = useRef<HTMLDivElement>(null);
   const isResizingExplorer = useRef(false);
-  const isResizingInspector = useRef(false);
-  const isResizingTimeline = useRef(false);
   const startX = useRef(0);
-  const startY = useRef(0);
   const startWidth = useRef(0);
-  const startHeight = useRef(0);
-
-  const showNodeGraph = showWorkshop; // Workshop pipeline flow replaces canvas when active
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      if (e.metaKey || e.ctrlKey) {
-        switch (e.key) {
-          case '1':
-            e.preventDefault();
-            togglePanel('explorer');
-            break;
-          case '2':
-            e.preventDefault();
-            togglePanel('timeline');
-            break;
-          case '3':
-            e.preventDefault();
-            togglePanel('inspector');
-            break;
-          case ',':
-            e.preventDefault();
-            setSettingsOpen(true);
-            break;
-        }
+      if ((e.metaKey || e.ctrlKey) && e.key === '1') {
+        e.preventDefault();
+        togglePanel('explorer');
+      } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        setSettingsOpen(true);
       }
     };
 
@@ -196,28 +140,17 @@ export const AppShell: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Global resize handlers
+  // Explorer resize
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isResizingExplorer.current) {
-        const delta = e.clientX - startX.current;
-        const newWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, startWidth.current + delta));
-        setLayout((prev) => ({ ...prev, explorer: { ...prev.explorer, width: newWidth } }));
-      } else if (isResizingInspector.current) {
-        const delta = startX.current - e.clientX;
-        const newWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, startWidth.current + delta));
-        setLayout((prev) => ({ ...prev, inspector: { ...prev.inspector, width: newWidth } }));
-      } else if (isResizingTimeline.current) {
-        const delta = startY.current - e.clientY;
-        const newHeight = Math.min(MAX_TIMELINE_HEIGHT, Math.max(MIN_TIMELINE_HEIGHT, startHeight.current + delta));
-        setTimelineHeight(newHeight);
-      }
+      if (!isResizingExplorer.current) return;
+      const delta = e.clientX - startX.current;
+      const newWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, startWidth.current + delta));
+      setLayout((prev) => ({ ...prev, explorer: { ...prev.explorer, width: newWidth } }));
     };
 
     const handleMouseUp = () => {
       isResizingExplorer.current = false;
-      isResizingInspector.current = false;
-      isResizingTimeline.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
@@ -239,70 +172,8 @@ export const AppShell: React.FC = () => {
     document.body.style.userSelect = 'none';
   }, [layout.explorer.width]);
 
-  const handleInspectorResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizingInspector.current = true;
-    startX.current = e.clientX;
-    startWidth.current = layout.inspector.width;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, [layout.inspector.width]);
-
-  const handleTimelineResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizingTimeline.current = true;
-    startY.current = e.clientY;
-    startHeight.current = timelineHeight;
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-  }, [timelineHeight]);
-
   const togglePanel = useCallback((panel: keyof WorkspaceLayout) => {
     setLayout((prev) => ({ ...prev, [panel]: { ...prev[panel], visible: !prev[panel].visible } }));
-  }, []);
-
-  const handleModeChange = useCallback((newMode: WorkspaceMode) => {
-    if (newMode === 'timeline') {
-      setLayout((prev) => {
-        const next = !prev.timeline.visible;
-        return { ...prev, timeline: { ...prev.timeline, visible: next } };
-      });
-      if (mode !== 'timeline') setMode(newMode);
-      log('settings_change', `Toggled timeline`, { mode: newMode });
-      return;
-    }
-
-    setMode(newMode);
-    log('settings_change', `Switched to ${newMode} mode`, { mode: newMode });
-  }, [log, mode]);
-
-  const handleToolChange = useCallback((tool: ToolId) => {
-    setActiveTool(tool);
-    if (tool === 'pointer' || tool === 'lasso' || tool === 'hand') {
-      setCanvasTool(tool);
-    }
-  }, [setCanvasTool]);
-
-  useEffect(() => {
-    const handleCreativeShortcut = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
-
-      if (e.key === 'b' || e.key === 'B') {
-        setActiveTool('pen');
-      } else if (e.key === 'r' || e.key === 'R') {
-        setActiveTool('shape');
-      } else if (e.key === 't' || e.key === 'T') {
-        setActiveTool('text');
-      }
-    };
-
-    window.addEventListener('keydown', handleCreativeShortcut);
-    return () => window.removeEventListener('keydown', handleCreativeShortcut);
-  }, []);
-
-  const handleExportCanvas = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('ars:export-canvas'));
   }, []);
 
   return (
@@ -313,27 +184,10 @@ export const AppShell: React.FC = () => {
         onProjectNameChange={setProjectName}
         moduleActions={(
           <div className={styles.moduleBar}>
-            <button title="AI Generate — open Inspector" onClick={() => togglePanel('inspector')}>
-              <Sparkles size={15} />
-            </button>
-            <button
-              title={showWorkshop ? 'Back to Canvas' : 'Workshop — creation pipeline'}
-              onClick={() => setShowWorkshop((v) => !v)}
-              style={showWorkshop ? { color: 'var(--accent-primary, #00d4aa)' } : undefined}
-            >
-              <GitBranch size={15} />
-            </button>
-            <div className={styles.moduleBarDivider} />
-            <button title="Video Pipeline" onClick={() => handleModeChange('timeline')}>
-              <Film size={15} />
-            </button>
             <button title="Audio — coming soon" onClick={() => toast.addToast({ type: 'info', title: 'Audio Module', message: 'Audio generation and mixing is coming soon.', duration: 4000 })}>
               <Music size={15} />
             </button>
             <div className={styles.moduleBarDivider} />
-            <button title="Export Canvas" onClick={handleExportCanvas}>
-              <Download size={15} />
-            </button>
             <button title="Publish" onClick={() => { setSettingsInitialTab('publishing'); setSettingsOpen(true); }}>
               <Share2 size={15} />
             </button>
@@ -359,68 +213,11 @@ export const AppShell: React.FC = () => {
           </button>
         )}
 
-        <div ref={mainAreaRef} className={styles.mainArea}>
-          {showNodeGraph ? (
-            <PanelErrorBoundary panelName="Workshop">
-              <WorkshopFlow />
-            </PanelErrorBoundary>
-          ) : (
-            <>
-              <PanelErrorBoundary panelName="Canvas">
-                <Canvas
-                  showTimeline={layout.timeline.visible}
-                  overlayTool={(['pen', 'shape', 'text'].includes(activeTool) ? activeTool : null) as 'pen' | 'shape' | 'text' | null}
-                />
-              </PanelErrorBoundary>
-              {layout.timeline.visible && (
-                <>
-                  <div className={styles.resizeHandleHorizontal} onMouseDown={handleTimelineResizeStart} />
-                  <PanelErrorBoundary panelName="Timeline">
-                    <Timeline height={timelineHeight} />
-                  </PanelErrorBoundary>
-                </>
-              )}
-              {layout.timeline.visible && (
-                <ConnectionOverlay containerRef={mainAreaRef} />
-              )}
-              {/* Floating tool bar — sits above canvas on the left */}
-              <FloatingToolbar
-                activeTool={(['pen', 'shape', 'text', 'eyedropper'].includes(activeTool) ? activeTool : canvasTool) as ToolId}
-                onToolChange={handleToolChange}
-                mode={mode}
-                side="left"
-              />
-            </>
-          )}
+        <div className={styles.mainArea}>
+          <PanelErrorBoundary panelName="Workshop">
+            <WorkshopFlow />
+          </PanelErrorBoundary>
         </div>
-
-        {layout.inspector.visible && !showNodeGraph ? (
-          <>
-            <div className={styles.resizeHandle} onMouseDown={handleInspectorResizeStart} />
-            <PanelErrorBoundary panelName="Inspector">
-              <InspectorPanel
-                width={layout.inspector.width}
-                onOpenSettings={() => setSettingsOpen(true)}
-                onOpenPublishing={() => { setSettingsInitialTab('publishing'); setSettingsOpen(true); }}
-                onOpenLayers={() => setLayersOpen(v => !v)}
-                onToggle={() => togglePanel('inspector')}
-              />
-            </PanelErrorBoundary>
-          </>
-        ) : (
-          !showNodeGraph && (
-            <button
-              className={styles.collapsedInspectorToggle}
-              onClick={() => togglePanel('inspector')}
-              title="Open Inspector (⌘3)"
-            >
-              <PanelRight size={18} />
-            </button>
-          )
-        )}
-
-        {/* Layers Panel — overlay on the right */}
-        <LayersPanel isOpen={layersOpen} onClose={() => setLayersOpen(false)} width={260} />
       </div>
 
       <ActionLog />
@@ -449,21 +246,21 @@ export const AppShell: React.FC = () => {
               <div className={styles.onboardingBody}>
                 <div className={styles.onboardingIcon}>📥</div>
                 <h2 className={styles.onboardingTitle}>Import or Generate</h2>
-                <p className={styles.onboardingText}>Drag any image, video, or audio file into the Explorer on the left — or type a prompt in the Inspector on the right to generate your first image with AI.</p>
+                <p className={styles.onboardingText}>Drag any image, video, or audio file into the Explorer on the left — or click <b>+ Add node</b> at the top to bring in a moodboard, script, character, or generated visual.</p>
               </div>
             )}
             {onboardingStep === 2 && (
               <div className={styles.onboardingBody}>
                 <div className={styles.onboardingIcon}>🎨</div>
-                <h2 className={styles.onboardingTitle}>Place on Canvas</h2>
-                <p className={styles.onboardingText}>Drag assets from the Explorer onto the infinite canvas. Hover over any asset to see the ● connection dot at the bottom — drag it to another asset to link them into a pipeline.</p>
+                <h2 className={styles.onboardingTitle}>Build the pipeline</h2>
+                <p className={styles.onboardingText}>Every node can generate, import, or be tuned by hand, and stacks alternatives vertically. Drag a node anywhere on the canvas — it stays right where you drop it. Connect ports to wire nodes together.</p>
               </div>
             )}
             {onboardingStep === 3 && (
               <div className={styles.onboardingBody}>
                 <div className={styles.onboardingIcon}>🚀</div>
-                <h2 className={styles.onboardingTitle}>Export to Social</h2>
-                <p className={styles.onboardingText}>Use Format Profiles to export in 9:16 for TikTok, 1:1 for Instagram, or 16:9 for YouTube. Press <kbd>?</kbd> anytime on the canvas to see all keyboard shortcuts.</p>
+                <h2 className={styles.onboardingTitle}>Cut and deliver</h2>
+                <p className={styles.onboardingText}>Add pictures to the Film order strip at the bottom to build your cut, then use Format Profiles to export in 9:16, 1:1, or 16:9 for any platform.</p>
               </div>
             )}
 

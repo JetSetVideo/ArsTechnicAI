@@ -184,10 +184,16 @@ export interface PipelineNode {
   type: string;               // key into the catalog
   stage: PipelineStageId;
   title: string;              // user-renamable
-  /** Manual position override; when absent, auto-layout owns the position. */
+  /**
+   * Manual position override. Every node starts in its stage lane (slot
+   * below), but once the user drags it, it keeps whatever x/y they dropped
+   * it at rather than snapping back into a lane/slot — the same "put it
+   * anywhere" freedom the old freeform Canvas gave, now on the same node
+   * graph instead of a second, incompatible editor.
+   */
   x?: number;
   y?: number;
-  /** Order inside its stage lane (vertical slot). */
+  /** Order inside its stage lane (vertical slot); irrelevant once `x`/`y` are set. */
   slot: number;
   params: Record<string, unknown>;
   status: NodeStatus;

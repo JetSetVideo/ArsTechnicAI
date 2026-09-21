@@ -23,7 +23,8 @@ import {
   Link,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { useFileStore, useLogStore, useCanvasStore } from '@/stores';
+import { useFileStore, useLogStore } from '@/stores';
+import { usePipelineStore } from '@/stores/pipelineStore';
 import { loadDemoFiles } from '@/stores/fileStore';
 import { useAssetLibrary, DbAsset } from '@/hooks/useAssetLibrary';
 import { Button } from '../ui/Button';
@@ -308,7 +309,6 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({ node
 
 // ─── Cloud asset card ─────────────────────────────────────────────────────────
 const CloudAssetCard: React.FC<{ asset: DbAsset }> = ({ asset }) => {
-  const { addItem } = useCanvasStore();
   const log = useLogStore((s) => s.log);
 
   const thumbnailUrl = asset.thumbnailPath ? `/api/assets/${asset.thumbnailPath}` : null;
@@ -330,20 +330,19 @@ const CloudAssetCard: React.FC<{ asset: DbAsset }> = ({ asset }) => {
 
   const handleDoubleClick = () => {
     if (!thumbnailUrl) return;
-    addItem({
-      type: 'image',
-      x: 100 + Math.random() * 200,
-      y: 100 + Math.random() * 200,
-      width: asset.width ?? 512,
-      height: asset.height ?? 512,
-      rotation: 0,
-      scale: Math.min(1, 300 / Math.max(asset.width ?? 512, asset.height ?? 512)),
-      locked: false,
-      visible: true,
-      src: thumbnailUrl,
-      name: asset.name,
-      assetId: asset.id,
-    });
+    // Adds a pipeline node instead of a freeform Canvas item — the Workshop
+    // is the only editor now.
+    const ps = usePipelineStore.getState();
+    const node = ps.addNode('image-import');
+    if (node) {
+      ps.renameNode(node.id, asset.name);
+      ps.addVariant(node.id, {
+        label: asset.name,
+        image: thumbnailUrl,
+        meta: { width: asset.width, height: asset.height, source: 'cloud-library', assetId: asset.id },
+      });
+      ps.setParam(node.id, 'file', thumbnailUrl);
+    }
     log('canvas_add', `Added ${asset.name} from cloud library`);
   };
 

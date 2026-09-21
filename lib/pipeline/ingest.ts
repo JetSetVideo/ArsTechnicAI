@@ -73,12 +73,13 @@ export async function ingestImage(
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0, outW, outH);
 
-  // Pick the lighter of WebP(0.92) and PNG — photographic sources usually win
-  // with WebP, flat graphics with PNG.
+  // Prefer WebP(0.92) — smaller than PNG for virtually all real images, and
+  // every browser we support encodes it. Only fall back to a second
+  // (synchronous, main-thread) PNG encode when WebP genuinely isn't
+  // supported, instead of always encoding both just to compare sizes.
   const webp = canvas.toDataURL('image/webp', 0.92);
-  const png = canvas.toDataURL('image/png');
-  const useWebp = webp.startsWith('data:image/webp') && webp.length < png.length;
-  const dataUrl = useWebp ? webp : png;
+  const webpSupported = webp.startsWith('data:image/webp');
+  const dataUrl = webpSupported ? webp : canvas.toDataURL('image/png');
   const bytes = dataUrlBytes(dataUrl);
 
   if (scale < 1) warnings.push(`Downscaled ${w}×${h} → ${outW}×${outH} (cap ${MAX_DIMENSION}px)`);

@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { useCanvasStore } from '@/stores/canvasStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useProjectsStore } from '@/stores/projectsStore';
 import { saveProjectWorkspaceState } from './useProjectSync';
-import type { GenerationMeta, Asset } from '@/types';
+import type { Asset } from '@/types';
 import type { Blueprint } from '@/types/blueprint';
 
 import { useBlueprintStore } from '@/stores/blueprintStore';
@@ -95,10 +94,11 @@ async function reconcile() {
     // --- Projects list restoration ---
     restoreProjectsList(loadRes);
 
-    // --- Canvas + file tree restoration ---
-    if (projectId) {
-      restoreCanvasFromDisk(loadRes, projectId, projectName);
-    }
+    // Canvas restoration is retired — stores/pipelineStore.ts's own
+    // loadForProject (triggered by components/workshop/WorkshopFlow.tsx on
+    // mount) is now the single authoritative loader for a project's
+    // Workshop state, from the same .ars-data disk files this hook used to
+    // read into the now-removed canvasStore.
 
     // --- Reconcile generated assets from disk scan ---
     reconcileGeneratedAssets(scanRes, projectName);
@@ -168,79 +168,12 @@ function restoreProjectsList(load: DiskLoadResult | null) {
   console.log(`[DiskReconciliation] Restored ${diskProjects.length} projects from disk`);
 }
 
-function restoreCanvasFromDisk(load: DiskLoadResult | null, projectId: string, projectName: string) {
-  const canvasStore = useCanvasStore.getState();
-  if (canvasStore.items.length > 0) return; // already has items from localStorage
-
-  const diskCanvas = load?.canvas;
-  if (!diskCanvas?.items?.length) return;
-
-  if (diskCanvas.viewport) {
-    canvasStore.setViewport(diskCanvas.viewport);
-  }
-
-  canvasStore.clearCanvas();
-  for (const item of diskCanvas.items) {
-    const restoredMeta: GenerationMeta | undefined =
-      item.generationMeta && typeof item.generationMeta === 'object'
-        ? (item.generationMeta as GenerationMeta)
-        : item.nodeData && typeof item.nodeData === 'object'
-          ? (item.nodeData as GenerationMeta)
-          : undefined;
-
-    canvasStore.addItem({
-      type: ((item.type as string)?.toLowerCase?.() ?? 'image') as 'image' | 'generated' | 'placeholder',
-      x: (item.x as number) ?? 0,
-      y: (item.y as number) ?? 0,
-      width: (item.width as number) ?? 512,
-      height: (item.height as number) ?? 512,
-      rotation: (item.rotation as number) ?? 0,
-      scale: (item.scale as number) ?? 1,
-      locked: (item.locked as boolean) ?? false,
-      visible: (item.visible as boolean) ?? true,
-      src: (item.src as string) ?? (item.dataUrl as string) ?? '',
-      name: (item.name as string) ?? 'Untitled',
-      prompt: item.prompt as string | undefined,
-      assetId: item.assetId as string | undefined,
-      generationMeta: restoredMeta,
-    });
-  }
-
-  // Rebuild file tree
-  const fileStore = useFileStore.getState();
-  const generatedPath = fileStore.getProjectGeneratedPath();
-  for (const item of diskCanvas.items) {
-    if ((item.type as string)?.toLowerCase() === 'generated' && item.name) {
-      fileStore.addAssetToFolder(
-        {
-          id: (item.assetId as string) || (item.id as string) || Date.now().toString(),
-          name: item.name as string,
-          type: 'image',
-          path: `${generatedPath}/${item.name}`,
-          createdAt: (item.createdAt as number) || Date.now(),
-          modifiedAt: Date.now(),
-          thumbnail: (item.src as string) || (item.dataUrl as string) || '',
-          metadata: {
-            width: item.width as number,
-            height: item.height as number,
-            prompt: item.prompt as string,
-          },
-        },
-        generatedPath,
-      );
-    }
-  }
-
-  console.log(`[DiskReconciliation] Restored ${diskCanvas.items.length} canvas items from disk`);
-}
-
 function reconcileGeneratedAssets(scan: ScanResult | null, projectName: string) {
   if (!scan?.assets?.length) return;
 
   const fileStore = useFileStore.getState();
   const generatedPath = fileStore.getProjectGeneratedPath();
   const existingAssets = fileStore.assets;
-  const canvasStore = useCanvasStore.getState();
 
   let added = 0;
 
@@ -272,53 +205,17 @@ function reconcileGeneratedAssets(scan: ScanResult | null, projectName: string) 
     };
 
     fileStore.addAssetToFolder(asset, generatedPath);
-
-    // Also add to canvas if not already there
-    const alreadyOnCanvas = canvasStore.items.some(
-      (item) => item.name === diskAsset.filename,
-    );
-
-    if (!alreadyOnCanvas) {
-      const existingCount = canvasStore.items.length;
-      canvasStore.addItem({
-        type: 'generated',
-        x: 100 + existingCount * 40,
-        y: 100 + existingCount * 40,
-        width: meta?.width || 512,
-        height: meta?.height || 512,
-        rotation: 0,
-        scale: 1,
-        locked: false,
-        visible: true,
-        src: diskAsset.url,
-        name: diskAsset.filename,
-        prompt: meta?.prompt,
-        assetId,
-        generationMeta: meta
-          ? {
-              id: meta.id || assetId,
-              prompt: meta.prompt || '',
-              negativePrompt: meta.negativePrompt,
-              model: meta.model || 'unknown',
-              seed: meta.seed || 0,
-              width: meta.width || 512,
-              height: meta.height || 512,
-              generatedAt: meta.generatedAt || diskAsset.modifiedAt,
-              filePath: diskAsset.filePath,
-              parentIds: meta.parentIds || [],
-              childIds: meta.childIds || [],
-              imageVersion: meta.imageVersion || 1,
-              variations: meta.variations || [],
-            }
-          : undefined,
-      });
-    }
-
+    // Adding orphaned disk assets straight into the Workshop pipeline is
+    // deliberately NOT done here — pipelineStore.ts owns its own node list
+    // authoritatively per project; auto-injecting a node on every app load
+    // for any file this scan turns up would create unwanted duplicate nodes
+    // over repeated sessions. Users add a file-tree asset to the pipeline
+    // explicitly (double-click in the Explorer, or drag onto the canvas).
     added++;
   }
 
   if (added > 0) {
-    console.log(`[DiskReconciliation] Reconciled ${added} assets from disk into file tree + canvas`);
+    console.log(`[DiskReconciliation] Reconciled ${added} assets from disk into the file tree`);
   }
 }
 
