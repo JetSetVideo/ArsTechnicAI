@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
 import { TopBar } from './TopBar';
 import { ExplorerPanel } from './ExplorerPanel';
 import { InspectorPanel } from './InspectorPanel';
 import { Canvas } from './Canvas';
-import { NodeGraph } from './NodeGraph';
+import { WorkshopFlow } from '../workshop/WorkshopFlow';
 import { Timeline } from './Timeline';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { SettingsModal } from './SettingsModal';
@@ -23,7 +24,6 @@ import { saveToDisk } from '@/hooks/useDiskSave';
 import { PanelLeft, PanelRight, Sparkles, Film, Music, Download, Share2, GitBranch } from 'lucide-react';
 import styles from './AppShell.module.css';
 import type { WorkspaceMode, WorkspaceLayout } from '@/types';
-import { NODE_DEFS, type NodeType } from '@/stores/nodeStore';
 
 const DEFAULT_LAYOUT: WorkspaceLayout = {
   explorer: { visible: true, width: 260, collapsed: false },
@@ -38,8 +38,6 @@ const MAX_TIMELINE_HEIGHT = 400;
 
 // All modes use canvas now (create+rework merged into creation)
 
-const BASIC_NODE_TYPES: NodeType[] = ['prompt', 'negative', 'generator', 'image-in', 'transform', 'blend', 'output'];
-
 export const AppShell: React.FC = () => {
   const [mode, setMode] = useState<WorkspaceMode>('creation');
   const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT);
@@ -48,7 +46,13 @@ export const AppShell: React.FC = () => {
   const [timelineHeight, setTimelineHeight] = useState(160);
   const [activeTool, setActiveTool] = useState<ToolId>('pointer');
   const [layersOpen, setLayersOpen] = useState(false);
-  const [nodePaletteOpen, setNodePaletteOpen] = useState(false);
+  const [showWorkshop, setShowWorkshop] = useState(false);
+
+  // Deep link from the project home page: /project/<id>?workshop=1
+  const router = useRouter();
+  useEffect(() => {
+    if (router.query.workshop === '1') setShowWorkshop(true);
+  }, [router.query.workshop]);
 
   // First-run onboarding (Design.md §22)
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0); // 0=hidden
@@ -103,6 +107,10 @@ export const AppShell: React.FC = () => {
 
     const handleBeforeUnload = () => {
       saveProjectWorkspaceState(currentProject.id, currentProject.name);
+      try {
+        const { usePipelineStore } = require('@/stores/pipelineStore');
+        usePipelineStore.getState().saveForProject(currentProject.id, currentProject.name);
+      } catch { /* best effort */ }
       // Use sendBeacon for reliable save on page unload
       try {
         const { useCanvasStore } = require('@/stores/canvasStore');
@@ -155,7 +163,7 @@ export const AppShell: React.FC = () => {
   const startWidth = useRef(0);
   const startHeight = useRef(0);
 
-  const showNodeGraph = false; // Node graph always available, never replaces canvas
+  const showNodeGraph = showWorkshop; // Workshop pipeline flow replaces canvas when active
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -297,13 +305,6 @@ export const AppShell: React.FC = () => {
     window.dispatchEvent(new CustomEvent('ars:export-canvas'));
   }, []);
 
-  const handleNodeDragStart = useCallback((e: React.DragEvent, type: NodeType) => {
-    const def = NODE_DEFS[type];
-    e.dataTransfer.setData('application/x-ars-node-type', type);
-    e.dataTransfer.effectAllowed = 'copy';
-    log('canvas_add', `Started dragging ${def.title} node`);
-  }, [log]);
-
   return (
     <div id="app-shell-layout-root" className={styles.appShellLayoutRoot}>
       <TopBar
@@ -315,37 +316,13 @@ export const AppShell: React.FC = () => {
             <button title="AI Generate — open Inspector" onClick={() => togglePanel('inspector')}>
               <Sparkles size={15} />
             </button>
-            <button title="Node Graph" onClick={() => {
-              setNodePaletteOpen((open) => !open);
-            }}>
+            <button
+              title={showWorkshop ? 'Back to Canvas' : 'Workshop — creation pipeline'}
+              onClick={() => setShowWorkshop((v) => !v)}
+              style={showWorkshop ? { color: 'var(--accent-primary, #00d4aa)' } : undefined}
+            >
               <GitBranch size={15} />
             </button>
-            {nodePaletteOpen && (
-              <div className={styles.nodePalette} role="menu" aria-label="Node palette">
-                <div className={styles.nodePaletteHeader}>
-                  <span>Nodes</span>
-                  <small>Drag onto canvas</small>
-                </div>
-                {BASIC_NODE_TYPES.map((type) => {
-                  const def = NODE_DEFS[type];
-                  return (
-                    <button
-                      key={type}
-                      className={styles.nodePaletteItem}
-                      draggable
-                      onDragStart={(e) => handleNodeDragStart(e, type)}
-                      onDragEnd={() => setNodePaletteOpen(false)}
-                      style={{ '--node-color': def.color } as React.CSSProperties}
-                      title={`Drag ${def.title} onto the canvas`}
-                      type="button"
-                    >
-                      <span className={styles.nodePaletteDot} />
-                      <span>{def.title}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
             <div className={styles.moduleBarDivider} />
             <button title="Video Pipeline" onClick={() => handleModeChange('timeline')}>
               <Film size={15} />
@@ -384,8 +361,8 @@ export const AppShell: React.FC = () => {
 
         <div ref={mainAreaRef} className={styles.mainArea}>
           {showNodeGraph ? (
-            <PanelErrorBoundary panelName="Node Graph">
-              <NodeGraph />
+            <PanelErrorBoundary panelName="Workshop">
+              <WorkshopFlow />
             </PanelErrorBoundary>
           ) : (
             <>

@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import "../styles/globals.css";
 import { ToastContainer } from "@/components/ui";
 import { useSyncOnReconnect } from "@/hooks/useSyncOnReconnect";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 const TelemetryProvider = dynamic(
   () => import("@/contexts/TelemetryProvider").then((m) => m.TelemetryProvider),
@@ -16,16 +17,14 @@ function SyncManager() {
   return null;
 }
 
-// Restore parametric design knobs from localStorage
-const PARAM_KEYS = ['--param-density', '--param-roundness', '--param-glow', '--param-contrast', '--param-speed'] as const;
-
-function ParametricInit() {
+// Applies parametric design tokens (density/roundness/glow/contrast/speed),
+// theme, and accent color as CSS custom properties on <html>. The real
+// source of truth is the persisted, DB-synced settingsStore (Settings →
+// Appearance) — this just guarantees applyAppearance() runs once per page
+// load even if no other mounted component has touched the store yet.
+function AppearanceInit() {
   useEffect(() => {
-    const root = document.documentElement;
-    for (const key of PARAM_KEYS) {
-      const stored = localStorage.getItem(`ars:${key.replace('--', '')}`);
-      if (stored !== null) root.style.setProperty(key, stored);
-    }
+    useSettingsStore.getState().applyAppearance();
   }, []);
   return null;
 }
@@ -36,7 +35,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       <Component {...pageProps} />
       <TelemetryProvider>{null}</TelemetryProvider>
       <SyncManager />
-      <ParametricInit />
+      <AppearanceInit />
       <ToastContainer />
     </SessionProvider>
   );

@@ -1,0 +1,160 @@
+/* ============================================================
+   WORKFLOW MENU — saved-workflow (pipeline JSON) dropdown,
+   shared between the home page top nav and the Workshop toolbar
+   ============================================================ */
+
+.wrap { position: relative; }
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary, #b6b6c8);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.trigger:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 340px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: rgba(16, 16, 30, 0.97);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 0.6rem;
+  z-index: 200;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9a9ab2;
+  padding: 4px 6px 8px;
+}
+
+.smallBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 212, 170, 0.12);
+  color: #00d4aa;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.smallBtn:hover { background: rgba(0, 212, 170, 0.2); }
+
+.saveRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 8px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f0f0fa;
+  font-size: 0.75rem;
+}
+.input:focus { outline: none; border-color: #00d4aa; }
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9a9ab2;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.iconBtn:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+
+.empty {
+  padding: 10px 8px 14px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #71718a;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+.row:hover { background: rgba(255, 255, 255, 0.05); }
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #d9d9e8;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.rowMain:hover { color: #fff; }
+
+.rowName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.rowMeta {
+  margin-left: auto;
+  font-size: 0.62rem;
+  color: #71718a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}

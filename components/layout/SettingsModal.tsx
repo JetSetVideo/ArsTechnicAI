@@ -18,6 +18,7 @@ import type { SocialPlatformId } from '@/types/dashboard';
 import { Button } from '../ui/Button';
 import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
+import { STAGES, STAGE_ORDER } from '@/lib/pipeline/catalog';
 import { useUserStore } from '@/stores/userStore';
 import { useAuthStore } from '@/stores/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -90,11 +91,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
 
-  // Appearance
-  const [gridStyle, setGridStyle] = useState<'dots' | 'lines' | 'none'>(settings.canvas?.gridStyle || 'dots');
-  const [gridColor, setGridColor] = useState(settings.canvas?.gridColor || '#333');
-  const [gridThickness, setGridThickness] = useState(settings.canvas?.gridThickness || 1);
-  const [canvasBg, setCanvasBg] = useState(settings.canvas?.backgroundColor || '#0a0a0f');
+  // Appearance — all controls below apply live via updateAppearance/updateSettings,
+  // reading straight from the store rather than mirrored local state.
+  const appearance = settings.appearance;
 
   // State
   const [localApiKey, setLocalApiKey] = useState(settings.aiProvider.apiKey);
@@ -138,7 +137,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
 
   const handleSave = () => {
     updateAIProvider({ apiKey: localApiKey, endpoint: localEndpoint, model: localModel });
-    updateAppearance({ gridStyle, gridColor, gridThickness, backgroundColor: canvasBg });
     log('settings_change', 'Updated settings');
     onClose();
   };
@@ -413,17 +411,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
               {activeTab === 'appearance' && (
                 <div className={styles.section}>
                   <h3>Appearance</h3>
-                  <p className={styles.description}>Customize the canvas grid, colors, and visual style.</p>
+                  <p className={styles.description}>Customize the canvas grid, colors, density, and visual style. Changes apply live.</p>
 
                   <div style={{ marginBottom: 14 }}>
-                    <span style={labelStyle}>Canvas Grid Style</span>
+                    <span style={labelStyle}>Theme</span>
+                    <select
+                      style={inputStyle}
+                      value={settings.theme}
+                      onChange={e => updateSettings({ theme: e.target.value as typeof settings.theme })}
+                    >
+                      <option value="dark">Dark (default)</option>
+                      <option value="light">Light</option>
+                      <option value="system">System</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Accent Color</span>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input type="color" value={appearance.accentColor} onChange={e => updateAppearance({ accentColor: e.target.value })}
+                        style={{ width: 36, height: 30, border: '1px solid var(--border-color)', borderRadius: 5, cursor: 'pointer', background: 'none' }} />
+                      <input style={inputStyle} value={appearance.accentColor} onChange={e => updateAppearance({ accentColor: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Font Size</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {(['small', 'medium', 'large'] as const).map(s => (
+                        <button key={s} onClick={() => updateAppearance({ fontSize: s })} style={{
+                          padding: '6px 16px', borderRadius: 6, border: '1px solid',
+                          borderColor: appearance.fontSize === s ? 'var(--accent-primary)' : 'var(--border-color)',
+                          background: appearance.fontSize === s ? 'rgba(0,212,170,0.08)' : 'none',
+                          color: appearance.fontSize === s ? 'var(--accent-primary)' : 'var(--text-muted)',
+                          fontSize: '0.6875rem', cursor: 'pointer', textTransform: 'capitalize',
+                        }}>{s}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {([
+                    ['density', 'Density', ['Airy', 'Balanced', 'Compact']],
+                    ['roundness', 'Roundness', ['Sharp', 'Rounded', 'Pill']],
+                    ['glow', 'Glow', ['Flat', 'Subtle', 'Vivid']],
+                    ['contrast', 'Contrast', ['Soft', 'Normal', 'Crisp (high-contrast)']],
+                    ['speed', 'Animation Speed', ['Instant', 'Default', 'Slow']],
+                  ] as const).map(([key, label, labels]) => (
+                    <div style={{ marginBottom: 14 }} key={key}>
+                      <span style={labelStyle}>{label}: {labels[appearance[key]]}</span>
+                      <input type="range" min={0} max={2} step={1} value={appearance[key]}
+                        onChange={e => updateAppearance({ [key]: Number(e.target.value) as 0 | 1 | 2 })}
+                        style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
+                    </div>
+                  ))}
+
+                  <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" id="reduce-motion" checked={appearance.reduceMotion}
+                      onChange={e => updateAppearance({ reduceMotion: e.target.checked })} />
+                    <label htmlFor="reduce-motion" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                      Reduce motion (forces animation speed to instant, for accessibility)
+                    </label>
+                  </div>
+
+                  <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" id="compact-mode" checked={appearance.compactMode}
+                      onChange={e => updateAppearance({ compactMode: e.target.checked })} />
+                    <label htmlFor="compact-mode" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                      Compact UI mode
+                    </label>
+                  </div>
+
+                  <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                    <span style={{ ...labelStyle, fontWeight: 700 }}>Canvas</span>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Grid Style</span>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {(['dots', 'lines', 'none'] as const).map(s => (
-                        <button key={s} onClick={() => setGridStyle(s)} style={{
+                        <button key={s} onClick={() => updateAppearance({ gridStyle: s })} style={{
                           padding: '6px 16px', borderRadius: 6, border: '1px solid',
-                          borderColor: gridStyle === s ? 'var(--accent-primary)' : 'var(--border-color)',
-                          background: gridStyle === s ? 'rgba(0,212,170,0.08)' : 'none',
-                          color: gridStyle === s ? 'var(--accent-primary)' : 'var(--text-muted)',
+                          borderColor: appearance.gridStyle === s ? 'var(--accent-primary)' : 'var(--border-color)',
+                          background: appearance.gridStyle === s ? 'rgba(0,212,170,0.08)' : 'none',
+                          color: appearance.gridStyle === s ? 'var(--accent-primary)' : 'var(--text-muted)',
                           fontSize: '0.6875rem', cursor: 'pointer', textTransform: 'capitalize',
                         }}>{s}</button>
                       ))}
@@ -433,35 +503,64 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                   <div style={{ marginBottom: 14 }}>
                     <span style={labelStyle}>Grid Color</span>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input type="color" value={gridColor} onChange={e => setGridColor(e.target.value)}
+                      <input type="color" value={appearance.gridColor} onChange={e => updateAppearance({ gridColor: e.target.value })}
                         style={{ width: 36, height: 30, border: '1px solid var(--border-color)', borderRadius: 5, cursor: 'pointer', background: 'none' }} />
-                      <input style={inputStyle} value={gridColor} onChange={e => setGridColor(e.target.value)} />
+                      <input style={inputStyle} value={appearance.gridColor} onChange={e => updateAppearance({ gridColor: e.target.value })} />
                     </div>
                   </div>
 
                   <div style={{ marginBottom: 14 }}>
-                    <span style={labelStyle}>Grid Thickness: {gridThickness}px</span>
-                    <input type="range" min={1} max={10} step={1} value={gridThickness}
-                      onChange={e => setGridThickness(Number(e.target.value))}
+                    <span style={labelStyle}>Grid Thickness: {appearance.gridThickness}px</span>
+                    <input type="range" min={1} max={10} step={1} value={appearance.gridThickness}
+                      onChange={e => updateAppearance({ gridThickness: Number(e.target.value) })}
                       style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
                   </div>
 
                   <div style={{ marginBottom: 14 }}>
                     <span style={labelStyle}>Canvas Background</span>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input type="color" value={canvasBg} onChange={e => setCanvasBg(e.target.value)}
+                      <input type="color" value={appearance.canvasBackgroundColor} onChange={e => updateAppearance({ canvasBackgroundColor: e.target.value })}
                         style={{ width: 36, height: 30, border: '1px solid var(--border-color)', borderRadius: 5, cursor: 'pointer', background: 'none' }} />
-                      <input style={inputStyle} value={canvasBg} onChange={e => setCanvasBg(e.target.value)} />
+                      <input style={inputStyle} value={appearance.canvasBackgroundColor} onChange={e => updateAppearance({ canvasBackgroundColor: e.target.value })} />
                     </div>
                   </div>
 
-                  <div style={{ marginBottom: 14 }}>
-                    <span style={labelStyle}>Theme</span>
-                    <select style={inputStyle} value={settings.appearance?.theme || 'dark'} onChange={e => updateAppearance({ theme: e.target.value })}>
-                      <option value="dark">Dark (default)</option>
-                      <option value="light">Light</option>
-                      <option value="system">System</option>
-                    </select>
+                  <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                    <span style={{ ...labelStyle, fontWeight: 700 }}>Workshop Stage Colors</span>
+                    <p className={styles.description} style={{ marginTop: 4 }}>Override the default color of each pipeline stage lane.</p>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    {STAGE_ORDER.map((stageId) => {
+                      const stage = STAGES[stageId];
+                      const color = appearance.stageLaneColors?.[stageId] || stage.color;
+                      return (
+                        <div key={stageId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="color"
+                            value={color}
+                            onChange={e => updateAppearance({
+                              stageLaneColors: { ...(appearance.stageLaneColors ?? {}), [stageId]: e.target.value },
+                            })}
+                            style={{ width: 26, height: 24, border: '1px solid var(--border-color)', borderRadius: 4, cursor: 'pointer', background: 'none', flexShrink: 0 }}
+                          />
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{stage.title}</span>
+                          {appearance.stageLaneColors?.[stageId] && (
+                            <button
+                              onClick={() => {
+                                const next = { ...(appearance.stageLaneColors ?? {}) };
+                                delete next[stageId];
+                                updateAppearance({ stageLaneColors: next });
+                              }}
+                              title="Reset to default"
+                              style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.65rem', padding: 0 }}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

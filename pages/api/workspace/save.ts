@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try { body = JSON.parse(body); } catch { return res.status(400).json({ error: 'Invalid JSON' }); }
   }
 
-  const { canvas, fileState, settings, projectId, projectName } = body ?? {};
+  const { canvas, fileState, settings, projectId, projectName, pipeline } = body ?? {};
 
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -38,6 +38,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         savedAt: Date.now(),
         viewport: canvas.viewport,
         items: canvas.items,
+      }, null, 2), 'utf-8');
+    }
+
+    // Save Workshop pipeline draft (per-project — see stores/pipelineStore.ts)
+    if (pipeline && projectId) {
+      const pipelineFile = path.join(DATA_DIR, `pipeline-${projectId}-draft.json`);
+      await fs.writeFile(pipelineFile, JSON.stringify({
+        projectId,
+        projectName: projectName || 'Untitled',
+        savedAt: Date.now(),
+        nodes: pipeline.nodes,
+        edges: pipeline.edges,
+        viewport: pipeline.viewport,
+        collapsedStages: pipeline.collapsedStages,
+        scenes: pipeline.scenes,
+        paramTemplates: pipeline.paramTemplates,
       }, null, 2), 'utf-8');
     }
 

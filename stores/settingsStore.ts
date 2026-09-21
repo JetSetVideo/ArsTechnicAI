@@ -31,6 +31,9 @@ interface SettingsState {
   updateAIProvider: (partial: Partial<AIProviderSettings>) => void;
   updateAppearance: (partial: Partial<AppearanceSettings>) => void;
   applyFontScale: () => void;
+  /** Applies theme, parametric tokens (density/roundness/glow/contrast/speed),
+   *  accent color and reduce-motion as CSS custom properties on <html>. */
+  applyAppearance: () => void;
   resetSettings: () => void;
 }
 
@@ -40,6 +43,18 @@ const defaultAppearance: AppearanceSettings = {
   fontScale: 1,
   compactMode: false,
   showFilenames: true,
+  gridStyle: 'dots',
+  gridColor: '#333333',
+  gridThickness: 1,
+  canvasBackgroundColor: '#0a0a0f',
+  density: 1,
+  roundness: 1,
+  glow: 1,
+  contrast: 1,
+  speed: 1,
+  reduceMotion: false,
+  accentColor: '#00d4aa',
+  stageLaneColors: {},
 };
 
 // Default AI provider settings - extracted for reuse in migration
@@ -78,10 +93,12 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       settings: defaultSettings,
 
-      updateSettings: (partial) =>
+      updateSettings: (partial) => {
         set((state) => ({
           settings: { ...state.settings, ...partial },
-        })),
+        }));
+        if ('theme' in partial) get().applyAppearance();
+      },
 
       updateAIProvider: (partial) =>
         set((state) => ({
@@ -107,9 +124,10 @@ export const useSettingsStore = create<SettingsState>()(
             appearance: newAppearance,
           },
         }));
-        
-        // Apply the font scale to CSS
+
+        // Apply the font scale + parametric tokens to CSS
         get().applyFontScale();
+        get().applyAppearance();
       },
 
       applyFontScale: () => {
@@ -117,9 +135,9 @@ export const useSettingsStore = create<SettingsState>()(
           // Defensive: ensure appearance exists with defaults
           const appearance = get().settings?.appearance ?? defaultAppearance;
           const { fontScale = 1, compactMode = false } = appearance;
-          
+
           document.documentElement.style.setProperty('--font-scale', String(fontScale));
-          
+
           // Apply compact mode
           if (compactMode) {
             document.documentElement.classList.add('compact-mode');
@@ -129,9 +147,37 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
+      applyAppearance: () => {
+        if (typeof document === 'undefined') return;
+        const root = document.documentElement;
+        const appearance = get().settings?.appearance ?? defaultAppearance;
+        const {
+          density = 1, roundness = 1, glow = 1, contrast = 1, speed = 1,
+          reduceMotion = false, accentColor,
+        } = appearance;
+
+        root.style.setProperty('--param-density', String(density));
+        root.style.setProperty('--param-roundness', String(roundness));
+        root.style.setProperty('--param-glow', String(glow));
+        root.style.setProperty('--param-contrast', String(contrast));
+        // Reduce-motion is an accessibility override: force instant (0)
+        // regardless of the speed dial when enabled.
+        root.style.setProperty('--param-speed', String(reduceMotion ? 0 : speed));
+
+        if (accentColor) root.style.setProperty('--accent-primary', accentColor);
+
+        const theme = get().settings?.theme ?? 'dark';
+        if (theme === 'dark' || theme === 'light') {
+          root.setAttribute('data-theme', theme);
+        } else {
+          root.removeAttribute('data-theme'); // 'system' — follow prefers-color-scheme
+        }
+      },
+
       resetSettings: () => {
         set({ settings: defaultSettings });
         get().applyFontScale();
+        get().applyAppearance();
       },
     }),
     {
@@ -186,9 +232,10 @@ export const useSettingsStore = create<SettingsState>()(
         };
       },
       onRehydrateStorage: () => (state) => {
-        // Apply font scale after rehydration
+        // Apply font scale + parametric tokens after rehydration
         if (state) {
           state.applyFontScale();
+          state.applyAppearance();
         }
       },
     }

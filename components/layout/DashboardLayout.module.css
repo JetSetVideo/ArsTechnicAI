@@ -11,7 +11,7 @@
 .searchIcon { color: var(--text-muted); flex-shrink: 0; }
 .searchInput { flex: 1; background: none; border: none; color: var(--text-primary); font-size: 0.75rem; outline: none; }
 .searchInput::placeholder { color: var(--text-muted); }
-.topBarRight { display: flex; align-items: center; gap: 8px; }
+.topBarRight { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .avatarBtn { background: none; border: none; cursor: pointer; padding: 2px; border-radius: 50%; }
 .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--bg-tertiary); border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; }
 .avatarConnected { border-color: var(--success); }

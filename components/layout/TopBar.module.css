@@ -1,6 +1,6 @@
 .topBar {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   padding: 0 var(--space-2, 0.5rem);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);

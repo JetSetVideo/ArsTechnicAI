@@ -28,6 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (projectId && typeof projectId === 'string') {
       result.canvas = await readJsonSafe(path.join(DATA_DIR, `canvas-${projectId}.json`));
       result.fileState = await readJsonSafe(path.join(DATA_DIR, `filestate-${projectId}.json`));
+      result.pipeline = await readJsonSafe(path.join(DATA_DIR, `pipeline-${projectId}-draft.json`));
     }
 
     // Load projects list

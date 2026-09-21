@@ -28,18 +28,15 @@ import {
   Link2,
   X,
 } from 'lucide-react';
-import { useCanvasStore, useFileStore, useLogStore, useSettingsStore, useNodeStore } from '@/stores';
+import { useCanvasStore, useFileStore, useLogStore, useSettingsStore } from '@/stores';
 import { Button } from '../ui/Button';
 import styles from './Canvas.module.css';
-import nodeStyles from './NodeGraph.module.css';
-import { NodeCard, ConnLine } from './NodeComponents';
 import { NodeEtiquette, type NodeTabId } from './NodeEtiquette';
 import { CanvasConnections } from './CanvasConnections';
 import { useCanvasPointerInteractions } from '@/hooks/useCanvasPointerInteractions';
 import { findParentItemAtPoint, attachOverlayToParent } from '@/lib/canvas/migration';
 import { exceedsDragThreshold } from '@/lib/canvas/viewport';
 import type { CanvasItem, Asset, GenerationMeta } from '@/types';
-import { NODE_DEFS, type NodeType } from '@/stores/nodeStore';
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 type OverlayTool = 'pen' | 'shape' | 'text';
@@ -51,12 +48,6 @@ type OverlayDraft = {
   currentY: number;
   points: { x: number; y: number }[];
 };
-
-const NODE_DRAG_MIME = 'application/x-ars-node-type';
-
-function isNodeType(value: string): value is NodeType {
-  return value in NODE_DEFS;
-}
 
 function escapeSvgText(value: string): string {
   return value
@@ -188,8 +179,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
     cancelConnection,
     pendingConnection,
   } = useCanvasStore();
-
-  const { nodes, connections } = useNodeStore();
 
   const { getAsset, getAssetsByLineage, getAssetsByParentId, updateAsset } = useFileStore();
   const { settings } = useSettingsStore();
@@ -491,10 +480,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           removeSelected();
           log('canvas_remove', `Removed ${selectedIds.length} item(s)`);
         }
-        const selectedNodeIds = useNodeStore.getState().selectedIds;
-        if (selectedNodeIds.length > 0) {
-          selectedNodeIds.forEach(id => useNodeStore.getState().removeNode(id));
-        }
       } else if (e.key === 'Escape') {
         if (showShortcuts) {
           setShowShortcuts(false);
@@ -510,8 +495,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           setAutoLassoActive(false);
         } else {
           clearSelection();
-          useNodeStore.getState().clearSelection();
-          useNodeStore.getState().cancelConnection();
         }
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
         copy();
@@ -594,15 +577,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
       const x = (e.clientX - rect.left - viewport.x) / viewport.zoom;
       const y = (e.clientY - rect.top - viewport.y) / viewport.zoom;
-
-      const nodeType = e.dataTransfer.getData(NODE_DRAG_MIME);
-      if (isNodeType(nodeType)) {
-        const def = NODE_DEFS[nodeType];
-        const node = useNodeStore.getState().addNode(nodeType, x - def.defaultWidth / 2, y - 24);
-        useNodeStore.getState().selectNode(node.id);
-        log('canvas_add', `Added ${def.title} node to canvas`);
-        return;
-      }
 
       const data = e.dataTransfer.getData('application/json');
       if (data) {
@@ -733,7 +707,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = e.dataTransfer.types.includes(NODE_DRAG_MIME) ? 'copy' : 'move';
+    e.dataTransfer.dropEffect = 'move';
     setIsDragging(true);
   }, []);
 
@@ -756,7 +730,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
 
       if (activeTool === 'pointer') {
         clearSelection();
-        useNodeStore.getState().clearSelection();
         setPromptOverlayItemId(null);
         setVersionOverlayItemId(null);
       }
@@ -1642,8 +1615,17 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
       <div
         id="canvas-infinite-workspace-active"
         ref={canvasRef}
-        className={`${styles.canvas} ${isDragging ? styles.dropTarget : ''} ${showGrid ? styles.showGrid : ''}`}
-        style={{ cursor: getCursor() }}
+        className={`${styles.canvas} ${isDragging ? styles.dropTarget : ''} ${
+          showGrid && settings.appearance?.gridStyle !== 'none' ? styles.showGrid : ''
+        } ${settings.appearance?.gridStyle === 'dots' ? styles.gridDots : styles.gridLines}`}
+        style={{
+          cursor: getCursor(),
+          ['--canvas-bg-color' as string]: settings.appearance?.canvasBackgroundColor || undefined,
+          ['--canvas-grid-color' as string]: settings.appearance?.gridColor || undefined,
+          ['--canvas-grid-thickness' as string]: settings.appearance?.gridThickness
+            ? `${settings.appearance.gridThickness}px`
+            : undefined,
+        }}
         onClick={pointerInteractions.handleCanvasClick}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -1668,20 +1650,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             svgH={svgH}
             connectionPreviewEnd={pointerInteractions.connectionPreviewEnd}
           />
-
-          {/* Node Connections Layer */}
-          <svg
-            className={nodeStyles.connSvg}
-            width={svgW}
-            height={svgH}
-            style={{ left: -svgW / 2, top: -svgH / 2 }}
-          >
-            <g transform={`translate(${svgW / 2}, ${svgH / 2})`}>
-              {connections.map((conn) => (
-                <ConnLine key={conn.id} conn={conn} nodes={nodes} zoom={viewport.zoom} />
-              ))}
-            </g>
-          </svg>
 
           {/* Canvas Items */}
           {items.map((item) => {
@@ -2039,18 +2007,6 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
             );
           })}
 
-          {/* Node Cards Layer */}
-          {nodes.map((node) => (
-            <div key={node.id} data-node style={{ position: 'absolute', left: 0, top: 0 }}>
-              <NodeCard
-                node={node}
-                zoom={viewport.zoom}
-                isSelected={useNodeStore.getState().selectedIds.includes(node.id)}
-                connections={connections}
-              />
-            </div>
-          ))}
-
           {overlayDraft && (() => {
             const left = overlayDraft.tool === 'pen'
               ? Math.min(...overlayDraft.points.map((p) => p.x)) - 8
@@ -2085,7 +2041,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showTimeline: _showTimeline = fa
           })()}
         </div>
 
-        {items.length === 0 && nodes.length === 0 && (
+        {items.length === 0 && (
           <div className={styles.emptyState}>
             <Layers size={48} />
             <h3>Start by generating an image or importing assets</h3>

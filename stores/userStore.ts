@@ -184,6 +184,21 @@ function createDefaultSession(): UserSession {
   };
 }
 
+// A "session" is persisted to localStorage, so without a lifetime cap it never
+// rotates: `startedAt` stays fixed forever, counters accumulate indefinitely,
+// and consumers deriving `Date.now() - startedAt` (telemetry sessionDuration)
+// grow without bound. Rotate anything older than this on rehydrate.
+const MAX_SESSION_AGE_MS = 24 * 60 * 60 * 1000; // 24h
+
+function rotateIfStale(session: UserSession | undefined): UserSession {
+  if (!session || typeof session.startedAt !== 'number') return createDefaultSession();
+  const age = Date.now() - session.startedAt;
+  if (!Number.isFinite(age) || age < 0 || age > MAX_SESSION_AGE_MS) {
+    return createDefaultSession();
+  }
+  return session;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // STORE DEFINITION
 // ════════════════════════════════════════════════════════════════════════════
@@ -293,6 +308,16 @@ export const useUserStore = create<UserState>()(
         recentProjects: state.recentProjects,
         session: state.session,
       }),
+      // Rotate the persisted session if it has outlived MAX_SESSION_AGE_MS,
+      // so "session" stays bounded and duration-derived metrics stay sane.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<UserState>;
+        return {
+          ...current,
+          ...p,
+          session: rotateIfStale(p.session),
+        };
+      },
     }
   )
 );

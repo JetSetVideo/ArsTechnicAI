@@ -179,6 +179,14 @@
   margin-bottom: 0;
 }
 
+.digestEntry {
+  border-left: 2px dashed var(--text-muted);
+  opacity: 0.75;
+}
+.digestEntry:hover {
+  opacity: 1;
+}
+
 .entryHeader {
   display: flex;
   align-items: center;

@@ -295,6 +295,19 @@ export interface ActionLogEntry {
   description: string;
   data?: Record<string, unknown>;
   undoable: boolean;
+  /** Project this action happened in — entries are scoped per-project. */
+  projectId?: string;
+  /**
+   * Set when this entry is a rolled-up summary of many older entries of the
+   * same day + type (see stores/logStore.ts compression), rather than a
+   * single user action. `digestCount` / `digestPeriodStart/End` describe the
+   * range folded in; `data.samples` (if present) keeps a few representative
+   * original entries.
+   */
+  isDigest?: boolean;
+  digestCount?: number;
+  digestPeriodStart?: Timestamp;
+  digestPeriodEnd?: Timestamp;
 }
 
 // ------------------------------------------------------------
@@ -330,6 +343,29 @@ export interface AppearanceSettings {
   fontScale: number; // 0.875 | 1 | 1.125
   compactMode: boolean;
   showFilenames: boolean;
+
+  // Canvas grid & background (Canvas.tsx consumes these as CSS custom
+  // properties — see components/layout/Canvas.tsx / Canvas.module.css)
+  gridStyle: 'dots' | 'lines' | 'none';
+  gridColor: string;
+  gridThickness: number;
+  canvasBackgroundColor: string;
+
+  // Parametric design tokens (styles/globals.css "PARAMETRIC DESIGN SYSTEM")
+  // — each 0/1/2, cascading via calc() into spacing/radius/glow/shadow/motion.
+  density: 0 | 1 | 2; // 0 airy, 1 balanced, 2 compact
+  roundness: 0 | 1 | 2; // 0 sharp, 1 rounded, 2 pill
+  glow: 0 | 1 | 2; // 0 flat, 1 subtle, 2 vivid
+  contrast: 0 | 1 | 2; // 0 soft, 1 normal, 2 crisp (also the high-contrast dial)
+  speed: 0 | 1 | 2; // 0 instant, 1 default, 2 slow
+  /** Accessibility override: forces motion to instant regardless of `speed`. */
+  reduceMotion: boolean;
+
+  /** Accent color driving --accent-primary across the whole UI. */
+  accentColor: string;
+
+  /** Per-stage Workshop lane color overrides, keyed by PipelineStageId. */
+  stageLaneColors?: Record<string, string>;
 }
 
 export interface AppSettings {

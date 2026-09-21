@@ -92,8 +92,25 @@ interface ActionEntryProps {
 
 const ActionEntry: React.FC<ActionEntryProps> = ({ entry }) => {
   const config = getActionConfig(entry.type);
+
+  if (entry.isDigest) {
+    const samples = (entry.data?.samples as { description: string }[] | undefined) ?? [];
+    return (
+      <div className={`${styles.entry} ${styles.digestEntry}`} title={samples.map((s) => s.description).join('\n')}>
+        <div className={styles.entryHeader}>
+          <span className={styles.entryBadge} style={{ background: 'var(--text-muted)' }}>
+            {config.icon}
+            <span>{entry.digestCount}×</span>
+          </span>
+          <span className={styles.entryTime}>{formatTimestamp(entry.timestamp)}</span>
+        </div>
+        <div className={styles.entryDescription}>{entry.description}</div>
+      </div>
+    );
+  }
+
   const params = formatParams(entry.data);
-  
+
   return (
     <div className={styles.entry}>
       <div className={styles.entryHeader}>
@@ -116,14 +133,18 @@ const ActionEntry: React.FC<ActionEntryProps> = ({ entry }) => {
 };
 
 export const ActionLog: React.FC = () => {
-  const { entries, clearLog } = useLogStore();
+  const { clearLog, getEntriesForCurrentProject } = useLogStore();
+  // Subscribe to the raw entries so this re-renders when new/compressed
+  // entries land, then derive the current project's slice from them.
+  useLogStore((s) => s.entries);
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const recentEntries = isExpanded ? entries : entries.slice(0, 8);
+  const projectEntries = getEntriesForCurrentProject();
+  const recentEntries = isExpanded ? projectEntries : projectEntries.slice(0, 8);
 
   // Count by type for the badge
-  const generationCount = entries.filter(e => e.type.startsWith('generation')).length;
+  const generationCount = projectEntries.filter(e => e.type.startsWith('generation')).length;
 
   if (!isOpen) {
     return (
@@ -134,8 +155,8 @@ export const ActionLog: React.FC = () => {
         type="button"
       >
         <History size={16} />
-        {entries.length > 0 && (
-          <span className={styles.badge}>{entries.length}</span>
+        {projectEntries.length > 0 && (
+          <span className={styles.badge}>{projectEntries.length}</span>
         )}
       </button>
     );
@@ -147,7 +168,7 @@ export const ActionLog: React.FC = () => {
         <div className={styles.headerLeft}>
           <History size={14} />
           <span>Activity</span>
-          <span className={styles.count}>{entries.length}</span>
+          <span className={styles.count}>{projectEntries.length}</span>
           {generationCount > 0 && (
             <span className={styles.genCount}>
               <Sparkles size={10} />
@@ -189,7 +210,7 @@ export const ActionLog: React.FC = () => {
         )}
       </div>
 
-      {entries.length > 8 && (
+      {projectEntries.length > 8 && (
         <button
           className={styles.expandButton}
           onClick={() => setIsExpanded(!isExpanded)}
@@ -203,7 +224,7 @@ export const ActionLog: React.FC = () => {
           ) : (
             <>
               <ChevronDown size={14} />
-              Show all ({entries.length})
+              Show all ({projectEntries.length})
             </>
           )}
         </button>

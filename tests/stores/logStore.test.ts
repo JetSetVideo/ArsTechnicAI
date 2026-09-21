@@ -117,35 +117,53 @@ describe('LogStore', () => {
     });
   });
 
-  describe('Log Limit Enforcement', () => {
-    it('should enforce maximum log entries', () => {
+  describe('Log Limit Enforcement (compression, not hard trim)', () => {
+    it('should cap full-detail entries at maxEntries and fold the rest into digests', () => {
       const store = useLogStore.getState();
       const MAX_LOGS = store.maxEntries;
-      
-      // Add more than the limit
+
+      // Add more than the limit, all same type/day so they fold into one digest
       for (let i = 0; i < MAX_LOGS + 50; i++) {
         store.log('canvas_add', `Entry ${i}`);
       }
-      
+
       const state = useLogStore.getState();
-      expect(state.entries.length).toBeLessThanOrEqual(MAX_LOGS);
+      const raw = state.entries.filter((e) => !e.isDigest);
+      const digests = state.entries.filter((e) => e.isDigest);
+      // Full-detail entries never exceed the window...
+      expect(raw.length).toBeLessThanOrEqual(MAX_LOGS);
+      // ...but nothing is silently discarded — the overflow becomes a digest.
+      expect(digests.length).toBeGreaterThan(0);
+      expect(digests[0].digestCount).toBe(50);
     });
 
-    it('should remove oldest entries when limit reached', () => {
+    it('should remove oldest entries from full detail when limit reached', () => {
       const store = useLogStore.getState();
-      
+
       // Add entries up to limit
       for (let i = 0; i < store.maxEntries; i++) {
         store.log('canvas_add', `Entry ${i}`);
       }
-      
+
       // Add one more
       store.log('canvas_add', 'Newest Entry');
-      
+
       const state = useLogStore.getState();
       expect(state.entries[0].description).toBe('Newest Entry');
-      // First entry should have been removed
+      // First entry should have been folded into a digest, not kept raw
       expect(state.entries.find(l => l.description === 'Entry 0')).toBeUndefined();
+      expect(state.entries.some((e) => e.isDigest)).toBe(true);
+    });
+  });
+
+  describe('Per-project scoping', () => {
+    it('tags entries with the current project and scopes helper methods to it', () => {
+      const store = useLogStore.getState();
+      store.log('canvas_add', 'Project A action');
+
+      const state = useLogStore.getState();
+      expect(state.entries[0].projectId).toBeDefined();
+      expect(store.getEntriesForCurrentProject()).toHaveLength(1);
     });
   });
 
