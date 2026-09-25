@@ -1,0 +1,247 @@
+{
+  "id": "shot-list-from-a-script",
+  "name": "Shot list from a script card",
+  "note": "A script shelf card and a film card go to a language model, which writes the shot list; its text drives a generate node directly. Nothing here touches the restoration engine.",
+  "savedAt": 1789684961276,
+  "media_type": "movie",
+  "graph": {
+    "id": "shot-list-from-a-script",
+    "projectId": null,
+    "nodes": {
+      "script": {
+        "id": "script",
+        "type": "ref.card",
+        "name": "Reference",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "w": 250,
+          "h": 138
+        },
+        "values": {
+          "reference_id": {
+            "kind": "Text",
+            "value": "script.two_hander"
+          }
+        },
+        "authoredBy": {
+          "reference_id": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "film": {
+        "id": "film",
+        "type": "ref.card",
+        "name": "Reference",
+        "position": {
+          "x": 0,
+          "y": 240
+        },
+        "size": {
+          "w": 250,
+          "h": 138
+        },
+        "values": {
+          "reference_id": {
+            "kind": "Text",
+            "value": "movie.seven_samurai"
+          }
+        },
+        "authoredBy": {
+          "reference_id": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "blend": {
+        "id": "blend",
+        "type": "ref.blend",
+        "name": "Blend References",
+        "position": {
+          "x": 304,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 118
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "ask": {
+        "id": "ask",
+        "type": "llm.ask",
+        "name": "Ask a Model",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "size": {
+          "w": 258,
+          "h": 198
+        },
+        "values": {
+          "model": {
+            "kind": "Enum",
+            "value": "anthropic:claude-opus-5"
+          },
+          "instruction": {
+            "kind": "Text",
+            "value": "Break this scene into a numbered shot list. One line per shot."
+          },
+          "context": {
+            "kind": "Text",
+            "value": "A village at dawn, before the raid."
+          }
+        },
+        "authoredBy": {
+          "model": "user",
+          "instruction": "user",
+          "context": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "gen": {
+        "id": "gen",
+        "type": "gen.image",
+        "name": "Generate Image",
+        "position": {
+          "x": 904,
+          "y": 0
+        },
+        "size": {
+          "w": 264,
+          "h": 238
+        },
+        "values": {
+          "model": {
+            "kind": "Enum",
+            "value": "comfy:flux-dev"
+          },
+          "seed": {
+            "kind": "Number",
+            "value": -1
+          }
+        },
+        "authoredBy": {
+          "model": "user",
+          "seed": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "save": {
+        "id": "save",
+        "type": "out.save",
+        "name": "Save",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 138
+        },
+        "values": {
+          "name": {
+            "kind": "Text",
+            "value": "shot-01"
+          }
+        },
+        "authoredBy": {
+          "name": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      }
+    },
+    "edges": {
+      "e_317d6cdc04c2": {
+        "id": "e_317d6cdc04c2",
+        "from": {
+          "node": "script",
+          "port": "style"
+        },
+        "to": {
+          "node": "blend",
+          "port": "styles"
+        },
+        "order": 0
+      },
+      "e_6dde37da8d2b": {
+        "id": "e_6dde37da8d2b",
+        "from": {
+          "node": "film",
+          "port": "style"
+        },
+        "to": {
+          "node": "blend",
+          "port": "styles"
+        },
+        "order": 1
+      },
+      "e_1e201efafe3a": {
+        "id": "e_1e201efafe3a",
+        "from": {
+          "node": "blend",
+          "port": "style"
+        },
+        "to": {
+          "node": "ask",
+          "port": "style"
+        },
+        "order": 0
+      },
+      "e_40f72e79a2af": {
+        "id": "e_40f72e79a2af",
+        "from": {
+          "node": "blend",
+          "port": "style"
+        },
+        "to": {
+          "node": "gen",
+          "port": "style"
+        },
+        "order": 0
+      },
+      "e_145912d79e62": {
+        "id": "e_145912d79e62",
+        "from": {
+          "node": "ask",
+          "port": "text"
+        },
+        "to": {
+          "node": "gen",
+          "port": "prompt"
+        },
+        "order": 0
+      },
+      "e_5e98b0a29f4c": {
+        "id": "e_5e98b0a29f4c",
+        "from": {
+          "node": "gen",
+          "port": "image"
+        },
+        "to": {
+          "node": "save",
+          "port": "image"
+        },
+        "order": 0
+      }
+    },
+    "stacks": {},
+    "revision": 12
+  }
+}

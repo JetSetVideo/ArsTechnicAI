@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-09-17T22:50:52.333Z",
+  "capture_id": "cap_vlm_20260917t22504_mobile_l",
+  "screen_profile": "mobile-l",
+  "resolution": {
+    "width": 740,
+    "height": 360
+  },
+  "telemetry": {
+    "current_fps": 61.9,
+    "vram_usage_mb": null,
+    "system_ram_mb": 13,
+    "draw_calls": 20
+  },
+  "lineage_context": {
+    "active_node_id": null,
+    "parent_asset_id": null,
+    "graph_node_depth": null,
+    "columnar_record_id": null
+  },
+  "context": {
+    "active_route": "/blueprint/",
+    "radial_menu_open": false,
+    "bottom_terminal_expanded": false,
+    "theme": "dark_custom"
+  },
+  "evaluation_target": {
+    "macro_region": "workshop_shell",
+    "micro_region": "panel_layout",
+    "intent": "Verify the single-column-drawers layout and 10–14px base typography at 740×360."
+  }
+}

@@ -1,0 +1,334 @@
+{
+  "kind": "comic",
+  "source": "Comics idiom reference — drawing, colour and panel grammar",
+  "_note": "Each entry is a drawing system, not a named artist's likeness of a work. Where a movement or house style is named it is named as attribution for a technique, the same way the cinematography shelf credits a director of photography.",
+  "entries": [
+    {
+      "id": "golden_age",
+      "name": "Golden Age Newsprint",
+      "year": 1940,
+      "summary": "Four-colour process on absorbent newsprint. The registration errors are the look.",
+      "tags": ["1940s", "print", "four-colour", "halftone", "american"],
+      "detail": "Flat CMY at 25/50/100% with a heavy black plate, printed on paper that spreads the ink. Registration drifts by a hair, so colours peek out past their linework — reproducing that misregistration is what separates the period look from a modern flat-colour pastiche.",
+      "grant": {
+        "prompt": [
+          "four-colour newsprint process, benday dot screens visible",
+          "heavy uniform black ink line, no line weight modulation",
+          "flat colour at 25/50/100 percent tints only",
+          "slight plate misregistration, colour offset past the linework",
+          "warm yellowed paper stock, ink spread and bleed"
+        ],
+        "negative": ["digital gradients", "airbrushed rendering", "clean white paper"]
+      },
+      "where": "United States newsstands",
+      "when": "1940s",
+      "why": "The registration errors are the look — period colour as a printing accident, not a filter.",
+      "how": "Four-colour process on absorbent newsprint, CMY at 25/50/100% with a heavy black plate.",
+      "characters": ["stock hero", "sidekick", "newsstand reader"],
+      "studio": "American newsstand publishers",
+      "length": "8–64 pages",
+      "score": 4.2,
+      "related": ["comic.silver_age_halftone", "comic.ec_horror"]
+    },
+    {
+      "id": "ec_horror",
+      "name": "EC Horror",
+      "year": 1952,
+      "summary": "Meticulous crosshatched rendering doing genuinely nasty things, at newsstand size.",
+      "tags": ["1950s", "horror", "crosshatch", "print", "american"],
+      "detail": "The tension is between craftsmanship and content: the linework is patient, academic and beautifully controlled, and it is being spent on a rotting corpse. Dense feathered crosshatch for form, heavy spot blacks for mood, and a caption box that will not stop talking.",
+      "grant": {
+        "prompt": [
+          "dense feathered crosshatch rendering for tonal form",
+          "heavy spot blacks and dramatic cast shadow",
+          "lurid four-colour palette on newsprint",
+          "high-contrast horror lighting from below",
+          "ornate caption boxes and hand lettering"
+        ],
+        "negative": ["minimal linework", "pastel palette", "clean flat shading"]
+      }
+    },
+    {
+      "id": "kirby_dynamism",
+      "name": "Kinetic Superhero",
+      "year": 1965,
+      "summary": "Anatomy sacrificed to force. Everything is mid-explosion and coming at you.",
+      "tags": ["1960s", "superhero", "dynamic", "foreshortening", "american"],
+      "detail": "Extreme foreshortening on a wide-angle virtual lens, figures bursting the panel border, and abstract energy crackle standing in for physics. Blocky, slab-like anatomy — musculature drawn as engineering rather than biology.",
+      "grant": {
+        "prompt": [
+          "extreme foreshortening, fist or foot thrust at the viewer",
+          "blocky slab-built anatomy, exaggerated musculature",
+          "figures breaking the panel border",
+          "abstract black energy crackle and photo-collage texture",
+          "bold four-colour flats, heavy black holding line"
+        ],
+        "negative": ["anatomical accuracy", "static posing", "subtle rendering"]
+      }
+    },
+    {
+      "id": "ligne_claire",
+      "name": "Ligne Claire",
+      "year": 1950,
+      "summary": "One uniform line, flat colour, no shadow. Everything equally in focus.",
+      "tags": ["franco-belgian", "clean", "flat", "european", "adventure"],
+      "detail": "The Franco-Belgian discipline: a single unvarying line weight for every object at every distance, flat unmodulated colour, and no hatching or cast shadow anywhere. Depth comes entirely from overlap and from colour temperature, which forces the drawing to be structurally correct.",
+      "grant": {
+        "prompt": [
+          "uniform unvarying line weight throughout, no tapering",
+          "flat unmodulated colour fills, no gradients",
+          "no hatching, no cast shadows, no rendering",
+          "depth by overlap and colour temperature only",
+          "architecturally precise backgrounds, everything equally sharp"
+        ],
+        "negative": ["crosshatching", "cast shadow", "atmospheric perspective", "line weight variation"]
+      }
+    },
+    {
+      "id": "moebius_line",
+      "name": "Fine-Line Science Fantasy",
+      "year": 1975,
+      "summary": "Hairline pen, enormous vistas, and a palette that has no business being that calm.",
+      "tags": ["european", "science-fiction", "fine-line", "1970s", "psychedelic"],
+      "detail": "A very fine, even technical-pen line describing extraordinary density of detail without ever getting heavy, over flat washes in unexpected desert pastels. Figures are small; the world is the subject.",
+      "grant": {
+        "prompt": [
+          "hairline technical pen work, even weight, extraordinary detail density",
+          "vast landscape with a small figure for scale",
+          "flat pastel washes — sand, rose, pale turquoise",
+          "organic biomechanical architecture",
+          "no black spotting, tone built entirely from line density"
+        ],
+        "negative": ["heavy spot blacks", "saturated primaries", "close-up framing"]
+      }
+    },
+    {
+      "id": "chiaroscuro_noir",
+      "name": "Ink Chiaroscuro Noir",
+      "year": 1991,
+      "summary": "Pure black and pure white, no grey. The reader assembles the image.",
+      "tags": ["noir", "high-contrast", "monochrome", "expressionist", "crime"],
+      "detail": "Every tone is a decision to leave paper or fill it — there is no rendering in between. Rain becomes white scratches on black; a face becomes two shapes and an eye. Works because the eye completes what the ink refuses to state.",
+      "grant": {
+        "prompt": [
+          "pure black and white only, no greys, no halftone",
+          "figures reduced to silhouette and negative-space shapes",
+          "white rain scratched into solid black fields",
+          "extreme high-contrast expressionist lighting",
+          "occasional single spot colour on one element"
+        ],
+        "negative": ["grey tones", "gradient shading", "full colour", "even lighting"]
+      }
+    },
+    {
+      "id": "nine_panel_grid",
+      "name": "The Nine-Panel Grid",
+      "year": 1986,
+      "summary": "A rigid 3×3 that never varies, so every break from it detonates.",
+      "tags": ["formalist", "grid", "1980s", "literary", "structural"],
+      "detail": "A structural choice more than a drawing style: identical panel size throughout, which forces the storytelling to work through composition and rhyme instead of layout drama. Because the grid is absolute, a single splash page carries the weight a whole sequence would elsewhere.",
+      "grant": {
+        "prompt": [
+          "strict three by three panel grid, identical panel dimensions",
+          "even naturalistic rendering, deliberately undramatic",
+          "muted period colour, purple and orange complementary scheme",
+          "composition rhymes between corresponding panels",
+          "dense caption text overlaying the image"
+        ],
+        "negative": ["splash pages", "irregular panel shapes", "bleeding panels"]
+      }
+    },
+    {
+      "id": "shonen_manga",
+      "name": "Shōnen Manga",
+      "summary": "Screentone, speed lines, and a page built to be read in eleven seconds.",
+      "tags": ["manga", "japanese", "monochrome", "screentone", "action"],
+      "detail": "Monochrome with adhesive screentone doing all the tonal work. Layouts break the rectangle constantly — diagonal gutters, figures crossing panels — and impact frames go full bleed. Read right to left, which changes where the eye lands.",
+      "grant": {
+        "prompt": [
+          "monochrome ink with adhesive screentone dot shading",
+          "radiating speed lines and impact focus lines",
+          "diagonal irregular panel gutters, figures crossing borders",
+          "exaggerated expression, sweat drops and emotive symbols",
+          "right-to-left reading order"
+        ],
+        "negative": ["full colour", "rectangular grid", "gradient shading"]
+      }
+    },
+    {
+      "id": "gekiga",
+      "name": "Gekiga",
+      "year": 1957,
+      "summary": "Manga's adult register: heavier line, slower pacing, nothing cute.",
+      "tags": ["manga", "japanese", "literary", "monochrome", "realist"],
+      "detail": "Coined to distance itself from 'manga' as children's work. Realistic proportions, weathered faces, dense environmental detail, and long wordless sequences of nothing much happening — the pacing is the argument.",
+      "grant": {
+        "prompt": [
+          "heavy brush-inked line with realistic proportion",
+          "dense hatched environmental detail, urban decay",
+          "long wordless panel sequences, ordinary action",
+          "coarse screentone, high tonal contrast",
+          "weathered specific faces, no stylised cuteness"
+        ],
+        "negative": ["large stylised eyes", "speed lines", "chibi proportions"]
+      }
+    },
+    {
+      "id": "shojo_manga",
+      "name": "Shōjo Manga",
+      "summary": "Panels dissolve, flowers erupt, and interior feeling overrides physical space.",
+      "tags": ["manga", "japanese", "monochrome", "emotional", "decorative"],
+      "detail": "The most formally radical mainstream comics grammar: panel borders vanish, backgrounds become symbolic pattern, and a character's emotional state literally replaces the room they are standing in. Delicate line, enormous eyes, screentone used decoratively rather than tonally.",
+      "grant": {
+        "prompt": [
+          "borderless dissolving panels bleeding into each other",
+          "symbolic decorative backgrounds — flowers, sparkles, screentone pattern",
+          "very large detailed eyes with multiple highlights",
+          "delicate fine variable line weight",
+          "figure floating free of any physical setting"
+        ],
+        "negative": ["rigid panel grid", "literal background", "heavy brush line"]
+      }
+    },
+    {
+      "id": "webtoon_vertical",
+      "name": "Vertical Scroll Webtoon",
+      "summary": "One continuous column. Pacing is measured in scroll distance, not page turns.",
+      "tags": ["korean", "digital", "vertical", "colour", "contemporary"],
+      "detail": "Built for a thumb: a single infinite vertical strip, full digital colour, generous empty space between beats because whitespace is the only pacing tool left when there is no page turn. Compositions are tall and centred, never wide.",
+      "grant": {
+        "prompt": [
+          "single continuous vertical composition, tall narrow framing",
+          "full digital colour with soft airbrushed shading",
+          "generous empty vertical space between story beats",
+          "clean digital line, uniform weight",
+          "centred subject, no wide horizontal compositions"
+        ],
+        "negative": ["page grid layout", "wide horizontal panels", "print halftone"]
+      }
+    },
+    {
+      "id": "underground_comix",
+      "name": "Underground Comix",
+      "year": 1968,
+      "summary": "Obsessive crosshatch, bad vibes, and no editor whatsoever.",
+      "tags": ["1960s", "counterculture", "crosshatch", "satirical", "american"],
+      "detail": "Dense nervous crosshatching over grotesque caricature, hand-lettered wall to wall, printed cheap on bad paper. The visual density is anxiety made legible.",
+      "grant": {
+        "prompt": [
+          "obsessive nervous crosshatch covering every surface",
+          "grotesque exaggerated caricature, bulbous distorted anatomy",
+          "hand lettering crammed into every available space",
+          "cheap offset print on coarse paper, muddy registration",
+          "claustrophobic composition with no empty space"
+        ],
+        "negative": ["clean linework", "empty space", "idealised anatomy"]
+      }
+    },
+    {
+      "id": "mignola_shadow",
+      "name": "Architectural Shadow",
+      "year": 1994,
+      "summary": "Design by subtraction — huge black shapes with a few decisive lines left over.",
+      "tags": ["horror", "design", "high-contrast", "graphic", "folkloric"],
+      "detail": "Figures and environments built as flat interlocking black shapes rather than drawn and then shaded. Detail appears only where it is load-bearing; everywhere else is solid ink. Colour is applied in flat unmodulated fields, usually one dominant hue per scene.",
+      "grant": {
+        "prompt": [
+          "massive flat interlocking black shapes defining form",
+          "minimal decisive linework only where structurally necessary",
+          "flat unmodulated colour fields, one dominant hue per scene",
+          "folk-art and woodcut influenced silhouette design",
+          "geometric rubble, ornament and architectural pattern"
+        ],
+        "negative": ["gradient rendering", "detailed crosshatching", "naturalistic colour"]
+      }
+    },
+    {
+      "id": "bd_album",
+      "name": "Bande Dessinée Album",
+      "summary": "Large-format, painted, and unhurried. A page is composed as a page.",
+      "tags": ["franco-belgian", "european", "painted", "album", "literary"],
+      "detail": "The European album tradition: A4 hardcover, forty-eight pages, full painted or richly rendered colour, and layouts composed for the whole spread rather than assembled panel by panel. Backgrounds are researched.",
+      "grant": {
+        "prompt": [
+          "richly painted colour with visible brush and watercolour texture",
+          "researched architecturally accurate backgrounds",
+          "regular tier-based page layout composed as a whole spread",
+          "naturalistic proportion, restrained expression",
+          "large format detail density"
+        ],
+        "negative": ["flat digital colour", "irregular splash layouts", "exaggerated anatomy"]
+      }
+    },
+    {
+      "id": "silver_age_halftone",
+      "name": "Silver Age Four-Colour",
+      "year": 1962,
+      "summary": "Optimistic primaries, confident line, benday dots you can count.",
+      "tags": ["1960s", "superhero", "halftone", "print", "american"],
+      "detail": "Cleaner and brighter than the Golden Age — better paper, better registration, and a house line style that is confident rather than crude. Benday dots are large enough to read as texture at arm's length, which is the signature.",
+      "grant": {
+        "prompt": [
+          "large visible benday dot screens, countable at reading distance",
+          "confident even-weight ink outline",
+          "bright optimistic primary palette, red yellow blue dominant",
+          "clean registration on improved paper stock",
+          "heroic upright posing, clear silhouette"
+        ],
+        "negative": ["grim palette", "misregistration", "photorealistic rendering"]
+      }
+    },
+    {
+      "id": "autobio_indie",
+      "name": "Autobiographical Indie",
+      "summary": "Small, plain, honest. Deliberately unimpressive drawing doing precise work.",
+      "tags": ["indie", "autobiography", "monochrome", "minimal", "contemporary"],
+      "detail": "A drawing style that refuses virtuosity so the reader trusts it: simple confident line, minimal or no shading, rigid small-panel grid, and figures that stay consistent rather than beautiful. Usually monochrome or a single flat spot colour.",
+      "grant": {
+        "prompt": [
+          "simple confident unshowy line, minimal shading",
+          "small regular panel grid, many panels per page",
+          "monochrome or a single flat muted spot colour",
+          "consistent simplified figures, mundane domestic settings",
+          "hand lettering in the artist's own hand"
+        ],
+        "negative": ["virtuoso rendering", "dynamic layouts", "saturated colour"]
+      }
+    },
+    {
+      "id": "risograph_zine",
+      "name": "Risograph Zine",
+      "summary": "Two spot inks, misregistered on purpose, and the overprint is the third colour.",
+      "tags": ["print", "zine", "spot-colour", "contemporary", "diy"],
+      "detail": "Soy-ink duplication in a small number of fluorescent spot colours. Each colour is a separate pass, so registration drifts, and where two passes overlap you get a colour neither ink can make alone. Grain, streaking and roller marks are features.",
+      "grant": {
+        "prompt": [
+          "two or three fluorescent spot inks, layered separations",
+          "deliberate misregistration between colour passes",
+          "overprint multiply where colours cross",
+          "visible paper grain, roller streaking, ink mottling",
+          "coarse halftone screens at a visible angle"
+        ],
+        "negative": ["full CMYK colour", "perfect registration", "smooth digital gradients"]
+      }
+    },
+    {
+      "id": "painted_graphic_novel",
+      "name": "Fully Painted Graphic Novel",
+      "year": 1989,
+      "summary": "No holding line at all. Form is described entirely by paint.",
+      "tags": ["painted", "literary", "prestige", "realist"],
+      "detail": "Oil or acrylic rendered directly, with the ink outline abandoned — which removes the single most comic-like element and pushes the page toward illustration. Panels usually float on a plain field with no border.",
+      "grant": {
+        "prompt": [
+          "fully painted rendering with no ink holding line",
+          "form described by value and edge quality alone",
+          "oil or acrylic texture, visible brushwork",
+          "borderless panels floating on a plain field",
+          "naturalistic light with real falloff and bounce"
+        ],
+        "negative": ["ink outline", "flat colour fills", "panel borders"]
+      }
+    }
+  ]
+}

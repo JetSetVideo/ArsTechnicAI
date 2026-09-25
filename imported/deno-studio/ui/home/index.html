@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ars Technic AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/home.css">
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <header class="top" id="topbar">
+    <a id="brand-home" class="brand" href="/" aria-current="page" title="ArsTechnicAI — projects, assets, utilities">
+      <span class="brand-ars">Ars</span><span class="brand-technic">Technic</span><span class="brand-ai">AI</span>
+    </a>
+    <div class="top-center">
+      <a class="mode" href="/blueprint/">Workshop</a>
+      <label class="search">
+        <span class="sr-only">Search</span>
+        <input id="home-search" type="search" placeholder="Search projects, assets, workflows, references…" autocomplete="off">
+      </label>
+      <button type="button" class="cta-new" id="cta-new" title="Start a new project">New</button>
+    </div>
+    <div class="settings-ctl" id="settings-ctl">
+      <button type="button" id="btn-settings" class="action" aria-haspopup="true" aria-expanded="false" aria-controls="settings-menu" title="Settings">Settings</button>
+      <div id="settings-menu" class="settings-menu" hidden>
+        <div class="settings-section">
+          <p>Shortcuts</p>
+          <button type="button" id="btn-help" class="action" title="Keyboard shortcuts (?)">Keyboard shortcuts</button>
+        </div>
+        <div class="settings-section settings-mcp">
+          <p>MCP</p>
+          <div id="health" class="status" title="Engine connection">checking…</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="tools" aria-label="Collections and actions">
+      <nav class="shelf-tabs" role="tablist" aria-label="What to show">
+        <button type="button" class="shelf-tab is-active" role="tab" aria-selected="true" data-tab="projects">
+          <span class="shelf-tab-label">Projects</span>
+          <span class="shelf-tab-count" data-count="projects">0</span>
+        </button>
+        <button type="button" class="shelf-tab" role="tab" aria-selected="false" data-tab="assets">
+          <span class="shelf-tab-label">Assets</span>
+          <span class="shelf-tab-count" data-count="assets">0</span>
+        </button>
+        <button type="button" class="shelf-tab" role="tab" aria-selected="false" data-tab="workflows">
+          <span class="shelf-tab-label">Workflows</span>
+          <span class="shelf-tab-count" data-count="workflows">0</span>
+        </button>
+        <button type="button" class="shelf-tab" role="tab" aria-selected="false" data-tab="subjects">
+          <span class="shelf-tab-label">Characters &amp; places</span>
+          <span class="shelf-tab-count" data-count="subjects">0</span>
+        </button>
+        <button type="button" class="shelf-tab" role="tab" aria-selected="false" data-tab="refs">
+          <span class="shelf-tab-label">Media references</span>
+          <span class="shelf-tab-count" data-count="refs">0</span>
+        </button>
+      </nav>
+
+      <details class="tool-group cat-source" open>
+        <summary>Source</summary>
+        <button type="button" class="tool" data-util="open" title="Extract a reel into a project">Open video</button>
+      </details>
+      <details class="tool-group cat-stage">
+        <summary>Restore</summary>
+        <button type="button" class="tool" data-util="grade" title="Picture, play, and look knobs">Grade</button>
+        <button type="button" class="tool" data-util="stabilize" title="Stabilise the selected project">Stabilise</button>
+        <button type="button" class="tool" data-util="export" title="Encode the finished film">Export</button>
+      </details>
+      <details class="tool-group cat-mask">
+        <summary>Mask</summary>
+        <button type="button" class="tool" data-util="mask" title="Isolate a subject">Segment</button>
+      </details>
+      <details class="tool-group cat-ai">
+        <summary>Generate</summary>
+        <button type="button" class="tool" data-util="enhance" title="Generative enhance on the desk">Enhance</button>
+        <button type="button" class="tool" data-util="repair" title="Generative repair on the desk">Repair</button>
+        <button type="button" class="tool" data-util="analyse" title="Vision analysis">Analyse</button>
+        <button type="button" class="tool" data-util="gen-image" title="Place Generate Image on the canvas">Image</button>
+        <button type="button" class="tool" data-util="gen-video" title="Place Generate Video on the canvas">Video</button>
+        <button type="button" class="tool" data-util="gen-audio" title="Place Generate Audio on the canvas">Audio</button>
+        <button type="button" class="tool" data-util="gen-mesh" title="Place Generate 3D on the canvas">3D</button>
+        <button type="button" class="tool" data-util="ask" title="Place Ask a Model on the canvas">Ask</button>
+      </details>
+      <details class="tool-group cat-flow">
+        <summary>Compose</summary>
+        <button type="button" class="tool" data-util="blueprint" title="Open the graph">Workshop</button>
+        <button type="button" class="tool" data-util="stack" title="Z-stack depth">Z-stack</button>
+      </details>
+    </aside>
+
+    <main class="main">
+      <div class="main-chrome" id="main-chrome">
+        <div class="kind-row" id="kind-row">
+          <button type="button" class="star-chip" id="star-chip" aria-pressed="false">★ starred</button>
+          <div class="kind-chips" id="ref-kinds" role="tablist" aria-label="Media kind" hidden></div>
+          <div class="kind-row-end">
+            <div class="sort-ctl" id="sort-ctl">
+              <button type="button" class="sort-btn" id="sort-btn" aria-haspopup="listbox" aria-expanded="false">
+                <span id="sort-label">Recent</span>
+                <span class="sort-dir" aria-hidden="true">↓</span>
+              </button>
+              <ul class="sort-menu" id="sort-menu" role="listbox" hidden></ul>
+            </div>
+            <p class="result-count" id="result-count">0</p>
+          </div>
+        </div>
+        <div class="facet-stack" id="facet-stack" hidden>
+          <div class="facet-row" data-facet="decade">
+            <span class="facet-label">Decade</span>
+            <div class="facet-chips" id="facet-decade"></div>
+          </div>
+          <div class="facet-row" data-facet="space">
+            <span class="facet-label">Space</span>
+            <div class="facet-chips" id="facet-space"></div>
+          </div>
+          <div class="facet-row" data-facet="style">
+            <span class="facet-label">Style</span>
+            <div class="facet-chips" id="facet-style"></div>
+          </div>
+        </div>
+      </div>
+
+      <section id="projects-panel" class="panel" role="tabpanel">
+        <div class="project-grid" id="project-grid"></div>
+        <p class="empty" id="empty" hidden>
+          No projects yet. New opens a blank one, or Open video extracts a reel.
+        </p>
+      </section>
+
+      <section id="assets-panel" class="panel" role="tabpanel" hidden>
+        <div class="asset-grid" id="asset-grid"></div>
+        <p class="empty" id="assets-empty" hidden>
+          No frames to show. Open a project first.
+        </p>
+      </section>
+
+      <section id="workflows-panel" class="panel" role="tabpanel" hidden>
+        <div class="flow-grid" id="flow-grid"></div>
+        <p class="empty" id="workflows-empty" hidden>
+          No saved workflows. Build a graph in Workshop, then Save current.
+        </p>
+      </section>
+
+      <section id="subjects-panel" class="panel" role="tabpanel" hidden>
+        <div class="subject-bar">
+          <button type="button" class="cta-new" id="subject-new">New subject</button>
+          <p class="muted small">
+            A character, a place or an object the work is about — what it looks like, what must not
+            change about it, and the drawings, photographs or clips you have of it. Every save keeps
+            the previous one.
+          </p>
+        </div>
+        <div class="subject-grid" id="subject-grid"></div>
+        <p class="empty" id="subjects-empty" hidden>
+          No subjects yet. New subject opens a page you can write, draw and attach film to.
+        </p>
+      </section>
+
+      <section id="refs-panel" class="panel" role="tabpanel" hidden>
+        <div class="ref-grid" id="ref-grid"></div>
+        <p class="empty" id="refs-empty" hidden>
+          No references match.
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <div id="ref-overlay" class="expand-overlay" hidden>
+    <button type="button" class="overlay-scrim" data-close-ref aria-label="Close"></button>
+    <article class="overlay-card" id="ref-overlay-card" role="dialog" aria-modal="true" aria-labelledby="ref-ov-title">
+      <header class="overlay-head">
+        <span class="rcard-swatch" id="ref-ov-swatch"></span>
+        <div class="overlay-head-copy">
+          <p class="rcard-kind" id="ref-ov-kind"></p>
+          <h2 id="ref-ov-title"></h2>
+        </div>
+        <button type="button" class="icon-btn" data-close-ref title="Close">✕</button>
+      </header>
+      <div class="overlay-cover" id="ref-ov-cover"></div>
+      <div class="overlay-body" id="ref-ov-body"></div>
+      <footer class="overlay-foot">
+        <a class="chip" id="ref-ov-workshop" href="/blueprint/">Place in Workshop</a>
+      </footer>
+    </article>
+  </div>
+
+  <!-- The subject editor: write it, draw it, attach what you filmed. -->
+  <div id="subject-overlay" class="expand-overlay" hidden>
+    <form class="overlay-card subject-card-editor" id="subject-form" role="dialog" aria-modal="true" aria-labelledby="subject-title">
+      <header class="overlay-head">
+        <h2 id="subject-title">New subject</h2>
+        <button type="button" class="icon-btn" id="subject-close" title="Close">✕</button>
+      </header>
+
+      <div class="subject-editor-grid">
+        <div class="subject-written">
+          <div class="new-field">
+            <span>What is it</span>
+            <div class="kind-chips" id="subject-kinds">
+              <button type="button" class="chip is-on" data-subject-kind="character" aria-pressed="true">Character</button>
+              <button type="button" class="chip" data-subject-kind="place" aria-pressed="false">Place</button>
+              <button type="button" class="chip" data-subject-kind="prop" aria-pressed="false">Object</button>
+            </div>
+          </div>
+          <label class="new-field">
+            <span>Name</span>
+            <input id="subject-name" maxlength="80" placeholder="Grandmother Marie" autocomplete="off" required>
+          </label>
+          <label class="new-field">
+            <span>In one line</span>
+            <input id="subject-summary" maxlength="200" placeholder="the bride, 24, in a borrowed dress">
+          </label>
+          <label class="new-field">
+            <span>Traits — the facts that must not drift</span>
+            <input id="subject-trait" placeholder="left-handed  ⏎" autocomplete="off">
+          </label>
+          <div class="trait-list" id="subject-trait-list"></div>
+          <label class="new-field">
+            <span>Describe it in your own words</span>
+            <textarea id="subject-description" rows="7" placeholder="Who they are, where this is, what happened here. Written the way you would tell it."></textarea>
+          </label>
+        </div>
+
+        <div class="subject-drawn">
+          <div class="new-field">
+            <span>Draw it</span>
+            <div class="draw-tools">
+              <input type="color" id="subject-colour" value="#1b1b22" title="Pen colour">
+              <input type="range" id="subject-size" min="1" max="24" value="3" title="Pen size">
+              <button type="button" class="chip" id="subject-erase" aria-pressed="false">Erase</button>
+              <button type="button" class="chip" id="subject-undo">Undo</button>
+              <button type="button" class="chip" id="subject-clear">Clear</button>
+            </div>
+            <canvas id="subject-canvas" width="720" height="540" aria-label="Drawing surface"></canvas>
+          </div>
+          <label class="new-field">
+            <span>Or attach what you have</span>
+            <input type="file" id="subject-upload" multiple accept="image/*,video/*,audio/*,.pdf,.txt,.md">
+          </label>
+          <div class="subject-media" id="subject-media"></div>
+        </div>
+      </div>
+
+      <footer class="overlay-foot">
+        <button type="submit" class="cta-new">Save subject</button>
+      </footer>
+    </form>
+  </div>
+
+  <div id="new-overlay" class="expand-overlay" hidden>
+    <button type="button" class="overlay-scrim" data-close-new aria-label="Close"></button>
+    <form class="overlay-card new-card" id="new-form" role="dialog" aria-modal="true" aria-labelledby="new-title">
+      <header class="overlay-head">
+        <h2 id="new-title">New project</h2>
+        <button type="button" class="icon-btn" data-close-new title="Close">✕</button>
+      </header>
+      <label class="new-field">
+        <span>Name</span>
+        <input id="new-name" name="name" required maxlength="80" placeholder="Untitled" autocomplete="off">
+      </label>
+      <fieldset class="new-field">
+        <legend>Media type</legend>
+        <div class="kind-chips" id="new-media"></div>
+      </fieldset>
+      <label class="new-field" id="new-length-wrap">
+        <span id="new-length-label">Length</span>
+        <input id="new-length" name="length" inputmode="numeric" placeholder="minutes">
+      </label>
+      <div class="new-field">
+        <span>Import assets</span>
+        <label class="new-drop" id="new-drop">
+          <input id="new-files" type="file" multiple accept="image/*,video/*,audio/*,.pdf" hidden>
+          Drop files, or click to choose
+        </label>
+        <ul class="new-file-list" id="new-file-list"></ul>
+      </div>
+      <label class="new-field">
+        <span>Tags</span>
+        <input id="new-tags" name="tags" placeholder="noir, 1970s, interior">
+      </label>
+      <fieldset class="new-field">
+        <legend>Models</legend>
+        <div class="model-list" id="new-models"></div>
+      </fieldset>
+      <footer class="overlay-foot">
+        <button type="submit" class="cta-new" id="new-create">Create</button>
+      </footer>
+    </form>
+  </div>
+
+  <div id="onboard" class="onboard" hidden>
+    <div class="onboard-card">
+      <header>
+        <span>Ars Technic AI</span>
+        <button type="button" id="onboard-skip">Skip</button>
+      </header>
+      <div class="onboard-dots" aria-hidden="true">
+        <i data-step="1"></i><i data-step="2"></i><i data-step="3"></i>
+      </div>
+      <div id="onboard-body"></div>
+      <footer>
+        <span id="onboard-progress">Step 1 of 3</span>
+        <div>
+          <button type="button" id="onboard-back" hidden>Back</button>
+          <button type="button" class="cta-new onboard-next" id="onboard-next">Next</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <div id="shortcuts" hidden>
+    <div class="shortcuts-panel" role="dialog" aria-label="Keyboard shortcuts">
+      <header>
+        <strong>Home shortcuts</strong>
+        <button type="button" data-close-shortcuts>✕</button>
+      </header>
+      <div class="shortcuts-grid">
+        <div><kbd>/</kbd> Search</div>
+        <div><kbd>?</kbd> This list</div>
+        <div><kbd>1</kbd> Projects</div>
+        <div><kbd>2</kbd> Assets</div>
+        <div><kbd>3</kbd> Workflows</div>
+        <div><kbd>4</kbd> Media references</div>
+        <div><kbd>N</kbd> New project</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>Ars Technic AI</span>
+    <span class="sep">·</span>
+    <span>projects, assets, workflows, references — moodboards that make media</span>
+    <span class="sep">·</span>
+    <a href="/status">status</a>
+  </footer>
+
+  <script type="module" src="/home.js"></script>
+</body>
+</html>

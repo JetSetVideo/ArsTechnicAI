@@ -1,0 +1,14 @@
+{
+  "phase": "02-home-dashboard",
+  "captured_at": "2026-09-04T12:28:20+0200",
+  "github": "https://github.com/JetSetVideo/ArsTechnicAI",
+  "commits_compared": "bd07b76..120bd15 (10)",
+  "features": [
+    "picture-first projects",
+    "assets tab",
+    "utilities rail",
+    "search",
+    "sort"
+  ],
+  "bytes": 181352
+}

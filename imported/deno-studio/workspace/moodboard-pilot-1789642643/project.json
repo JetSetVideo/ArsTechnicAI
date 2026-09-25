@@ -1,0 +1,30 @@
+{
+  "project_id": "moodboard-pilot-1789642643",
+  "name": "Moodboard Pilot",
+  "source_name": "Moodboard Pilot",
+  "created_at": 1789642643.774,
+  "createdAt": "2026-09-17T10:57:23.774Z",
+  "media_type": "comic",
+  "length": "12 pages",
+  "tags": [
+    "noir",
+    "chamber"
+  ],
+  "models": [
+    "comfy:flux-dev"
+  ],
+  "favorite": false,
+  "frame_count": 0,
+  "origin": "studio",
+  "moodboard": [],
+  "assets": [],
+  "references": [],
+  "workflow_id": null,
+  "source_path": "",
+  "relations": {
+    "assets": [],
+    "references": [],
+    "workflows": [],
+    "projects": []
+  }
+}

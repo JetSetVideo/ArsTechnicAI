@@ -1,0 +1,188 @@
+{
+  "id": "grade-one-frame",
+  "name": "Grade one frame",
+  "note": "The shortest useful graph: pick a frame, set levels and sharpening, and compare the result against the source in the Viewer. Everything is local, so it costs nothing to iterate.",
+  "savedAt": 1789684961265,
+  "media_type": "reel",
+  "graph": {
+    "id": "grade-one-frame",
+    "projectId": null,
+    "nodes": {
+      "src": {
+        "id": "src",
+        "type": "source.sequence",
+        "name": "Video",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 138
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "frame": {
+        "id": "frame",
+        "type": "source.frame",
+        "name": "Frame Selection",
+        "position": {
+          "x": 304,
+          "y": 0
+        },
+        "size": {
+          "w": 212,
+          "h": 118
+        },
+        "values": {
+          "index": {
+            "kind": "Number",
+            "value": 0
+          }
+        },
+        "authoredBy": {
+          "index": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "levels": {
+        "id": "levels",
+        "type": "stage.levels",
+        "name": "Levels & Colour",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 198
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "sharp": {
+        "id": "sharp",
+        "type": "stage.sharpen",
+        "name": "Sharpen",
+        "position": {
+          "x": 904,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 178
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "view": {
+        "id": "view",
+        "type": "out.view",
+        "name": "Viewer",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 98
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      }
+    },
+    "edges": {
+      "e_524b186d7546": {
+        "id": "e_524b186d7546",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "frame",
+          "port": "sequence"
+        },
+        "order": 0
+      },
+      "e_1df2ee0af5b7": {
+        "id": "e_1df2ee0af5b7",
+        "from": {
+          "node": "frame",
+          "port": "image"
+        },
+        "to": {
+          "node": "levels",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_b1bb0518708d": {
+        "id": "e_b1bb0518708d",
+        "from": {
+          "node": "levels",
+          "port": "image"
+        },
+        "to": {
+          "node": "sharp",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_9be9ecc0a975": {
+        "id": "e_9be9ecc0a975",
+        "from": {
+          "node": "sharp",
+          "port": "image"
+        },
+        "to": {
+          "node": "view",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_1c3edf3cf593": {
+        "id": "e_1c3edf3cf593",
+        "from": {
+          "node": "frame",
+          "port": "image"
+        },
+        "to": {
+          "node": "view",
+          "port": "compare"
+        },
+        "order": 0
+      }
+    },
+    "stacks": {},
+    "revision": 10
+  }
+}

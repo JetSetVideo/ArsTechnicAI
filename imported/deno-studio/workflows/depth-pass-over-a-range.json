@@ -1,0 +1,223 @@
+{
+  "id": "depth-pass-over-a-range",
+  "name": "Look at a range in depth",
+  "note": "A Z Stack with a stride: run a light pass over every Nth frame and read the result as a carousel in Inspect → Depth. Raise the stride to rough out a long reel cheaply, then drop it back to 1.",
+  "savedAt": 1789684961276,
+  "media_type": "reel",
+  "graph": {
+    "id": "depth-pass-over-a-range",
+    "projectId": null,
+    "nodes": {
+      "src": {
+        "id": "src",
+        "type": "source.sequence",
+        "name": "Video",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 138
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "stack": {
+        "id": "stack",
+        "type": "flow.stack",
+        "name": "Z Stack",
+        "position": {
+          "x": 304,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 158
+        },
+        "values": {
+          "stride": {
+            "kind": "Number",
+            "value": 12
+          },
+          "wrap": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "stride": "user",
+          "wrap": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "stab": {
+        "id": "stab",
+        "type": "stage.stabilize",
+        "name": "Stabilisation",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 238
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "levels": {
+        "id": "levels",
+        "type": "stage.levels",
+        "name": "Levels & Colour",
+        "position": {
+          "x": 904,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 198
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "collect": {
+        "id": "collect",
+        "type": "flow.collect",
+        "name": "Collect",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "size": {
+          "w": 212,
+          "h": 98
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "view": {
+        "id": "view",
+        "type": "out.view",
+        "name": "Viewer",
+        "position": {
+          "x": 904,
+          "y": 240
+        },
+        "size": {
+          "w": 236,
+          "h": 98
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      }
+    },
+    "edges": {
+      "e_3977a6f67a63": {
+        "id": "e_3977a6f67a63",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "stack",
+          "port": "sequence"
+        },
+        "order": 0
+      },
+      "e_699fed4bb072": {
+        "id": "e_699fed4bb072",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "stab",
+          "port": "neighbours"
+        },
+        "order": 0
+      },
+      "e_a27095b709c5": {
+        "id": "e_a27095b709c5",
+        "from": {
+          "node": "stack",
+          "port": "image"
+        },
+        "to": {
+          "node": "stab",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_e19973ec976b": {
+        "id": "e_e19973ec976b",
+        "from": {
+          "node": "stab",
+          "port": "image"
+        },
+        "to": {
+          "node": "levels",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_2109dff8e9ac": {
+        "id": "e_2109dff8e9ac",
+        "from": {
+          "node": "levels",
+          "port": "image"
+        },
+        "to": {
+          "node": "collect",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_752f12a465dd": {
+        "id": "e_752f12a465dd",
+        "from": {
+          "node": "levels",
+          "port": "image"
+        },
+        "to": {
+          "node": "view",
+          "port": "image"
+        },
+        "order": 0
+      }
+    },
+    "stacks": {},
+    "revision": 12
+  }
+}

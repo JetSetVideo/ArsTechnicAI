@@ -1,0 +1,25 @@
+{
+  "captured_at": "2026-09-04T10:14:44Z",
+  "screenshots": [
+    {
+      "file": "00-baseline-desk.png",
+      "path": "/Users/macmax/Desktop/ArsTechnicAI/merge-screenshots/00-baseline-desk.png",
+      "url": "http://localhost:8080/",
+      "captured_at": "2026-09-04T10:14:44Z",
+      "width": 1440,
+      "height": 900,
+      "bytes": 352304,
+      "notes": "ok; Chrome headless --window-size=1440,900"
+    },
+    {
+      "file": "00-baseline-blueprint.png",
+      "path": "/Users/macmax/Desktop/ArsTechnicAI/merge-screenshots/00-baseline-blueprint.png",
+      "url": "http://localhost:8090/",
+      "captured_at": "2026-09-04T10:14:44Z",
+      "width": 1440,
+      "height": 900,
+      "bytes": 139260,
+      "notes": "ok; Chrome headless --window-size=1440,900"
+    }
+  ]
+}

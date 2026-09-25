@@ -1,0 +1,81 @@
+{
+  "clahe": {
+    "clip_limit": 2.0,
+    "enabled": true,
+    "tile_grid": 8
+  },
+  "defect": {
+    "dilate": 1,
+    "enabled": false,
+    "inpaint_radius": 3,
+    "max_area": 900,
+    "method": "telea",
+    "min_area": 2,
+    "sensitivity": 3.2,
+    "use_temporal": true
+  },
+  "deflicker": {
+    "enabled": true,
+    "mode": "histogram",
+    "strength": 0.85,
+    "window": 9
+  },
+  "denoise": {
+    "enabled": false,
+    "h_chroma": 6.0,
+    "h_luma": 4.0,
+    "search_window": 21,
+    "template_window": 7
+  },
+  "level": {
+    "angle": 0.0,
+    "auto": true,
+    "enabled": false,
+    "max_correction": 12.0,
+    "reference": 0.0,
+    "scale": 1.0,
+    "strength": 1.0
+  },
+  "levels": {
+    "black": 0,
+    "enabled": false,
+    "gamma": 1.0,
+    "saturation": 1.0,
+    "white": 255
+  },
+  "reframe": {
+    "enabled": false,
+    "fill": "mosaic",
+    "mosaic_radius": 6,
+    "offset_x": 0.0,
+    "offset_y": 0.0,
+    "zoom": 1.0
+  },
+  "sharpen": {
+    "amount": 0.6,
+    "enabled": false,
+    "radius": 1.6,
+    "threshold": 3
+  },
+  "stabilize": {
+    "anchor_frame": 0,
+    "border": "reflect",
+    "crop_ratio": 0.04,
+    "ecc_eps": 1e-05,
+    "ecc_iterations": 60,
+    "ecc_refine": false,
+    "enabled": true,
+    "match_ratio": 0.75,
+    "max_features": 900,
+    "mode": "smooth",
+    "motion_model": "similarity",
+    "ransac_reproj": 3.0,
+    "smoothing_radius": 12
+  },
+  "temporal_fusion": {
+    "detail_boost": 0.35,
+    "enabled": false,
+    "radius": 2,
+    "sigma_color": 18.0
+  }
+}

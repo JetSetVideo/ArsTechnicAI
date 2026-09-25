@@ -1,0 +1,254 @@
+{
+  "kind": "script",
+  "source": "Screenwriting form reference — scene shapes and the coverage each one implies",
+  "_note": "Each entry is a dramatic structure and the shot grammar it asks for, written as an original worked example. No copyrighted screenplay text is reproduced; where a technique is associated with a filmmaker it is named as attribution.",
+  "entries": [
+    {
+      "id": "cold_open",
+      "name": "Cold Open",
+      "summary": "Start inside the event. Establish nothing; explain later or never.",
+      "tags": ["structure", "opening", "tension"],
+      "detail": "INT. STAIRWELL — NIGHT\n\nA woman takes the stairs two at a time. She is not running from anything we can see.\n\nShe stops. Listens.\n\nBelow her, three floors down, a door closes.\n\nShe keeps climbing.\n\n— The rule: no establishing shot, no name, no context. The audience's first job is to work out what is happening, and that work is what buys their attention. Coverage starts tight and only widens once the question has been planted.",
+      "grant": {
+        "prompt": [
+          "open on action already in progress, no establishing wide",
+          "tight framing that withholds context",
+          "handheld or steadicam following, not leading",
+          "practical low-key light, source unclear"
+        ]
+      },
+      "where": "INT. STAIRWELL — NIGHT",
+      "when": "in medias res",
+      "why": "The audience's first job is to work out what is happening, and that work buys their attention.",
+      "how": "No establishing shot, no name, no context. Coverage starts tight and only widens once the question is planted.",
+      "characters": ["unnamed woman"],
+      "length": "one beat, under two minutes",
+      "related": ["script.suspense_setup", "script.arrival_sequence"]
+    },
+    {
+      "id": "two_hander",
+      "name": "The Two-Hander",
+      "summary": "Two people, one table, opposed objectives. All of it is in the cutting pattern.",
+      "tags": ["dialogue", "scene", "interior", "classic"],
+      "detail": "INT. DINER — LATE\n\nMARA sits. The other side of the booth is empty. She has ordered for two.\n\nDANIEL arrives eleven minutes late and does not apologise.\n\n                    DANIEL\n          You ordered.\n\n                    MARA\n          I ordered what you always get.\n          That's not the same as ordering\n          for you.\n\n— The grammar: begin on a sustained two-shot so the geography is clear, move to matched over-the-shoulders as the objectives diverge, and cut to clean singles only at the moment one of them wins. Going to singles too early spends the escalation before it is earned.",
+      "grant": {
+        "prompt": [
+          "sustained two-shot establishing geography before any coverage",
+          "matched over-the-shoulder singles on a normal to long lens",
+          "practical motivated light from a window or overhead fixture",
+          "static camera, cutting pattern carries the escalation"
+        ]
+      }
+    },
+    {
+      "id": "walk_and_talk",
+      "name": "Walk and Talk",
+      "summary": "Exposition delivered at speed while the world scrolls past behind it.",
+      "tags": ["dialogue", "steadicam", "exposition", "television"],
+      "detail": "INT. MINISTRY CORRIDOR — CONTINUOUS\n\nThey move. Everyone else moves around them.\n\n                    ADEYEMI\n          The committee sat at nine.\n\n                    HOLLOWAY\n          The committee sat at nine\n          yesterday. Today it sat at seven,\n          which is why you weren't in it.\n\nA junior intercepts, hands over a folder, peels away without breaking anyone's stride.\n\n— The device makes dense exposition watchable by giving the eye something to do. Needs a genuinely long unbroken take, a background populated with purposeful activity, and hand-offs that let new characters enter and leave without a cut.",
+      "grant": {
+        "prompt": [
+          "long unbroken steadicam take tracking backwards ahead of the subjects",
+          "deep populated background with purposeful crossing activity",
+          "even practical institutional lighting, fluorescent",
+          "characters entering and exiting frame without a cut"
+        ]
+      }
+    },
+    {
+      "id": "suspense_setup",
+      "name": "The Suspense Setup",
+      "summary": "Show the audience the bomb. Then refuse to mention it.",
+      "tags": ["suspense", "hitchcock", "structure", "tension"],
+      "detail": "INT. LECTURE HALL — DAY\n\nWe see, under the third row of seats, a canvas bag. Nobody in the room does.\n\nThe lecture begins. It is about eighteenth-century drainage.\n\nA student in the fourth row drops a pen. It rolls forward. Under the third row.\n\nShe reaches for it.\n\n— The distinction is surprise versus suspense: a bomb that explodes without warning buys ten seconds, a bomb the audience knows about buys the whole scene. Coverage must include the object regularly enough that the audience cannot forget it, and never so pointedly that the characters seem stupid.",
+      "grant": {
+        "prompt": [
+          "recurring insert of the threat object, low and unmotivated by any character POV",
+          "otherwise ordinary neutral coverage of a mundane scene",
+          "slow push in as the scene proceeds",
+          "even naturalistic daylight, nothing ominous in the lighting"
+        ]
+      }
+    },
+    {
+      "id": "montage_sequence",
+      "name": "Montage Sequence",
+      "summary": "Compress time by rhyming images. The cut does the arguing.",
+      "tags": ["montage", "structure", "time", "eisenstein"],
+      "detail": "MONTAGE — THE SEASON\n\n—  Hands taping a wrist. Fresh tape.\n—  The same hands. The tape is grey.\n—  A locker door. Three photographs.\n—  The same door. One photograph.\n—  Hands taping a wrist. The wrist is thinner.\n\nEND MONTAGE\n\n— The unit of meaning is the pair, not the shot: A next to B says something neither says alone. Matched framing across the cuts is what makes the comparison legible, so shoot the rhyming pairs on the same lens from the same position.",
+      "grant": {
+        "prompt": [
+          "matched framing and identical lens across rhyming shots",
+          "same camera position between paired images",
+          "consistent lighting so the change reads as time, not setup",
+          "tight insert scale, detail rather than context"
+        ]
+      }
+    },
+    {
+      "id": "reveal_turn",
+      "name": "The Reveal",
+      "summary": "Reframe everything already seen without contradicting any of it.",
+      "tags": ["structure", "twist", "third-act"],
+      "detail": "INT. RECORDS OFFICE — NIGHT\n\nHe finds the file. Reads it standing up.\n\nThe signature at the bottom of the intake form is his own.\n\nHe does not react. He reads it again.\n\n— The requirement is that the reveal be re-readable: every earlier scene must still make sense, and ideally make *more* sense. The shot is usually held long and static, because the audience needs time to do the arithmetic and a cut would take it away from them.",
+      "grant": {
+        "prompt": [
+          "long static hold on the moment of realisation, no cut",
+          "insert of the revealing detail, held longer than comfortable",
+          "no music-cue framing, no push in",
+          "flat unhelpful light — the image withholds any interpretation"
+        ]
+      }
+    },
+    {
+      "id": "chase_geography",
+      "name": "Chase Geography",
+      "summary": "Speed is felt only if the space is understood. Establish, then accelerate.",
+      "tags": ["action", "kinetic", "structure"],
+      "detail": "EXT. MARKET — DAY\n\nWide: the market runs east to west. A gate at each end.\n\nRHYS enters from the east gate. Two men enter behind him.\n\nHe goes west. He has three hundred metres and no plan.\n\n— The rule everyone breaks: a chase cut fast without an establishing geography is noise. Open wide, name the two endpoints, and only then cut to speed — every subsequent shot is legible because the audience knows which way is west.",
+      "grant": {
+        "prompt": [
+          "opening extreme wide establishing both endpoints of the route",
+          "consistent screen direction maintained through every cut",
+          "camera at subject height, moving with rather than watching",
+          "hard directional sunlight, strong shadow for depth cues"
+        ]
+      }
+    },
+    {
+      "id": "kitchen_sink",
+      "name": "Kitchen-Sink Realism",
+      "summary": "Ordinary people in real rooms, and the drama is economic.",
+      "tags": ["realism", "british", "social", "naturalistic"],
+      "detail": "INT. FLAT, KITCHEN — MORNING\n\nThe boiler is making the noise again. NADIA hits it. It stops.\n\n                    NADIA\n          Don't tell your dad.\n\n                    SAM\n          He'd have to be here.\n\nShe puts two slices in the toaster. Presses it down. It comes back up.\n\n— The register: no scene begins with a line that announces its subject. Conflict arrives through objects and money. Shoot in the real room at its real size, on available light, with the camera in the position an actual person would stand.",
+      "grant": {
+        "prompt": [
+          "real location at true scale, cramped framing forced by the room",
+          "available window light only, mixed with practicals",
+          "camera placed where a person would stand, eye level",
+          "desaturated northern palette, no colour styling"
+        ]
+      }
+    },
+    {
+      "id": "bottle_episode",
+      "name": "The Bottle Episode",
+      "summary": "One location, no exits, and the constraint generates the drama.",
+      "tags": ["chamber", "constraint", "interior", "television"],
+      "detail": "INT. SERVER ROOM — NIGHT\n\nThe door has locked. It locked forty minutes ago. They have discussed this.\n\n                    OKONKWO\n          Say it again.\n\n                    PRIYA\n          I'm not saying it again.\n\n                    OKONKWO\n          Say it again, because the first\n          time you said it there were four\n          of us in here.\n\n— Written for constraint and then discovered to be the best tool available: with nowhere to cut away to, every escalation has to come from character. Coverage must find new geometry in one room, so blocking changes rather than locations.",
+      "grant": {
+        "prompt": [
+          "single interior location, exits visible and closed",
+          "blocking that finds new angles within one room",
+          "hard practical sources — server LEDs, emergency lighting",
+          "progressively tighter framing as the scene escalates"
+        ]
+      }
+    },
+    {
+      "id": "opening_image_rhyme",
+      "name": "Opening / Closing Rhyme",
+      "summary": "End on the first image, changed. The difference is the film.",
+      "tags": ["structure", "bookend", "formal"],
+      "detail": "OPENING — EXT. JETTY — DAWN\nA man stands at the end of a jetty, facing the water. He does not go in.\n\nCLOSING — EXT. JETTY — DAWN\nA man stands at the end of a jetty, facing the water. Behind him, a second set of footprints in the frost.\n\n— The pair must be shot identically — same lens, same position, same time of day — so the single altered element carries all the meaning. Shooting them on different days at different focal lengths is the most common way this device quietly fails.",
+      "grant": {
+        "prompt": [
+          "identical framing, lens and camera position to the paired shot",
+          "same time of day and light direction",
+          "one deliberate compositional element changed",
+          "static locked-off camera, long hold"
+        ]
+      }
+    },
+    {
+      "id": "unreliable_pov",
+      "name": "Unreliable POV",
+      "summary": "Shoot subjective truth as though it were objective. Correct it later.",
+      "tags": ["structure", "pov", "subjective"],
+      "detail": "INT. RESTAURANT — NIGHT (AS REMEMBERED)\n\nThe table is by the window. The light is warm. She is laughing.\n\nINT. RESTAURANT — NIGHT (AS IT WAS)\n\nThe table is by the kitchen door. The light is green. She is not laughing.\n\n— The rule is that the first version must be shot with complete conviction — no soft focus, no hint that it is a memory — because the moment the camera signals unreliability the device is spent. The two passes differ in light and blocking, never in grammar.",
+      "grant": {
+        "prompt": [
+          "identical shot grammar in both passes, no dream signalling",
+          "difference carried entirely by light colour and blocking",
+          "no soft focus, vignette or memory convention",
+          "same lens and coverage pattern in both versions"
+        ]
+      }
+    },
+    {
+      "id": "procedural_beat",
+      "name": "The Procedural Beat",
+      "summary": "Competence shown, not stated. Watch the work happen at its real speed.",
+      "tags": ["procedural", "documentary", "process"],
+      "detail": "INT. WORKSHOP — DAY\n\nShe measures. Marks. Measures again. Cuts.\n\nThe cut is wrong by two millimetres. She does not swear. She takes a second piece of stock and starts again.\n\nNo dialogue. Four minutes.\n\n— Process scenes work at real duration or not at all: compressing them into a montage converts expertise into a plot point. Inserts must be genuinely informative — a hand doing the actual thing, framed so the technique is readable.",
+      "grant": {
+        "prompt": [
+          "informative macro inserts, technique readable in frame",
+          "real duration, minimal cutting",
+          "practical work lighting, task-lit hands",
+          "no music, no reaction cutaways"
+        ]
+      }
+    },
+    {
+      "id": "ensemble_intro",
+      "name": "Ensemble Introduction",
+      "summary": "Six people in four minutes, each defined by one action.",
+      "tags": ["ensemble", "structure", "opening"],
+      "detail": "INT. CREW ROOM — MORNING\n\nBARRETT is already there. He is always already there.\n\nSHIRIN arrives with three coffees and hands out two.\n\nDAVIES arrives with nothing and takes one of the two.\n\nMOSS arrives, sees this, says nothing, and writes it down.\n\n— Each introduction is a single behaviour that will still be true in the last act. The coverage must let each action land cleanly, which usually means a wide that holds the room and singles only for the beat that defines each person.",
+      "grant": {
+        "prompt": [
+          "sustained wide holding the whole ensemble and the room",
+          "one clean single per character, only on their defining action",
+          "even practical overhead lighting, no favouritism",
+          "staging that establishes relative status by position"
+        ]
+      }
+    },
+    {
+      "id": "silent_climax",
+      "name": "The Silent Climax",
+      "summary": "Strip the sound at the loudest moment. The audience leans in.",
+      "tags": ["climax", "sound", "structure"],
+      "detail": "EXT. STADIUM — NIGHT\n\nEighty thousand people are making a noise that can be felt in the chest.\n\nHe steps up.\n\nSILENCE.\n\nNot slow motion. Just the sound gone. His breathing. The ball. Nothing else.\n\n— Works because it is a subjective device masquerading as a technical one: removing the crowd puts the audience inside the character's attention. Do not pair it with slow motion — using two devices at once means neither is trusted.",
+      "grant": {
+        "prompt": [
+          "real-time motion, no slow motion",
+          "tight subjective framing, shallow focus isolating the subject",
+          "background crowd defocused into abstract light",
+          "hard stadium top light, strong rim separation"
+        ]
+      }
+    },
+    {
+      "id": "arrival_sequence",
+      "name": "The Arrival",
+      "summary": "A stranger enters a closed world. Shoot the world's reaction, not the stranger.",
+      "tags": ["structure", "western", "opening", "outsider"],
+      "detail": "EXT. VILLAGE ROAD — MIDDAY\n\nA figure on the road, a long way off.\n\nA child sees. The child does not run to tell anyone; the child goes inside.\n\nA shutter closes. Then another.\n\nBy the time the figure reaches the well, the street is empty and every window is occupied.\n\n— The mistake is covering the arrival from the stranger's side. The scene belongs to the place: shoot the doors closing, the watching, the emptiness, and let the stranger stay at a distance until the community has finished describing itself.",
+      "grant": {
+        "prompt": [
+          "extreme wide with the approaching figure small and distant",
+          "coverage weighted to the reacting community, not the arrival",
+          "hard midday sun, deep-set shadow in doorways and windows",
+          "static camera, long lens compression down the road"
+        ]
+      }
+    },
+    {
+      "id": "interrogation",
+      "name": "The Interrogation",
+      "summary": "One room, two chairs, and a table that decides who has power.",
+      "tags": ["interior", "dialogue", "tension", "procedural"],
+      "detail": "INT. INTERVIEW ROOM 2 — TIME UNCLEAR\n\nCONWAY sits. VOSS sits opposite. Between them, a folder Voss has not opened.\n\n                    VOSS\n          I'm going to open this.\n\n                    CONWAY\n          Then open it.\n\n                    VOSS\n          I'm going to open it in a minute.\n\nHe does not open it.\n\n— Power is expressed geometrically. Whoever is shot from the lower angle is losing. The classical progression tightens the singles by a shot size each time the pressure rises, so the last exchange is in a scale the scene has not used before.",
+      "grant": {
+        "prompt": [
+          "matched singles with deliberately mismatched camera height",
+          "framing tightens by one shot size at each escalation",
+          "hard overhead fluorescent, unflattering top light",
+          "featureless walls, no depth cues, no window"
+        ]
+      }
+    }
+  ]
+}

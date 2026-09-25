@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Workshop · ArsTechnicAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="tokens.css">
+    <link rel="stylesheet" href="canvas.css">
+  </head>
+  <body class="mode-graph mode-grade">
+    <header id="topbar">
+      <a
+        id="brand-home"
+        class="brand"
+        href="/"
+        title="ArsTechnicAI — projects, assets, utilities"
+      >
+        <span class="brand-ars">Ars</span><span class="brand-technic">Technic</span><span class="brand-ai">AI</span>
+      </a>
+
+      <div class="panel-toggles" role="toolbar" aria-label="Panels around the canvas">
+        <button type="button" class="action t-primary is-on" data-toggle-panel="palette" data-dock="left" aria-pressed="true" title="Library (⌘1)">Library</button>
+        <button type="button" class="action t-primary is-on" data-toggle-panel="graph" data-dock="top" aria-pressed="true" title="Canvas (⌘4)">Canvas</button>
+        <button type="button" class="action t-primary is-on" data-toggle-panel="grade" data-dock="bottom" aria-pressed="true" title="Grade — selected step, play, loop (⌘5)">Grade</button>
+        <button type="button" class="action t-primary is-on" data-toggle-panel="inspector" data-dock="right" aria-pressed="true" title="Inspector — wiring, Restorer tools, depth (⌘2)">Inspect</button>
+      </div>
+
+      <div class="project-ctl" id="project-ctl">
+        <button
+          type="button"
+          class="project-caret"
+          id="project-caret"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-controls="project-menu"
+          title="Switch project"
+        >
+          <span class="project-caret-mark" aria-hidden="true">
+            <svg viewBox="0 0 10 10" width="11" height="11" fill="none" overflow="visible">
+              <path d="M3.1 1.5 L7.7 5 L3.1 8.5" stroke="currentColor" stroke-width="1.45" stroke-linecap="butt" stroke-linejoin="miter" fill="none"/>
+            </svg>
+          </span>
+        </button>
+        <div class="project-name-shell">
+          <span id="project-folder" class="project-folder t-secondary" hidden></span>
+          <input
+            id="project-name"
+            class="project-name t-secondary"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="— none —"
+            title="Click to rename this project"
+          >
+        </div>
+        <ul id="project-menu" class="project-menu" hidden role="listbox" aria-label="Projects"></ul>
+        <select id="project-picker" hidden aria-hidden="true"><option value="">— none —</option></select>
+      </div>
+
+      <button
+        id="btn-run"
+        class="action t-primary is-primary"
+        title="Run the selection and everything upstream it needs (R). Nothing selected runs the whole canvas."
+      >
+        <span class="run-mark" aria-hidden="true"></span>
+        <span class="run-label">Run</span>
+        <span class="run-cost" id="run-cost" hidden></span>
+      </button>
+      <button id="btn-fit" class="action t-primary" title="Frame everything (F)">Fit</button>
+
+      <div class="settings-ctl" id="settings-ctl">
+        <button type="button" id="btn-settings" class="action t-primary" aria-haspopup="true" aria-expanded="false" aria-controls="settings-menu" title="Settings">Settings</button>
+        <div id="settings-menu" class="settings-menu" hidden>
+          <div class="settings-section">
+            <p>File</p>
+            <button type="button" id="btn-open" class="action t-primary" title="Open a reel (O)">Open reel</button>
+            <button type="button" id="btn-export" class="action t-primary" title="Export the finished film (E)">Export film</button>
+          </div>
+          <div class="settings-section">
+            <p>Options</p>
+            <label class="var-row">
+              <span>Auto-save when switching projects</span>
+              <input id="set-autosave-switch" type="checkbox" title="On: save silently and refresh the canvas. Off: if anything changed, ask first.">
+            </label>
+            <label class="var-row">
+              <span>Show estimated Run cost</span>
+              <input id="set-show-run-cost" type="checkbox" title="On: the Run button shows how much the current selection would cost.">
+            </label>
+          </div>
+          <div class="settings-section">
+            <p>Shortcuts</p>
+            <button type="button" id="btn-help" class="action t-primary" title="Keyboard shortcuts (?)">Keyboard shortcuts</button>
+          </div>
+          <div class="settings-section settings-mcp">
+            <p>MCP</p>
+            <div id="engine-status" class="status t-secondary" title="Engine connection">checking…</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="shell">
+      <aside id="palette" aria-label="Library">
+        <div class="lib-tabs" role="tablist" aria-label="What the library shows">
+          <button type="button" class="lib-tab t-primary is-on" data-lib="nodes" role="tab" aria-selected="true" title="Node types you can place">Nodes</button>
+          <button type="button" class="lib-tab t-primary" data-lib="files" role="tab" aria-selected="false" title="Folders and footage on this computer">Files</button>
+          <button type="button" class="lib-tab t-primary" data-lib="refs" role="tab" aria-selected="false" title="Films, archetypes, comic idioms and scene forms you can drop on the canvas">Refs</button>
+          <button type="button" class="lib-tab t-primary" data-lib="flows" role="tab" aria-selected="false" title="Saved workflows">Flows</button>
+        </div>
+
+        <div class="lib-pane" data-lib-pane="nodes">
+          <input id="palette-search" class="t-secondary" type="text" placeholder="search nodes…">
+          <div id="palette-list"></div>
+        </div>
+
+        <div class="lib-pane" data-lib-pane="files" hidden>
+          <div class="lib-bar">
+            <button type="button" id="files-up" class="action t-primary" title="Up one folder">↑</button>
+            <input id="files-filter" class="t-secondary" type="text" placeholder="filter this folder…">
+          </div>
+          <div id="files-path" class="lib-path t-secondary"></div>
+          <div id="files-list"></div>
+        </div>
+
+        <div class="lib-pane" data-lib-pane="refs" hidden>
+          <div class="lib-bar">
+            <input id="refs-search" class="t-secondary" type="text" placeholder="search the library…">
+            <button type="button" id="refs-reload" class="action t-primary" title="Re-read library/ from disk">⟳</button>
+          </div>
+          <div class="ref-kinds" role="tablist" aria-label="Which shelf">
+            <button type="button" class="ref-kind t-primary is-on" data-kind="movie" role="tab" aria-selected="true">Movies</button>
+            <button type="button" class="ref-kind t-primary" data-kind="star" role="tab" aria-selected="false">Stars</button>
+            <button type="button" class="ref-kind t-primary" data-kind="comic" role="tab" aria-selected="false">Comics</button>
+            <button type="button" class="ref-kind t-primary" data-kind="script" role="tab" aria-selected="false">Scripts</button>
+          </div>
+          <div id="refs-list" class="ref-grid"></div>
+          <p id="refs-note" class="lib-empty t-secondary"></p>
+        </div>
+
+        <div class="lib-pane" data-lib-pane="flows" hidden>
+          <div class="lib-bar">
+            <button type="button" id="flow-save" class="action t-primary" title="Save the current graph as a reusable workflow">Save current</button>
+            <button type="button" id="flow-refresh" class="action t-primary" title="Re-read the workflows folder">⟳</button>
+          </div>
+          <div id="flows-list"></div>
+        </div>
+      </aside>
+      <div class="resize-handle" data-resize="palette" title="Drag to resize"></div>
+
+      <div id="center">
+        <section id="stage" aria-label="Blueprint canvas">
+          <canvas id="wires"></canvas>
+          <div id="world">
+            <div id="cards"></div>
+            <div id="stacks"></div>
+          </div>
+          <div id="marquee" hidden></div>
+          <div id="wire-hint" class="t-primary" hidden></div>
+          <div id="empty-hint" class="t-primary" hidden>
+            Drop a node from the library, or right-click the canvas. Grade below follows the selected step.
+          </div>
+        </section>
+        <div class="resize-handle-h" data-resize="grade" title="Drag to resize Graph / Grade"></div>
+        <iframe id="grade-frame" title="Grade — selected step, play, and loop"></iframe>
+      </div>
+
+      <div class="resize-handle" data-resize="inspector" title="Drag to resize"></div>
+      <aside id="inspector" aria-label="Inspector">
+        <div id="inspect-body" hidden></div>
+
+        <div class="panel-head t-primary">Restorer</div>
+        <iframe id="desk-tools" title="Sections, damage, colour, isolation, AI"></iframe>
+
+        <div class="panel-head t-primary carousel-head">
+          <span>Depth</span>
+          <span id="carousel-label" class="t-secondary"></span>
+          <span class="spacer"></span>
+          <label class="depth-wrap" title="Z-stack wraps — the temporal loop">
+            <span>Wrap</span>
+            <input id="var-loop" type="checkbox" checked>
+          </label>
+          <button type="button" id="roll-back" class="action t-primary" title="Roll back one slice">◂</button>
+          <button type="button" id="roll-fwd" class="action t-primary" title="Roll forward one slice">▸</button>
+        </div>
+        <div id="carousel">
+          <div id="carousel-strip"></div>
+        </div>
+
+        <div class="panel-head t-primary">Workflow</div>
+        <div id="workflow-vars" class="workflow-vars t-secondary">
+          <label class="var-row">
+            <span>Auto-preview</span>
+            <input id="var-auto" type="checkbox" title="Re-run local steps when the graph changes">
+          </label>
+          <label class="var-row">
+            <span>Auto-save on project switch</span>
+            <input id="var-autosave-switch" type="checkbox" title="When on, switching project saves the graph silently. When off, a prompt asks first if anything changed.">
+          </label>
+          <div class="var-row">
+            <span>Variables</span>
+            <button type="button" id="var-harvest" class="action t-primary" title="Copy current node values into named variables">From graph</button>
+            <button type="button" id="var-apply" class="action t-primary" title="Write these variables back onto matching node ports">Apply</button>
+          </div>
+          <div id="var-list"></div>
+          <button type="button" id="var-add" class="action t-primary" title="Add a named workflow variable">Add variable</button>
+          <p class="var-hint">Harvest copies node values into named rows. Apply writes them back onto matching Name.port fields. AI-authored values stay violet until you Accept AI in the inspector.</p>
+        </div>
+
+        <div class="panel-head t-primary">Compilation</div>
+        <div id="compile-summary" class="t-secondary"></div>
+        <div id="diagnostics"></div>
+      </aside>
+    </main>
+
+    <div id="node-wheel" hidden>
+      <svg viewBox="0 0 360 360" aria-label="Create a node">
+        <g id="wheel-slices"></g>
+      </svg>
+      <button type="button" class="wheel-hub t-primary" data-close-wheel title="Close">Close</button>
+    </div>
+
+    <div id="card-menu" class="t-primary" hidden role="dialog" aria-label="Node options"></div>
+
+    <div id="toast" class="t-primary" hidden></div>
+
+    <div id="shortcuts" hidden>
+      <div class="shortcuts-panel t-primary" role="dialog" aria-label="Keyboard shortcuts">
+        <header>
+          <strong>Workshop shortcuts</strong>
+          <button type="button" class="action t-primary" data-close-shortcuts>✕</button>
+        </header>
+        <div class="shortcuts-grid">
+          <div>
+            <p>Canvas</p>
+            <div><kbd>R</kbd> Run the selected workflow</div>
+            <div><kbd>L</kbd> Loop the selection (Z Stack)</div>
+            <div><kbd>⇧R</kbd> Run stage by stage</div>
+            <div><kbd>Left-drag</kbd> Rectangle select</div>
+            <div><kbd>Two-finger</kbd> Pan the canvas</div>
+            <div><kbd>Pinch</kbd> Zoom</div>
+            <div><kbd>F</kbd> Fit</div>
+            <div><kbd>G</kbd> Cycle Graph / Grade / both</div>
+            <div><kbd>Click library</kbd> Grade that step (or place it)</div>
+            <div><kbd>O</kbd> Open reel</div>
+            <div><kbd>E</kbd> Export</div>
+            <div><kbd>N</kbd> Search nodes</div>
+            <div><kbd>Right-click</kbd> Node wheel</div>
+            <div><kbd>⋯</kbd> Card options — versions, lineage, run</div>
+            <div><kbd>M</kbd> Mute selected</div>
+            <div><kbd>C</kbd> Collapse selected</div>
+            <div><kbd>Double-click</kbd> Collapse card</div>
+            <div><kbd>⌫</kbd> Delete selected</div>
+            <div><kbd>⌘Z</kbd> Undo</div>
+          </div>
+          <div>
+            <p>Panels</p>
+            <div><kbd>⌘1</kbd> Library</div>
+            <div><kbd>⌘2</kbd> Inspect (depth + workflow)</div>
+            <div><kbd>⌘3</kbd> Inspect (same as ⌘2)</div>
+            <div><kbd>⌘4</kbd> Canvas</div>
+            <div><kbd>⌘5</kbd> Grade pane</div>
+            <div><kbd>?</kbd> Settings → shortcuts</div>
+            <div><kbd>Esc</kbd> Deselect</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="project-switch" hidden>
+      <div class="confirm-panel t-primary" role="dialog" aria-labelledby="project-switch-title">
+        <p id="project-switch-title">Save changes to this project before switching?</p>
+        <div class="confirm-actions">
+          <button type="button" class="action t-primary is-primary" data-switch="save">Save</button>
+          <button type="button" class="action t-primary" data-switch="discard">Don't save</button>
+          <button type="button" class="action t-primary" data-switch="cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="panels.js"></script>
+    <script type="module" src="wiv.js"></script>
+  </body>
+</html>

@@ -1,0 +1,431 @@
+{
+ "id": "stabilise-deflicker-clahe-1788859368584",
+ "name": "Stabilise, deflicker, CLAHE",
+ "note": "",
+ "savedAt": 1788859368586,
+ "media_type": "reel",
+ "graph": {
+  "id": "g1",
+  "projectId": null,
+  "nodes": {
+   "n1": {
+    "id": "n1",
+    "type": "source.sequence",
+    "name": "Footage",
+    "position": {
+     "x": 600,
+     "y": -272
+    },
+    "size": {
+     "w": 236,
+     "h": 97
+    },
+    "values": {
+     "project_id": {
+      "kind": "Text",
+      "value": "grandparentsmariage-1788191920"
+     }
+    },
+    "authoredBy": {
+     "project_id": "system"
+    },
+    "state": "idle",
+    "revision": 94,
+    "collapsed": false
+   },
+   "n3": {
+    "id": "n3",
+    "type": "stage.stabilize",
+    "name": "Stabilisation",
+    "position": {
+     "x": 512,
+     "y": 64
+    },
+    "size": {
+     "w": 248,
+     "h": 137
+    },
+    "values": {
+     "enabled": {
+      "kind": "Flag",
+      "value": true
+     },
+     "mode": {
+      "kind": "Enum",
+      "value": "smooth"
+     },
+     "motion_model": {
+      "kind": "Enum",
+      "value": "similarity"
+     },
+     "max_features": {
+      "kind": "Number",
+      "value": 900
+     },
+     "match_ratio": {
+      "kind": "Number",
+      "value": 0.75
+     },
+     "ransac_reproj": {
+      "kind": "Number",
+      "value": 3
+     },
+     "smoothing_radius": {
+      "kind": "Number",
+      "value": 28
+     },
+     "anchor_frame": {
+      "kind": "Number",
+      "value": 0
+     },
+     "ecc_refine": {
+      "kind": "Flag",
+      "value": false
+     },
+     "ecc_iterations": {
+      "kind": "Number",
+      "value": 60
+     },
+     "crop_ratio": {
+      "kind": "Number",
+      "value": 0.05
+     },
+     "border": {
+      "kind": "Enum",
+      "value": "reflect"
+     }
+    },
+    "authoredBy": {
+     "enabled": "user",
+     "mode": "user",
+     "motion_model": "user",
+     "max_features": "user",
+     "match_ratio": "user",
+     "ransac_reproj": "user",
+     "smoothing_radius": "user",
+     "anchor_frame": "user",
+     "ecc_refine": "user",
+     "ecc_iterations": "user",
+     "crop_ratio": "user",
+     "border": "user"
+    },
+    "state": "idle",
+    "revision": 157,
+    "collapsed": false,
+    "stack": {
+     "id": "s_n7",
+     "slice": 0
+    }
+   },
+   "n4": {
+    "id": "n4",
+    "type": "stage.deflicker",
+    "name": "Luminance Deflicker",
+    "position": {
+     "x": 840,
+     "y": 72
+    },
+    "size": {
+     "w": 248,
+     "h": 117
+    },
+    "values": {
+     "enabled": {
+      "kind": "Flag",
+      "value": true
+     },
+     "mode": {
+      "kind": "Enum",
+      "value": "histogram"
+     },
+     "window": {
+      "kind": "Number",
+      "value": 19
+     },
+     "strength": {
+      "kind": "Number",
+      "value": 0.95
+     }
+    },
+    "authoredBy": {
+     "enabled": "user",
+     "mode": "user",
+     "window": "user",
+     "strength": "user"
+    },
+    "state": "idle",
+    "revision": 64,
+    "collapsed": false,
+    "stack": {
+     "id": "s_n7",
+     "slice": 0
+    }
+   },
+   "n5": {
+    "id": "n5",
+    "type": "stage.clahe",
+    "name": "CLAHE / Contrast Balance",
+    "position": {
+     "x": 1152,
+     "y": 128
+    },
+    "size": {
+     "w": 248,
+     "h": 97
+    },
+    "values": {
+     "enabled": {
+      "kind": "Flag",
+      "value": true
+     },
+     "clip_limit": {
+      "kind": "Number",
+      "value": 2
+     },
+     "tile_grid": {
+      "kind": "Number",
+      "value": 8
+     }
+    },
+    "authoredBy": {
+     "enabled": "user",
+     "clip_limit": "user",
+     "tile_grid": "user"
+    },
+    "state": "fresh",
+    "revision": 21,
+    "collapsed": false,
+    "stack": {
+     "id": "s_n7",
+     "slice": 0
+    }
+   },
+   "n6": {
+    "id": "n6",
+    "type": "out.view",
+    "name": "Viewer",
+    "position": {
+     "x": 1464,
+     "y": 120
+    },
+    "size": {
+     "w": 236,
+     "h": 77
+    },
+    "values": {},
+    "authoredBy": {},
+    "state": "idle",
+    "revision": 49,
+    "collapsed": false,
+    "stack": {
+     "id": "s_n7",
+     "slice": 0
+    }
+   },
+   "n2": {
+    "id": "n2",
+    "type": "source.frame",
+    "name": "Frame Pick",
+    "position": {
+     "x": 864,
+     "y": -264
+    },
+    "size": {
+     "w": 212,
+     "h": 102
+    },
+    "values": {},
+    "authoredBy": {},
+    "state": "idle",
+    "revision": 0,
+    "collapsed": false
+   },
+   "n7": {
+    "id": "n7",
+    "type": "flow.stack",
+    "name": "Z Stack",
+    "position": {
+     "x": 216,
+     "y": 88
+    },
+    "size": {
+     "w": 248,
+     "h": 142
+    },
+    "values": {},
+    "authoredBy": {},
+    "state": "idle",
+    "revision": 0,
+    "collapsed": false,
+    "stack": {
+     "id": "s_n7",
+     "slice": 0
+    }
+   },
+   "n8": {
+    "id": "n8",
+    "type": "flow.collect",
+    "name": "Collect",
+    "position": {
+     "x": 1480,
+     "y": 24
+    },
+    "size": {
+     "w": 212,
+     "h": 82
+    },
+    "values": {},
+    "authoredBy": {},
+    "state": "idle",
+    "revision": 0,
+    "collapsed": false,
+    "stack": {
+     "id": "s_n7",
+     "slice": 0
+    }
+   }
+  },
+  "edges": {
+   "e_9ef3904a7e8d": {
+    "id": "e_9ef3904a7e8d",
+    "from": {
+     "node": "n1",
+     "port": "sequence"
+    },
+    "to": {
+     "node": "n3",
+     "port": "neighbours"
+    },
+    "order": 0
+   },
+   "e_02ca21309dc4": {
+    "id": "e_02ca21309dc4",
+    "from": {
+     "node": "n3",
+     "port": "image"
+    },
+    "to": {
+     "node": "n4",
+     "port": "image"
+    },
+    "order": 0
+   },
+   "e_6b56c65b79ff": {
+    "id": "e_6b56c65b79ff",
+    "from": {
+     "node": "n1",
+     "port": "sequence"
+    },
+    "to": {
+     "node": "n4",
+     "port": "neighbours"
+    },
+    "order": 0
+   },
+   "e_1cda2a6c4054": {
+    "id": "e_1cda2a6c4054",
+    "from": {
+     "node": "n4",
+     "port": "image"
+    },
+    "to": {
+     "node": "n5",
+     "port": "image"
+    },
+    "order": 0
+   },
+   "e_16f36cd6da1a": {
+    "id": "e_16f36cd6da1a",
+    "from": {
+     "node": "n5",
+     "port": "image"
+    },
+    "to": {
+     "node": "n6",
+     "port": "image"
+    },
+    "order": 0
+   },
+   "e_3a2953bcdedc": {
+    "id": "e_3a2953bcdedc",
+    "from": {
+     "node": "n1",
+     "port": "sequence"
+    },
+    "to": {
+     "node": "n2",
+     "port": "sequence"
+    },
+    "order": 0
+   },
+   "e_fc9f5dade642": {
+    "id": "e_fc9f5dade642",
+    "from": {
+     "node": "n2",
+     "port": "image"
+    },
+    "to": {
+     "node": "n6",
+     "port": "compare"
+    },
+    "order": 0
+   },
+   "e_30c04e1111b6": {
+    "id": "e_30c04e1111b6",
+    "from": {
+     "node": "n2",
+     "port": "image"
+    },
+    "to": {
+     "node": "n7",
+     "port": "sequence"
+    },
+    "order": 0
+   },
+   "e_04f5135987db": {
+    "id": "e_04f5135987db",
+    "from": {
+     "node": "n7",
+     "port": "image"
+    },
+    "to": {
+     "node": "n3",
+     "port": "image"
+    },
+    "order": 0
+   },
+   "e_b2b2a9db9cb5": {
+    "id": "e_b2b2a9db9cb5",
+    "from": {
+     "node": "n5",
+     "port": "image"
+    },
+    "to": {
+     "node": "n8",
+     "port": "image"
+    },
+    "order": 0
+   }
+  },
+  "stacks": {
+   "s_n7": {
+    "id": "s_n7",
+    "label": "Z Stack",
+    "source": "frames",
+    "range": {
+     "start": 0,
+     "end": 0,
+     "step": 1
+    },
+    "sliceCount": 1,
+    "focusIndex": 0,
+    "wrap": true,
+    "origin": {
+     "x": 216,
+     "y": 88
+    }
+   }
+  },
+  "revision": 701
+ }
+}

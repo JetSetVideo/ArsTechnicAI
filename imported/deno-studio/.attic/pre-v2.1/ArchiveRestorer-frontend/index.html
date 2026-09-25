@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desk · Ars Technic AI</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🎞️</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand brand-link" href="/" title="Ars Technic AI — mission control">
+    <span class="reel" aria-hidden="true">🎞️</span>
+    <div>
+      <h1>Archive Film Restorer</h1>
+      <p id="project-label">No project loaded</p>
+    </div>
+  </a>
+  <div class="topbar-actions">
+    <a class="btn view-link" id="btn-home" href="/" title="Ars Technic AI home">Home</a>
+    <a class="btn view-link" id="btn-blueprint"
+       href="/blueprint/"
+       title="Open the node Blueprint — compose the pipeline as a graph">
+      Graph
+    </a>
+    <button type="button" class="btn view-link" id="btn-toggle-cards"
+            aria-pressed="true" title="Show or hide the right-hand cards (drag the border to resize)">
+      Cards
+    </button>
+    <div class="menu" id="file-menu">
+      <button class="btn" id="btn-file" aria-haspopup="menu" aria-expanded="false"
+              title="Open, projects, inspector, export (O E I)">File</button>
+      <div class="menu-pop hidden" id="file-menu-pop" role="menu">
+        <button class="menu-item" id="btn-open" role="menuitem">
+          Open video… <kbd>O</kbd>
+        </button>
+        <button class="menu-item" id="btn-projects" role="menuitem">Projects</button>
+        <button class="menu-item" id="btn-inspector" role="menuitem" disabled
+                title="Open the frame-accurate review window">
+          Inspector <kbd>I</kbd>
+        </button>
+        <button class="menu-item accent" id="btn-export" role="menuitem" disabled>
+          Export… <kbd>E</kbd>
+        </button>
+        <div class="menu-sep"></div>
+        <button class="menu-item" id="btn-open-blueprint" role="menuitem">
+          Blueprint canvas…
+        </button>
+        <button class="menu-item" id="btn-commands" role="menuitem">
+          Command palette… <kbd>⌘K</kbd>
+        </button>
+      </div>
+    </div>
+    <!-- Steady-state health is not worth a permanent readout. The ring only
+         speaks up when something is actually blocking work. -->
+    <button class="settings-btn" id="btn-settings" data-health="unknown"
+            aria-label="Settings — checking system health">
+      <span class="gear">⚙</span>
+      <span class="ring" aria-hidden="true"></span>
+    </button>
+  </div>
+</header>
+
+<div id="progress-bar" class="progress hidden">
+  <div class="progress-fill" id="progress-fill"></div>
+  <span class="progress-text" id="progress-text"></span>
+</div>
+
+<main class="layout">
+
+  <!-- ============================ LEFT PANEL ============================ -->
+  <section class="panel left">
+
+    <!-- Workshop Grade: which canvas step you are looking at, and the loop
+         around it. Hidden in the standalone desk. -->
+    <div id="grade-step" class="grade-step">
+      <div class="grade-step-rail" id="grade-step-rail" role="tablist" aria-label="Workflow steps"></div>
+      <div class="grade-step-meta">
+        <span class="grade-step-label" id="grade-step-label">Select a node on the canvas</span>
+        <label class="chk grade-step-bypass" id="grade-step-bypass-wrap" hidden>
+          <input type="checkbox" id="grade-step-bypass"> Bypass
+        </label>
+        <div class="grade-loop" id="grade-loop" hidden>
+          <label class="chk" title="The depth axis wraps — last slice to first">
+            <input type="checkbox" id="grade-loop-wrap"> Wrap
+          </label>
+          <button type="button" class="btn small" id="grade-loop-eval">Evaluate loop</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="viewer">
+      <div class="viewer-head">
+        <div class="view-control" id="view-control" data-freshness="idle">
+          <div class="seg" role="tablist" aria-label="What the viewer is showing">
+            <button class="seg-btn active" data-view="processed" role="tab"
+                    aria-selected="true" title="Restored (1)">Rst</button>
+            <button class="seg-btn" data-view="source" role="tab"
+                    aria-selected="false" title="Source (2)">Src</button>
+            <button class="seg-btn" data-view="split" role="tab"
+                    aria-selected="false" title="Split wipe (3)">Split</button>
+          </div>
+          <span class="freshness" id="freshness"
+                title="Whether the restored view reflects the current settings">live</span>
+        </div>
+        <button class="tool" id="btn-play" title="Play / pause (K)">▶</button>
+        <button class="tool hidden" id="btn-split-axis" title="Wipe direction — horizontal / vertical">⇔</button>
+        <button class="tool" id="btn-neighbours"
+                title="Show the frames either side of this one (N)">◧◨</button>
+        <span class="zoom-readout" id="zoom-readout" title="Double-click the picture to fit">fit</span>
+        <button class="tool" id="btn-focus"
+                title="Focus the picture — collapse the filmstrip and the parameter drawer (F)">⤢</button>
+      </div>
+
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="canvas-image"></canvas>
+        <canvas id="canvas-overlay"></canvas>
+        <div class="viewer-hud hidden" id="viewer-hud">
+          <div class="viewer-meta" id="viewer-meta">—</div>
+          <div class="applied" id="applied-summary"></div>
+        </div>
+
+        <!-- Annotation is a mode, not a permanent fixture. The rail stays shut
+             until there is something to paint, and the header keeps its width. -->
+        <div class="annot-rail" id="annot-rail">
+          <button class="rail-toggle" id="rail-toggle"
+                  title="Annotation tools — brush, eraser, region (A)">🖌</button>
+          <div class="rail-body">
+            <button class="tool active" id="tool-pan" title="Pan / inspect">✋</button>
+            <button class="tool" id="tool-roi" title="Select region of interest for AI">⬚</button>
+            <button class="tool" id="tool-mask" title="Paint reconstruction mask">🖌</button>
+            <button class="tool" id="tool-erase" title="Erase mask">🧽</button>
+            <label class="brush" title="Brush size">
+              <input type="range" id="brush-size" min="4" max="160" value="48">
+            </label>
+            <button class="tool" id="mask-clear" title="Clear mask">✕</button>
+          </div>
+        </div>
+
+        <div class="section-badge hidden" id="section-badge"></div>
+
+        <div class="viewer-empty" id="viewer-empty">
+          <h2>Load a video to begin</h2>
+          <p>The engine extracts a lossless PNG sequence, measures every frame,
+             then proposes a starting calibration you can override completely.</p>
+          <button class="btn primary" id="btn-open-2">Open video…</button>
+        </div>
+        <div class="spinner hidden" id="preview-spinner"></div>
+      </div>
+
+      <!-- Neighbour comparison. Off by default; a frame is usually judged on
+           its own, but never repaired on its own. -->
+      <div class="neighbours hidden" id="neighbours">
+        <figure class="nb" data-offset="-1">
+          <canvas id="nb-prev"></canvas>
+          <figcaption><span class="nb-label">previous</span><span class="nb-stats" id="nb-prev-stats">—</span></figcaption>
+        </figure>
+        <div class="nb-controls">
+          <label class="field">
+            <span>Distance <b id="nb-distance-val">1</b></span>
+            <input type="range" id="nb-distance" min="1" max="12" step="1" value="1">
+          </label>
+          <label class="field">
+            <span>Combine</span>
+            <select id="nb-operation">
+              <option value="none">side by side only</option>
+              <option value="union">overlay — A ∪ B</option>
+              <option value="intersect">agreement — A ∩ B</option>
+              <option value="subtract">difference — A − B</option>
+              <option value="exclude">exclusion — A △ B</option>
+              <option value="singularity">defects — A − (prev ∩ next)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Tolerance <b id="nb-tol-val">auto</b></span>
+            <input type="range" id="nb-tolerance" min="0" max="60" step="1" value="0">
+          </label>
+          <label class="field">
+            <span>Overlay on picture <b id="nb-overlay-val">55%</b></span>
+            <input type="range" id="nb-overlay" min="0" max="100" step="1" value="55"
+                   title="How strongly the combination sits on the frame you are looking at">
+          </label>
+          <div class="row wrap">
+            <button class="btn small" id="btn-nb-commit" disabled
+                    title="Store the result as a matte a layer can use">Commit as matte</button>
+            <button class="btn small" id="btn-nb-repair" disabled
+                    title="Hand the result to the reconstruction engine">Repair with this</button>
+          </div>
+          <p class="muted small" id="nb-note"></p>
+        </div>
+        <figure class="nb" data-offset="1">
+          <canvas id="nb-next"></canvas>
+          <figcaption><span class="nb-label">next</span><span class="nb-stats" id="nb-next-stats">—</span></figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <div class="timeline">
+      <div class="timeline-head">
+        <div class="tl-left">
+          <button class="tool" id="btn-prev">◀</button>
+          <input type="number" id="frame-number" value="0" min="0" step="1">
+          <span class="muted" id="frame-total">/ 0</span>
+          <button class="tool" id="btn-next">▶</button>
+        </div>
+        <div class="tl-right">
+          <label class="chk"><input type="checkbox" id="chk-selected"> Keep this frame</label>
+          <span class="badge" id="frame-verdict">—</span>
+          <span class="badge score" id="frame-score">—</span>
+        </div>
+      </div>
+      <canvas id="quality-graph" height="104"
+              title="Quality, luminance and camera roll. Drag the grey line to declare true level."></canvas>
+      <div class="graph-legend">
+        <span class="gl q">quality</span>
+        <span class="gl l">luminance</span>
+        <span class="gl r">roll</span>
+        <label class="chk" title="Show the measured camera roll and the level reference">
+          <input type="checkbox" id="chk-level-band"> level band
+        </label>
+        <button class="btn small" id="btn-measure-roll">Measure roll</button>
+        <span class="muted small" id="roll-readout"></span>
+      </div>
+      <div class="section-strip-wrap">
+        <canvas id="section-strip" height="26"
+                title="Treatment coverage — drag to mark a range, then create a section"></canvas>
+        <!-- Every swatch is a tri-state filter: click to include, click again
+             to exclude, double-click from neutral to exclude directly. -->
+        <div class="strip-legend" id="strip-legend">
+          <button class="chip" data-filter="spec-none" data-state="neutral">
+            <i class="sw spec-none"></i>no treatment<b class="chip-n"></b></button>
+          <button class="chip" data-filter="spec-partial" data-state="neutral">
+            <i class="sw spec-partial"></i>partly described<b class="chip-n"></b></button>
+          <button class="chip" data-filter="spec-complete" data-state="neutral">
+            <i class="sw spec-complete"></i>complete<b class="chip-n"></b></button>
+          <button class="chip" data-filter="by-user" data-state="neutral">
+            <i class="sw by-user"></i>by you<b class="chip-n"></b></button>
+          <button class="chip" data-filter="by-ai" data-state="neutral">
+            <i class="sw by-ai"></i>by AI — review<b class="chip-n"></b></button>
+          <button class="btn small" id="btn-filter-select" disabled
+                  title="Select every frame the filter matches">Select matching</button>
+          <button class="btn small hidden" id="btn-filter-clear">Clear filter</button>
+          <span class="grow" id="coverage-readout"></span>
+        </div>
+      </div>
+      <div class="filmstrip" id="filmstrip"></div>
+      <div class="timeline-foot">
+        <div class="legend">
+          <span><i class="sw keep"></i>keep</span>
+          <span><i class="sw review"></i>review</span>
+          <span><i class="sw drop"></i>drop</span>
+          <span><i class="sw cut"></i>scene cut</span>
+        </div>
+        <div class="selection-tools">
+          <label>Min score <input type="number" id="sel-min-score" value="32" min="0" max="100" step="1"></label>
+          <button class="btn small" id="btn-apply-selection">Apply</button>
+          <button class="btn small" id="btn-best-scene">Best per scene</button>
+          <button class="btn small" id="btn-select-all">Select all</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="params" id="params">
+      <div class="params-head">
+        <h3>Pipeline parameters</h3>
+        <div>
+          <label class="chk"><input type="checkbox" id="chk-live" checked> Live preview</label>
+          <button class="btn small" id="btn-suggest">Auto-calibrate</button>
+          <button class="btn small" id="btn-reset">Reset</button>
+        </div>
+      </div>
+      <div id="param-sections"></div>
+    </div>
+  </section>
+
+  <div class="resize-handle" data-resize="inspector" title="Drag to resize"></div>
+
+  <!-- =========================== RIGHT PANEL =========================== -->
+  <aside class="panel right" id="desk-inspector">
+
+    <details class="card" open id="card-sections" data-card="sections">
+      <summary><h3>Sections <span class="count" id="sections-count">0</span></h3></summary>
+      <div class="card-body">
+        <p class="muted small">
+          A reel is never uniform. Each section carries its own parameter
+          overrides and layer stack, so an interior and an overexposed exterior
+          are treated separately. Drag on the strip above to mark a range.
+        </p>
+
+        <div class="row wrap">
+          <button class="btn small" id="btn-seg-from-scenes">From detected shots</button>
+          <button class="btn small" id="btn-seg-add">Add from marked range</button>
+          <button class="btn small" id="btn-seg-describe" title="Ask the vision model to describe the current section">AI describe</button>
+        </div>
+
+        <div class="marked-range muted small" id="marked-range">No range marked</div>
+
+        <div class="segment-list" id="segment-list"></div>
+
+        <div class="segment-editor hidden" id="segment-editor">
+          <div class="seg-editor-head">
+            <input type="color" id="seg-color" title="Section colour on the timeline">
+            <input type="text" id="seg-name" placeholder="Section name">
+            <button class="tool" id="seg-lock" title="Lock against AI edits">🔓</button>
+            <button class="tool danger" id="seg-delete" title="Delete section">🗑</button>
+          </div>
+
+          <div class="row">
+            <label class="field"><span>Start</span><input type="number" id="seg-start" min="0"></label>
+            <label class="field"><span>End</span><input type="number" id="seg-end" min="0"></label>
+            <label class="chk tall"><input type="checkbox" id="seg-enabled" checked> Active</label>
+          </div>
+
+          <div class="spec-fields">
+            <label class="field">
+              <span>Content <i class="prov" id="prov-content"></i></span>
+              <textarea id="spec-content" rows="2" placeholder="What is in this shot?"></textarea>
+            </label>
+            <label class="field">
+              <span>Damage <i class="prov" id="prov-damage"></i></span>
+              <textarea id="spec-damage" rows="2" placeholder="What is wrong with it?"></textarea>
+            </label>
+            <label class="field">
+              <span>Intent <i class="prov" id="prov-intent"></i></span>
+              <textarea id="spec-intent" rows="2" placeholder="How should it be treated?"></textarea>
+            </label>
+          </div>
+
+          <div class="seg-overrides">
+            <h4>Parameter overrides <span class="muted small" id="seg-override-count"></span></h4>
+            <div class="row wrap">
+              <button class="btn small" id="btn-seg-capture">Capture current sliders</button>
+              <button class="btn small" id="btn-seg-clear-params">Clear overrides</button>
+            </div>
+            <div class="override-list" id="override-list"></div>
+          </div>
+
+          <!-- The mechanism the whole application exists for: judge one frame,
+               govern the rest of the shot. -->
+          <div class="seg-keyframes">
+            <h4>Key frames <span class="muted small" id="seg-keyframe-count"></span></h4>
+            <p class="muted small">
+              Pin the current sliders to the frame you are looking at. Between two
+              key frames the values are interpolated, so a shot that drifts is
+              treated by a grade that drifts with it.
+            </p>
+            <div class="row wrap">
+              <button class="btn small primary" id="btn-key-set">Pin this frame</button>
+              <button class="btn small" id="btn-key-delete">Unpin</button>
+              <button class="btn small" id="btn-key-check"
+                      title="Where can this treatment honestly be trusted?">Check propagation</button>
+            </div>
+            <div class="keyframe-list" id="keyframe-list"></div>
+            <div id="propagation-result" class="muted small"></div>
+          </div>
+
+          <div class="seg-layers">
+            <h4>Layers <span class="muted small">masked adjustments, applied in order</span></h4>
+            <div class="layer-list" id="layer-list"></div>
+            <div class="row wrap">
+              <select id="layer-mask-select"><option value="">no mask (whole frame)</option></select>
+              <button class="btn small" id="btn-layer-add">Add layer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="card" id="card-damage" data-card="damage">
+      <summary><h3>Damage &amp; Missing Pixels</h3></summary>
+      <div class="card-body">
+        <p class="muted small">
+          Emulsion loss, tears and perforation damage destroy areas too large to
+          inpaint honestly from within one frame. This finds them by temporal
+          singularity — real content persists across neighbours, damage does not —
+          then transplants what a neighbouring frame actually photographed,
+          regrained and level-matched so the repair is not a clean patch on
+          grainy film.
+        </p>
+        <div class="row">
+          <label class="field">
+            <span>Neighbours searched <b id="dmg-radius-val">3</b></span>
+            <input type="range" id="dmg-radius" min="1" max="8" step="1" value="3">
+          </label>
+          <label class="field">
+            <span>Smallest region <b id="dmg-area-val">24</b>px</span>
+            <input type="range" id="dmg-area" min="4" max="600" step="4" value="24">
+          </label>
+        </div>
+        <label class="chk"><input type="checkbox" id="dmg-regrain" checked>
+          Regrain and level-match the repair</label>
+        <label class="chk"><input type="checkbox" id="dmg-use-mask">
+          Use the mask I painted instead of detecting</label>
+        <div class="row wrap">
+          <button class="btn small" id="btn-dmg-detect">Find damage here</button>
+          <button class="btn primary small" id="btn-dmg-repair">Rebuild this frame</button>
+          <button class="btn small" id="btn-dmg-range">Rebuild the range…</button>
+        </div>
+        <div id="dmg-result" class="dmg-result"></div>
+      </div>
+    </details>
+
+    <details class="card" id="card-reframe" data-card="reframe">
+      <summary><h3>Reframe &amp; Outpaint</h3></summary>
+      <div class="card-body">
+        <p class="muted small">
+          Much of this reel is framed too tightly, and levelling voids the
+          corners besides. Pulling back declares the composition you meant; the
+          margin it exposes is answered first from what neighbouring frames
+          already photographed, and only then, if you ask, by the image model.
+        </p>
+        <label class="field">
+          <span>Pull back <b id="rf-zoom-val">1.00</b>×</span>
+          <input type="range" id="rf-zoom" min="0.5" max="1.5" step="0.01" value="1">
+        </label>
+        <div class="row">
+          <label class="field">
+            <span>Shift across <b id="rf-x-val">0</b></span>
+            <input type="range" id="rf-x" min="-0.3" max="0.3" step="0.005" value="0">
+          </label>
+          <label class="field">
+            <span>Shift down <b id="rf-y-val">0</b></span>
+            <input type="range" id="rf-y" min="-0.3" max="0.3" step="0.005" value="0">
+          </label>
+        </div>
+        <label class="field">
+          <span>Fill the exposed margin with</span>
+          <select id="rf-fill">
+            <option value="mosaic">What the neighbours saw (deterministic)</option>
+            <option value="reflect">Reflected edge</option>
+            <option value="black">Nothing — leave it for the model</option>
+          </select>
+        </label>
+        <p class="muted small">
+          Aspect stays locked to the frame. Drag the gold rectangle on the
+          picture to pull back and recrop; the shaded area is what the film
+          never covered.
+        </p>
+        <div class="row wrap">
+          <button class="btn small" id="btn-rf-edit" title="Drag the framing on the picture (R)">Edit on picture</button>
+          <button class="btn small" id="btn-rf-preview">Preview the framing</button>
+          <button class="btn small" id="btn-rf-apply">Apply to this section</button>
+          <button class="btn primary small" id="btn-rf-outpaint">Outpaint the margin</button>
+        </div>
+        <div id="rf-result" class="dmg-result"></div>
+      </div>
+    </details>
+
+    <details class="card" id="card-colour" data-card="colour">
+      <summary><h3>Colour &amp; Gradation</h3></summary>
+      <div class="card-body">
+        <p class="muted small">
+          Measures the section in front of you, including whether it drifts from
+          its own start to its own end — a shot that fades cannot be fixed by a
+          single static grade.
+        </p>
+        <div class="row wrap">
+          <button class="btn small" id="btn-colour-analyse">Analyse this section</button>
+          <button class="btn small" id="btn-colour-apply" disabled>Apply suggestion</button>
+        </div>
+        <div id="colour-result" class="colour-result hidden">
+          <div class="palette" id="colour-palette"></div>
+          <table class="rec" id="colour-stats"></table>
+          <p class="verdict" id="colour-verdict"></p>
+          <p class="muted small" id="colour-rationale"></p>
+        </div>
+        <hr>
+        <h4>Match against a reference section</h4>
+        <div class="row">
+          <label class="field grow">
+            <span>Reference</span>
+            <select id="colour-ref"></select>
+          </label>
+          <button class="btn small" id="btn-colour-match">Match</button>
+        </div>
+        <div id="colour-match-result" class="muted small"></div>
+      </div>
+    </details>
+
+    <details class="card" id="card-isolation" data-card="isolation">
+      <summary><h3>Subject Isolation</h3></summary>
+      <div class="card-body">
+        <p class="muted small">
+          Subjects are found either by the vision model, which can name them, or
+          locally from faces, bodies, motion and saliency, which numbers them but
+          needs no credential. Either way GrabCut turns each box into a pixel
+          matte here on this machine. Attach a matte to a layer to treat that
+          subject on its own.
+        </p>
+        <label class="field">
+          <span>Looking for <em>(optional — a hint refines, it is not required)</em></span>
+          <input type="text" id="detect-hint" placeholder="e.g. the bride, the sky, the car">
+        </label>
+        <label class="field">
+          <span>Detector</span>
+          <select id="detect-mode">
+            <option value="auto">Automatic — model if available, otherwise local</option>
+            <option value="local">Local only — faces, motion and saliency</option>
+            <option value="model">Model only — named subjects</option>
+          </select>
+        </label>
+        <div class="row wrap">
+          <button class="btn primary grow" id="btn-detect">Detect subjects in this frame</button>
+        </div>
+        <div class="row wrap">
+          <button class="btn small" id="btn-bg-plate" title="Temporal median — no API key needed">Background plate (local)</button>
+          <button class="btn small" id="btn-track-mask" disabled>Track selected matte</button>
+        </div>
+        <div class="detect-list" id="detect-list"></div>
+        <h4>Stored mattes</h4>
+        <div class="mask-list" id="mask-list"></div>
+      </div>
+    </details>
+
+    <details class="card" id="card-missing" data-card="missing">
+      <summary><h3>Missing Frames</h3></summary>
+      <div class="card-body">
+        <p class="muted small">
+          Rebuilds destroyed frames from their neighbours with motion-compensated
+          interpolation. A frame is only offered once it stands out from its own
+          shot and the repair has been rehearsed successfully — a soft frame in a
+          soft shot is left alone, because interpolating it only makes it softer.
+        </p>
+        <div class="row wrap">
+          <button class="btn small" id="btn-interp-candidates">Find damaged frames</button>
+          <button class="btn small" id="btn-interp-preview">Preview here</button>
+          <button class="btn primary small" id="btn-interp-rebuild" disabled>Rebuild</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="interp-whole-reel"> Scan the whole reel, not just the marked range</label>
+        <div id="interp-result" class="muted small"></div>
+        <hr>
+        <h4>Retime a range</h4>
+        <div class="row">
+          <label class="field"><span>Factor</span>
+            <select id="retime-factor">
+              <option value="2">2× (16 → 32 fps feel)</option>
+              <option value="3">3×</option>
+              <option value="4">4×</option>
+            </select>
+          </label>
+          <button class="btn small" id="btn-retime">Retime marked range</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="card" open id="card-vision" data-card="vision">
+      <summary><h3>AI Vision Inspector</h3></summary>
+      <div class="card-body">
+        <label class="field">
+          <span>Footage context <em>(fed to the model)</em></span>
+          <textarea id="ai-context" rows="2"
+            placeholder="e.g. Wedding, Lyon, France, circa 1953. 8mm home movie, black and white."></textarea>
+        </label>
+        <div class="row">
+          <label class="field grow">
+            <span>Vision model</span>
+            <select id="ai-model">
+              <option value="gemini-2.5-flash">gemini-2.5-flash — fast</option>
+              <option value="gemini-2.5-pro">gemini-2.5-pro — deepest analysis</option>
+            </select>
+          </label>
+          <label class="chk tall"><input type="checkbox" id="ai-use-roi"> Use ROI crop</label>
+        </div>
+        <button class="btn primary wide" id="btn-analyze-frame">Analyse current frame</button>
+
+        <div id="ai-result" class="ai-result hidden">
+          <div class="ai-block">
+            <h4>Scene description</h4>
+            <p id="ai-scene"></p>
+          </div>
+          <div class="ai-block">
+            <h4>Historical context</h4>
+            <p id="ai-history"></p>
+          </div>
+          <div class="ai-block">
+            <h4>Damaged / missing elements <span class="sev" id="ai-severity"></span></h4>
+            <ul id="ai-damage"></ul>
+          </div>
+          <div class="ai-block">
+            <h4>Recommended CV adjustments</h4>
+            <p class="muted small" id="ai-rationale"></p>
+            <table class="rec" id="ai-recs"></table>
+            <button class="btn small" id="btn-apply-recs">Apply to sliders</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="card" id="card-prompt" data-card="prompt">
+      <summary><h3>Prompt Editor</h3></summary>
+      <div class="card-body">
+        <label class="field">
+          <span>Positive prompt</span>
+          <textarea id="prompt-positive" rows="6"
+            placeholder="Generated by the inspector — edit freely before generating."></textarea>
+        </label>
+        <label class="field">
+          <span>Negative prompt</span>
+          <textarea id="prompt-negative" rows="4"
+            placeholder="Flaws to avoid: blur, digital artefacts, modern clothing…"></textarea>
+        </label>
+        <p class="muted small" id="ai-color-notes"></p>
+      </div>
+    </details>
+
+    <details class="card" open id="card-generative" data-card="generative">
+      <summary><h3>Generative Restoration</h3></summary>
+      <div class="card-body">
+        <div class="row">
+          <label class="field grow">
+            <span>Mode</span>
+            <select id="gen-mode">
+              <option value="restore">Restore damage</option>
+              <option value="colorize">Colourise</option>
+              <option value="inpaint">Inpaint masked region</option>
+              <option value="upscale-detail">Recover fine detail</option>
+            </select>
+          </label>
+          <label class="field grow">
+            <span>Image model</span>
+            <select id="gen-model">
+              <option value="gemini-2.5-flash-image">gemini-2.5-flash-image</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span>Creativity <b id="gen-temp-val">0.35</b></span>
+          <input type="range" id="gen-temp" min="0" max="1" step="0.05" value="0.35">
+        </label>
+        <label class="field">
+          <span>AI influence <b id="gen-influence-val">0.65</b></span>
+          <input type="range" id="gen-influence" min="0" max="1" step="0.01" value="0.65">
+          <em class="muted small">Laplacian pyramid blend — coarse levels take the AI
+            result, fine levels keep the original photographic grain.</em>
+        </label>
+        <div class="row">
+          <button class="btn primary grow" id="btn-generate">Generate for this frame</button>
+          <button class="btn grow" id="btn-reblend" disabled>Re-blend</button>
+        </div>
+        <div class="gen-preview hidden" id="gen-preview">
+          <div class="gen-thumbs">
+            <figure><img id="gen-img-base" alt="deterministic result"><figcaption>Pipeline</figcaption></figure>
+            <figure><img id="gen-img-raw" alt="raw generation"><figcaption>AI raw</figcaption></figure>
+            <figure><img id="gen-img-blend" alt="blended result"><figcaption>Blended</figcaption></figure>
+          </div>
+          <p class="muted small" id="gen-note"></p>
+        </div>
+      </div>
+    </details>
+
+  </aside>
+</main>
+
+<!-- ============================== MODALS ============================== -->
+
+<div class="modal hidden" id="modal-settings">
+  <div class="modal-box wide">
+    <h2>Settings</h2>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-pane="pane-credentials" role="tab">Credentials</button>
+      <button class="tab" data-pane="pane-memory" role="tab">Project memory</button>
+      <button class="tab" data-pane="pane-diagnostics" role="tab">Diagnostics</button>
+    </div>
+
+    <section class="pane" id="pane-credentials">
+      <div class="health-line" id="health-line"></div>
+      <label class="field">
+        <span>Google AI Studio API key</span>
+        <input type="password" id="api-key" placeholder="AIza…" autocomplete="off">
+      </label>
+      <div class="row">
+        <button class="btn grow primary" id="btn-save-key">Save &amp; verify</button>
+        <button class="btn" id="btn-check-key">Re-check</button>
+      </div>
+      <div class="key-status" id="key-status">
+        <span class="pill" id="key-pill">not set</span>
+        <p class="muted small" id="key-message">No key configured.</p>
+        <div class="model-availability" id="model-availability"></div>
+      </div>
+      <p class="muted small">
+        The key is held in the local Python process for this session only and is
+        sent nowhere except directly to Google. Set <code>GEMINI_API_KEY</code>
+        before launching to skip this step. Everything except the two AI panels
+        and the semantic half of subject isolation works without one.
+      </p>
+      <hr>
+      <div class="engine-info" id="engine-info"></div>
+    </section>
+
+    <section class="pane hidden" id="pane-memory">
+      <p class="muted small">
+        Every pass is timed on this machine, so estimates come from measured
+        throughput rather than a guess — and the AI is given this history as
+        context instead of starting cold each call.
+      </p>
+      <div class="machine-info" id="machine-info"></div>
+      <h4>Passes run</h4>
+      <table class="rec" id="runs-table"></table>
+      <h4>Notes</h4>
+      <div class="row">
+        <input type="text" id="note-text" placeholder="Add a note about this project…">
+        <button class="btn small" id="btn-add-note">Add</button>
+      </div>
+      <div class="note-list" id="note-list"></div>
+      <h4>Recent activity</h4>
+      <div class="activity-list" id="activity-list"></div>
+    </section>
+
+    <section class="pane hidden" id="pane-diagnostics">
+      <div class="budget" id="log-budget"></div>
+      <div class="row wrap">
+        <button class="btn small" id="btn-log-compact">Compact now</button>
+        <button class="btn small" id="btn-log-export">Export raw log</button>
+        <label class="chk"><input type="checkbox" id="chk-log-errors">
+          errors only</label>
+      </div>
+      <p class="muted small">
+        When the log passes its budget the oldest records are folded into a
+        digest that keeps the counts, the span and every error verbatim, rather
+        than being truncated away.
+      </p>
+      <div class="log" id="log"></div>
+    </section>
+
+    <div class="modal-actions"><button class="btn" data-close>Close</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="modal-open">
+  <div class="modal-box">
+    <h2>Open a video</h2>
+    <div class="browser">
+      <div class="browser-path" id="browser-path"></div>
+      <div class="browser-list" id="browser-list"></div>
+    </div>
+    <div class="modal-fields">
+      <label class="field"><span>Selected file</span><input type="text" id="open-path" placeholder="/Users/…/wedding.mp4"></label>
+      <div class="row">
+        <label class="field"><span>Start frame</span><input type="number" id="open-start" value="0" min="0"></label>
+        <label class="field"><span>End frame <em>(blank = all)</em></span><input type="number" id="open-end" placeholder="all" min="0"></label>
+        <label class="field"><span>Frame step</span><input type="number" id="open-step" value="1" min="1" max="60"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Max edge <em>(0 = native)</em></span><input type="number" id="open-maxedge" value="0" min="0" step="160"></label>
+        <label class="field"><span>Scene cut threshold</span><input type="number" id="open-scene" value="0.35" min="0.02" max="0.95" step="0.01"></label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="btn-do-load">Extract &amp; analyse</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal hidden" id="modal-projects">
+  <div class="modal-box">
+    <h2>Projects</h2>
+    <div class="project-list" id="project-list"></div>
+    <div class="modal-actions"><button class="btn" data-close>Close</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="modal-export">
+  <div class="modal-box">
+    <h2>Export restoration</h2>
+    <div class="modal-fields">
+      <div class="export-warning hidden" id="exp-warning"></div>
+
+      <label class="chk"><input type="checkbox" id="exp-selected" checked> Only frames marked <b>keep</b></label>
+
+      <label class="field">
+        <span>Deselected frames inside the range</span>
+        <select id="exp-timing">
+          <option value="preserve" selected>Hold the previous frame — keeps original duration</option>
+          <option value="compress">Omit them — shortens the film and speeds up motion</option>
+        </select>
+        <em class="muted small">Dropping frames without holding them is why an
+          export can run shorter and faster than the source.</em>
+      </label>
+
+      <label class="chk"><input type="checkbox" id="exp-encode" checked> Encode MP4 after rendering</label>
+      <label class="chk"><input type="checkbox" id="exp-audio"> Mux the source audio track back in</label>
+
+      <div class="row">
+        <label class="field"><span>Frame rate</span><input type="number" id="exp-fps" step="0.01"></label>
+        <label class="field"><span>Quality (CRF)</span><input type="number" id="exp-crf" value="16" min="0" max="51"></label>
+      </div>
+
+      <label class="field">
+        <span>Apply cached AI frames at influence <b id="exp-inf-val">0.00</b></span>
+        <input type="range" id="exp-influence" min="0" max="1" step="0.01" value="0">
+      </label>
+
+      <div class="export-plan" id="exp-plan"></div>
+      <div class="export-sections hidden" id="exp-sections"></div>
+      <p class="muted small" id="exp-info"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn" id="btn-encode-only" title="Re-mux frames that are already rendered">Encode only</button>
+      <a class="btn hidden" id="btn-download" download>Download MP4</a>
+      <button class="btn primary" id="btn-do-export">Render</button>
+    </div>
+  </div>
+</div>
+
+<div class="palette hidden" id="command-palette" role="dialog" aria-label="Command palette">
+  <div class="palette-box">
+    <input id="palette-q" type="search" placeholder="Go to a tool, a view, a pass…"
+           autocomplete="off" spellcheck="false">
+    <div class="palette-list" id="palette-list"></div>
+    <p class="palette-hint">↑↓ to move · enter to run · esc to close · every action here is also a key</p>
+  </div>
+</div>
+
+<script src="desk-panels.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

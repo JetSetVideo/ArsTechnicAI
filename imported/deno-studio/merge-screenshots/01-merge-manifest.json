@@ -1,0 +1,38 @@
+{
+  "phase": "01-unified-gateway",
+  "captured_at": "2026-09-04T12:19:08+0200",
+  "origin": "http://127.0.0.1:8090",
+  "routes": [
+    "/",
+    "/desk/",
+    "/blueprint/"
+  ],
+  "files": [
+    {
+      "file": "01-merge-home.png",
+      "bytes": 133151,
+      "mtime": "2026-09-04T12:18:53+0200"
+    },
+    {
+      "file": "01-merge-desk.png",
+      "bytes": 352784,
+      "mtime": "2026-09-04T12:19:03+0200"
+    },
+    {
+      "file": "01-merge-blueprint.png",
+      "bytes": 140189,
+      "mtime": "2026-09-04T12:19:07+0200"
+    },
+    {
+      "file": "00-baseline-desk.png",
+      "bytes": 352304,
+      "mtime": "2026-09-04T12:14:40+0200"
+    },
+    {
+      "file": "00-baseline-blueprint.png",
+      "bytes": 139260,
+      "mtime": "2026-09-04T12:14:43+0200"
+    }
+  ],
+  "notes": "Single-origin merge: Home from ArsTechnicAI design + Desk + Blueprint"
+}

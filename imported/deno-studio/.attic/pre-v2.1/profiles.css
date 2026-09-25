@@ -1,0 +1,285 @@
+/*
+ * profiles.css — the four display profiles from core/profiles.ts.
+ *
+ * Breakpoints and type ranges here are checked against PROFILES by
+ * tests/profiles_test.ts; change one and the other, or the suite fails.
+ *
+ * --fs-base interpolates linearly across each band and is clamped to the
+ * band's range. canvas.css sizes every chrome font as a multiple of it,
+ * wrapped in clamp(8px, …, 32px). Node cards are world-space — they scale
+ * with canvas zoom — and keep their own pixel sizes.
+ */
+
+/* profile: mobile width 320-767 font 10-14 layout single-column-drawers */
+@media (max-width: 767px) {
+  :root {
+    --fs-base: clamp(10px, calc(10px + 4 * ((100vw - 320px) / 447)), 14px);
+    --console-h: 180px;
+  }
+  #palette, #inspector {
+    width: min(86vw, 320px);
+  }
+  #console:not(.is-expanded) .console-body {
+    display: none;
+  }
+  .console-tabs .console-tab {
+    padding-inline: 6px;
+  }
+}
+
+/* profile: tablet width 768-1024 font 12-16 layout canvas-slide-over-inspector */
+@media (min-width: 768px) and (max-width: 1024px) {
+  :root {
+    --fs-base: clamp(12px, calc(12px + 4 * ((100vw - 768px) / 256)), 16px);
+    --console-h: 200px;
+  }
+  /* Library stays docked; the inspector slides over the canvas. */
+  #shell {
+    display: grid;
+    grid-template-columns: var(--palette-w) var(--palette-handle) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    position: relative;
+  }
+  #palette {
+    position: static;
+    transform: none;
+    width: auto;
+    box-shadow: none;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .resize-handle[data-resize="palette"] {
+    display: block;
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .resize-handle[data-resize="inspector"] {
+    display: none;
+  }
+  #center {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  #inspector {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: auto;
+    width: min(360px, 46vw);
+    z-index: 45;
+    box-shadow: var(--shadow-3);
+    transition: transform 180ms ease;
+    transform: translateX(100%);
+  }
+  #inspector.open {
+    transform: translateX(0);
+  }
+}
+
+/* profile: desktop width 1025-1920 font 14-18 layout full-four-panel */
+@media (min-width: 1025px) and (max-width: 1920px) {
+  :root {
+    --fs-base: clamp(14px, calc(14px + 4 * ((100vw - 1025px) / 895)), 18px);
+    --console-h: 220px;
+  }
+}
+
+/* profile: lab-workstation width 1921- font 16-24 layout expanded-multi-dock */
+@media (min-width: 1921px) {
+  :root {
+    --fs-base: clamp(16px, calc(16px + 8 * ((100vw - 1921px) / 1919)), 24px);
+    --console-h: 300px;
+  }
+  /* Telemetry is persistent here: the console cannot be collapsed away. */
+  #console .console-body {
+    display: flex !important;
+  }
+  #console-toggle {
+    display: none;
+  }
+}
+
+/* ========================================================================
+   Bottom terminal & execution console
+   ======================================================================== */
+
+#console {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-1);
+  background: var(--surface-0);
+  min-height: 0;
+  z-index: 9;
+}
+
+.console-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--surface-1);
+  min-height: 30px;
+  flex-wrap: wrap;
+}
+
+.console-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.console-tab {
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent;
+  color: inherit;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 10px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.console-tab.is-on {
+  opacity: 1;
+  border-color: var(--border-2);
+  background: var(--surface-2);
+}
+
+.console-summary {
+  flex: 1 1 12em;
+  min-width: 0;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.console-bar .action {
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+}
+
+#console:not(.is-expanded) .console-body {
+  display: none;
+}
+
+.console-body {
+  height: var(--console-h, 220px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.console-pane[hidden] {
+  display: none !important;
+}
+
+.console-pane {
+  min-height: 0;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+
+.console-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+}
+.console-table th,
+.console-table td {
+  text-align: left;
+  padding: 3px 10px;
+  border-bottom: 1px solid var(--border-0);
+  white-space: nowrap;
+}
+.console-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-1);
+  font-weight: 500;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+}
+.console-table td.num,
+.console-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.console-table tr.is-network td:first-child {
+  box-shadow: inset 2px 0 0 #d8a84d;
+}
+.console-table tr.is-loop td:first-child {
+  box-shadow: inset 2px 0 0 var(--actor-ai);
+}
+.console-table tbody tr {
+  cursor: pointer;
+}
+.console-table tbody tr:hover {
+  background: var(--surface-1);
+}
+.console-iter {
+  width: 5.5em;
+  font: inherit;
+  background: var(--surface-2);
+  color: inherit;
+  border: 1px solid var(--border-2);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.console-query {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.console-query input {
+  flex: 1 1 18em;
+  min-width: 0;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.8571), 32px);
+  background: var(--surface-2);
+  color: inherit;
+  border: 1px solid var(--border-2);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.console-note {
+  padding: 4px 10px;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+  opacity: 0.6;
+}
+.console-note.is-error {
+  color: #e07a6a;
+  opacity: 1;
+}
+
+/* Pre-run gate: structural rows under the money line. */
+.gate-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 14px;
+  margin: 10px 0;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+}
+.gate-grid dt {
+  opacity: 0.6;
+}
+.gate-grid dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.gate-problems {
+  color: #d8a84d;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+
+#console-fps {
+  flex: 0 0 auto;
+}

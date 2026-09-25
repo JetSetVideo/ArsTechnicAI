@@ -1,0 +1,246 @@
+{
+  "animationMediumAliases": {
+    "2D": "2D",
+    "3D": "3D",
+    "Hybrid": "Hybrid",
+    "StopMotion": "StopMotion"
+  },
+  "cameraManufacturerByBody": {
+    "ARRI_35BL": "ARRI_Film",
+    "ARRI_35_III": "ARRI_Film",
+    "ARRI_535B": "ARRI_Film",
+    "Alexa": "ARRI",
+    "Alexa_35": "ARRI",
+    "Alexa_65": "ARRI",
+    "Alexa_LF": "ARRI",
+    "Alexa_Mini": "ARRI",
+    "Alexa_Mini_LF": "ARRI",
+    "Alexa_XT": "ARRI",
+    "Arricam_LT": "ARRI_Film",
+    "Arricam_ST": "ARRI_Film",
+    "Arriflex_35": "ARRI_Film",
+    "Arriflex_35BL": "ARRI_Film",
+    "Arriflex_435": "ARRI_Film",
+    "C300_Mark_III": "Canon",
+    "C500_Mark_II": "Canon",
+    "C700_FF": "Canon",
+    "Eclair_NPR": "Eclair",
+    "FX6": "Sony",
+    "FX9": "Sony",
+    "IMAX_GT": "IMAX",
+    "IMAX_MKIV": "IMAX",
+    "IMAX_MSM_9802": "IMAX",
+    "Inspire_3": "DJI",
+    "Komodo_X": "RED",
+    "Mavic_3_Cine": "DJI",
+    "Mitchell_BFC_65": "Mitchell",
+    "Mitchell_BNC": "Mitchell",
+    "Mitchell_BNCR": "Mitchell",
+    "Monstro_8K": "RED",
+    "Panavision_Gold": "Panavision",
+    "Panavision_Millennium": "Panavision",
+    "Panavision_Millennium_XL2": "Panavision",
+    "Panavision_Panaflex": "Panavision",
+    "Panavision_Panastar": "Panavision",
+    "Panavision_Platinum": "Panavision",
+    "Panavision_XL": "Panavision",
+    "Pathe_Studio": "Vintage",
+    "Pocket_6K": "Blackmagic",
+    "RED_One": "RED",
+    "S1H": "Panasonic",
+    "Super_Panavision_70": "Panavision",
+    "UFA_Custom": "Vintage",
+    "Ultra_Panavision_70": "Panavision",
+    "Ursa_Mini_Pro_12K": "Blackmagic",
+    "V_Raptor": "RED",
+    "V_Raptor_X": "RED",
+    "V_Raptor_XL": "RED",
+    "Varicam_LT": "Panasonic",
+    "Venice_2": "Sony",
+    "Z9": "Nikon"
+  },
+  "colorToneAliases": {
+    "Cool": "Cool_Saturated",
+    "Highly_Saturated": "Warm_Saturated",
+    "Muted": "Neutral_Desaturated",
+    "Neutral": "Neutral_Saturated",
+    "Teal Orange": "Teal_Orange",
+    "Warm": "Warm_Saturated"
+  },
+  "compositionAliases": {
+    "Frame Within Frame": "Frame_Within_Frame",
+    "Golden Ratio": "Golden_Ratio",
+    "Leading Lines": "Leading_Lines",
+    "Negative Space": "Negative_Space",
+    "Rule of Thirds": "Rule_of_Thirds"
+  },
+  "lensFamilyAliases": {
+    "Vintage_Anamorphic": "Vintage_Anamorphic",
+    "Vintage_Spherical": "Vintage_Spherical"
+  },
+  "lensManufacturerAliases": {
+    "Bausch_Lomb": "Bausch_Lomb",
+    "Kowa": "Kowa",
+    "MGM": "Vintage",
+    "Paramount": "Vintage",
+    "Technicolor": "Vintage",
+    "Todd_AO": "Todd_AO",
+    "Universal": "Vintage",
+    "Warner_Bros": "Vintage"
+  },
+  "movementAliases": {
+    "Controlled": {
+      "field": "equipment",
+      "value": "Static"
+    },
+    "Controlled_Dolly": {
+      "field": "equipment",
+      "value": "Dolly"
+    },
+    "Extended_Handheld": {
+      "field": "equipment",
+      "value": "Handheld"
+    },
+    "Extended_Tracking": {
+      "field": "movementType",
+      "value": "Track_In"
+    },
+    "Fast_Montage": {
+      "field": "timing",
+      "value": "Fast"
+    },
+    "Fast_Tracking": {
+      "field": "movementType",
+      "value": "Track_In"
+    },
+    "Floating": {
+      "field": "equipment",
+      "value": "Static"
+    },
+    "Floating_Handheld": {
+      "field": "equipment",
+      "value": "Handheld"
+    },
+    "Gentle_Dolly": {
+      "field": "equipment",
+      "value": "Dolly"
+    },
+    "IMAX_Crane": {
+      "field": "equipment",
+      "value": "Crane"
+    },
+    "Kinetic": {
+      "field": "movementType",
+      "value": "Track_In"
+    },
+    "Locked_Off": {
+      "field": "equipment",
+      "value": "Static"
+    },
+    "Mechanical": {
+      "field": "equipment",
+      "value": "Motion_Control"
+    },
+    "Mechanical_Dolly": {
+      "field": "equipment",
+      "value": "Dolly"
+    },
+    "Minimal": {
+      "field": "equipment",
+      "value": "Static"
+    },
+    "Minimal_Dolly": {
+      "field": "equipment",
+      "value": "Dolly"
+    },
+    "Observational": {
+      "field": "equipment",
+      "value": "Static"
+    },
+    "Rigid": {
+      "field": "equipment",
+      "value": "Static"
+    },
+    "Slow": {
+      "field": "timing",
+      "value": "Slow"
+    },
+    "Slow_Crane": {
+      "field": "equipment",
+      "value": "Crane"
+    },
+    "Slow_Creep": {
+      "field": "movementType",
+      "value": "Track_In"
+    },
+    "Slow_Dolly": {
+      "field": "equipment",
+      "value": "Dolly"
+    },
+    "Slow_Handheld": {
+      "field": "equipment",
+      "value": "Handheld"
+    },
+    "Slow_Pan": {
+      "field": "movementType",
+      "value": "Pan"
+    },
+    "Slow_Push_In": {
+      "field": "movementType",
+      "value": "Push_In"
+    },
+    "Slow_Tracking": {
+      "field": "movementType",
+      "value": "Track_In"
+    },
+    "Slow_Zoom": {
+      "field": "movementType",
+      "value": "Zoom_In"
+    },
+    "Tracking": {
+      "field": "movementType",
+      "value": "Track_In"
+    },
+    "Unpredictable": {
+      "field": "equipment",
+      "value": "Handheld"
+    },
+    "Unsettling_Static": {
+      "field": "equipment",
+      "value": "Static"
+    }
+  },
+  "shotSizeAliases": {
+    "Big Close Up": "BCU",
+    "Big_Close_Up": "BCU",
+    "Close Up": "CU",
+    "Close_Up": "CU",
+    "Cowboy_Shot": "American",
+    "Extreme Close Up": "ECU",
+    "Extreme Wide Shot": "EWS",
+    "Extreme_Close_Up": "ECU",
+    "Extreme_Wide_Shot": "EWS",
+    "Medium Close Up": "MCU",
+    "Medium Shot": "MS",
+    "Medium Wide Shot": "MWS",
+    "Medium_Close_Up": "MCU",
+    "Medium_Shot": "MS",
+    "Medium_Wide_Shot": "MWS",
+    "Over The Shoulder": "OTS",
+    "Over_The_Shoulder": "OTS",
+    "Point_of_View": "POV",
+    "Wide Shot": "WS",
+    "Wide_Shot": "WS"
+  },
+  "styleDomainAliases": {
+    "3D": "ThreeD",
+    "Anime": "Anime",
+    "Concept_Art": "Concept_Art",
+    "Graphic_Novel": "Graphic_Novel",
+    "Illustration": "Illustration",
+    "Manga": "Manga",
+    "Painterly": "Painterly",
+    "ThreeD": "ThreeD",
+    "Western_Animation": "Western_Animation"
+  }
+}

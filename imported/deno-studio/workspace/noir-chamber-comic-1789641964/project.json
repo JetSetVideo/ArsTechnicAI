@@ -1,0 +1,25 @@
+{
+  "project_id": "noir-chamber-comic-1789641964",
+  "name": "Noir Chamber Comic",
+  "source_name": "Noir Chamber Comic",
+  "created_at": 1789641964.719,
+  "createdAt": "2026-09-17T10:46:04.719Z",
+  "media_type": "comic",
+  "length": "24 pages",
+  "tags": [
+    "noir",
+    "1970s",
+    "chamber"
+  ],
+  "models": [
+    "comfy:flux-dev"
+  ],
+  "favorite": false,
+  "frame_count": 0,
+  "origin": "studio",
+  "moodboard": [],
+  "assets": [],
+  "references": [],
+  "workflow_id": null,
+  "source_path": ""
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://arttechnic.ai/schemas/v2/hybrid_blueprint.json",
+  "workflow_id": "wf_lineage_image_iteration",
+  "title": "Generative Image Iteration with Non-Destructive Lineage",
+  "version": "2.2.0",
+  "graph_structure": {
+    "nodes": [
+      {
+        "id": "ast_img_087_v1",
+        "type": "asset_node",
+        "origin_type": "generated",
+        "label": "Base Generation - Version 1",
+        "edges_out": ["ast_img_088_v2"]
+      },
+      {
+        "id": "ast_img_088_v2",
+        "type": "asset_node",
+        "origin_type": "derived",
+        "label": "Derived Generation - Version 2 (Prompt Refined)",
+        "edges_in": ["ast_img_087_v1"]
+      }
+    ]
+  },
+  "columnar_parameters": [
+    {
+      "record_id": "col_log_881922",
+      "asset_id": "ast_img_087_v1",
+      "model_name": "Nano Banana v2.0",
+      "prompt": "1950s wedding portrait, black and white film, realistic face details",
+      "seed": 40291823,
+      "guidance_scale": 7.0,
+      "execution_time_ms": 1420
+    },
+    {
+      "record_id": "col_log_881923",
+      "asset_id": "ast_img_088_v2",
+      "model_name": "Nano Banana v2.0",
+      "prompt": "1950s wedding portrait, black and white film, realistic face details, sharp focus, restored grain",
+      "seed": 40291823,
+      "guidance_scale": 8.5,
+      "execution_time_ms": 1580
+    }
+  ],
+  "cost_estimation": {
+    "total_branches": 1,
+    "total_execution_paths": 2,
+    "estimated_compute_cost_usd": 0.04
+  }
+}

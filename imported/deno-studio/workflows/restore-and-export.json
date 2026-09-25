@@ -1,0 +1,363 @@
+{
+  "id": "restore-and-export",
+  "name": "Restore a reel and export it",
+  "note": "The full restoration pass: stabilise first (every temporal stage improves once frames are aligned), then deflicker, repair dust, and balance contrast. The loop runs it over the frame range and Render encodes the result.",
+  "savedAt": 1789684961263,
+  "media_type": "reel",
+  "graph": {
+    "id": "restore-and-export",
+    "projectId": null,
+    "nodes": {
+      "src": {
+        "id": "src",
+        "type": "source.sequence",
+        "name": "Video",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 138
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "stack": {
+        "id": "stack",
+        "type": "flow.stack",
+        "name": "Z Stack",
+        "position": {
+          "x": 304,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 158
+        },
+        "values": {
+          "stride": {
+            "kind": "Number",
+            "value": 1
+          },
+          "wrap": {
+            "kind": "Flag",
+            "value": false
+          }
+        },
+        "authoredBy": {
+          "stride": "user",
+          "wrap": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "stab": {
+        "id": "stab",
+        "type": "stage.stabilize",
+        "name": "Stabilisation",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 238
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "flick": {
+        "id": "flick",
+        "type": "stage.deflicker",
+        "name": "Luminance Deflicker",
+        "position": {
+          "x": 904,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 198
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "dust": {
+        "id": "dust",
+        "type": "stage.defect",
+        "name": "Dust & Scratch Repair",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 218
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "clahe": {
+        "id": "clahe",
+        "type": "stage.clahe",
+        "name": "CLAHE / Contrast Balance",
+        "position": {
+          "x": 1504,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 158
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "collect": {
+        "id": "collect",
+        "type": "flow.collect",
+        "name": "Collect",
+        "position": {
+          "x": 1800,
+          "y": 0
+        },
+        "size": {
+          "w": 212,
+          "h": 98
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "render": {
+        "id": "render",
+        "type": "out.render",
+        "name": "Render",
+        "position": {
+          "x": 2104,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 138
+        },
+        "values": {
+          "fps": {
+            "kind": "Number",
+            "value": 25
+          },
+          "crf": {
+            "kind": "Number",
+            "value": 18
+          }
+        },
+        "authoredBy": {
+          "fps": "user",
+          "crf": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "view": {
+        "id": "view",
+        "type": "out.view",
+        "name": "Viewer",
+        "position": {
+          "x": 1504,
+          "y": 240
+        },
+        "size": {
+          "w": 236,
+          "h": 98
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      }
+    },
+    "edges": {
+      "e_3977a6f67a63": {
+        "id": "e_3977a6f67a63",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "stack",
+          "port": "sequence"
+        },
+        "order": 0
+      },
+      "e_699fed4bb072": {
+        "id": "e_699fed4bb072",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "stab",
+          "port": "neighbours"
+        },
+        "order": 0
+      },
+      "e_1c6e53d9e177": {
+        "id": "e_1c6e53d9e177",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "flick",
+          "port": "neighbours"
+        },
+        "order": 0
+      },
+      "e_f4b1d045d92e": {
+        "id": "e_f4b1d045d92e",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "dust",
+          "port": "neighbours"
+        },
+        "order": 0
+      },
+      "e_a27095b709c5": {
+        "id": "e_a27095b709c5",
+        "from": {
+          "node": "stack",
+          "port": "image"
+        },
+        "to": {
+          "node": "stab",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_d6ab30608e90": {
+        "id": "e_d6ab30608e90",
+        "from": {
+          "node": "stab",
+          "port": "image"
+        },
+        "to": {
+          "node": "flick",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_73cd0174c3a0": {
+        "id": "e_73cd0174c3a0",
+        "from": {
+          "node": "flick",
+          "port": "image"
+        },
+        "to": {
+          "node": "dust",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_ffb979b5aa05": {
+        "id": "e_ffb979b5aa05",
+        "from": {
+          "node": "dust",
+          "port": "image"
+        },
+        "to": {
+          "node": "clahe",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_7af57308fa10": {
+        "id": "e_7af57308fa10",
+        "from": {
+          "node": "clahe",
+          "port": "image"
+        },
+        "to": {
+          "node": "collect",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_8a910580da3d": {
+        "id": "e_8a910580da3d",
+        "from": {
+          "node": "clahe",
+          "port": "image"
+        },
+        "to": {
+          "node": "view",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_11375a7c9a86": {
+        "id": "e_11375a7c9a86",
+        "from": {
+          "node": "collect",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "render",
+          "port": "sequence"
+        },
+        "order": 0
+      }
+    },
+    "stacks": {},
+    "revision": 20
+  }
+}

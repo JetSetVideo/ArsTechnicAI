@@ -1,0 +1,286 @@
+{
+  "id": "isolate-subject-and-treat",
+  "name": "Treat the subject only",
+  "note": "Segment the subject, turn the matte into a region, and composite a differently graded version through it. The background keeps its grain; the face gets the contrast.",
+  "savedAt": 1789684961266,
+  "media_type": "reel",
+  "graph": {
+    "id": "isolate-subject-and-treat",
+    "projectId": null,
+    "nodes": {
+      "src": {
+        "id": "src",
+        "type": "source.sequence",
+        "name": "Video",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 138
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "frame": {
+        "id": "frame",
+        "type": "source.frame",
+        "name": "Frame Selection",
+        "position": {
+          "x": 304,
+          "y": 0
+        },
+        "size": {
+          "w": 212,
+          "h": 118
+        },
+        "values": {
+          "index": {
+            "kind": "Number",
+            "value": 0
+          }
+        },
+        "authoredBy": {
+          "index": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "seg": {
+        "id": "seg",
+        "type": "mask.segment",
+        "name": "Segment Subject",
+        "position": {
+          "x": 600,
+          "y": 240
+        },
+        "size": {
+          "w": 248,
+          "h": 158
+        },
+        "values": {
+          "prompt": {
+            "kind": "Text",
+            "value": "the people in the foreground"
+          }
+        },
+        "authoredBy": {
+          "prompt": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "region": {
+        "id": "region",
+        "type": "flow.propagate",
+        "name": "Region",
+        "position": {
+          "x": 904,
+          "y": 240
+        },
+        "size": {
+          "w": 236,
+          "h": 158
+        },
+        "values": {
+          "mode": {
+            "kind": "Enum",
+            "value": "union"
+          }
+        },
+        "authoredBy": {
+          "mode": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "clahe": {
+        "id": "clahe",
+        "type": "stage.clahe",
+        "name": "CLAHE / Contrast Balance",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 158
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "comp": {
+        "id": "comp",
+        "type": "flow.composite",
+        "name": "Composite",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 158
+        },
+        "values": {
+          "opacity": {
+            "kind": "Number",
+            "value": 1
+          }
+        },
+        "authoredBy": {
+          "opacity": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "view": {
+        "id": "view",
+        "type": "out.view",
+        "name": "Viewer",
+        "position": {
+          "x": 1504,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 98
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      }
+    },
+    "edges": {
+      "e_524b186d7546": {
+        "id": "e_524b186d7546",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "frame",
+          "port": "sequence"
+        },
+        "order": 0
+      },
+      "e_68dd11a3e6db": {
+        "id": "e_68dd11a3e6db",
+        "from": {
+          "node": "frame",
+          "port": "image"
+        },
+        "to": {
+          "node": "seg",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_6cd015c9cf84": {
+        "id": "e_6cd015c9cf84",
+        "from": {
+          "node": "frame",
+          "port": "image"
+        },
+        "to": {
+          "node": "clahe",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_145ce59a0184": {
+        "id": "e_145ce59a0184",
+        "from": {
+          "node": "seg",
+          "port": "mask"
+        },
+        "to": {
+          "node": "region",
+          "port": "a"
+        },
+        "order": 0
+      },
+      "e_fe9b7ee958c1": {
+        "id": "e_fe9b7ee958c1",
+        "from": {
+          "node": "frame",
+          "port": "image"
+        },
+        "to": {
+          "node": "comp",
+          "port": "base"
+        },
+        "order": 0
+      },
+      "e_46e8b5a9913d": {
+        "id": "e_46e8b5a9913d",
+        "from": {
+          "node": "clahe",
+          "port": "image"
+        },
+        "to": {
+          "node": "comp",
+          "port": "over"
+        },
+        "order": 0
+      },
+      "e_b31022a20525": {
+        "id": "e_b31022a20525",
+        "from": {
+          "node": "region",
+          "port": "mask"
+        },
+        "to": {
+          "node": "comp",
+          "port": "mask"
+        },
+        "order": 0
+      },
+      "e_804624232ef1": {
+        "id": "e_804624232ef1",
+        "from": {
+          "node": "comp",
+          "port": "image"
+        },
+        "to": {
+          "node": "view",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_1c3edf3cf593": {
+        "id": "e_1c3edf3cf593",
+        "from": {
+          "node": "frame",
+          "port": "image"
+        },
+        "to": {
+          "node": "view",
+          "port": "compare"
+        },
+        "order": 0
+      }
+    },
+    "stacks": {},
+    "revision": 16
+  }
+}

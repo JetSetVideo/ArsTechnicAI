@@ -1,0 +1,273 @@
+{
+  "kind": "star",
+  "source": "Screen-archetype vocabulary — casting and performance, not likeness",
+  "_note": "These describe how a presence is cast, played, dressed and lit. They deliberately do not describe the face of any real person: a shot needs a presence, and presence is a blocking and lighting decision. Real people appear in this library only as attribution, in library/cinema/cinematography.json.",
+  "entries": [
+    {
+      "id": "hardboiled_detective",
+      "name": "The Hard-Boiled Detective",
+      "summary": "Weathered, watchful, always one drink and one betrayal behind the plot.",
+      "tags": ["noir", "1940s", "male-coded", "cynical", "urban"],
+      "detail": "The camera respects him and does not like him. Shot from slightly below in his own office, slightly above everywhere else — he owns exactly one room. Practical desk lamp as key, venetian-blind slats across the face, the eyes kept in shadow until he decides to tell the truth.",
+      "grant": {
+        "prompt": [
+          "worn trench coat and loosened tie, hat brim low",
+          "hard low-key key light from a desk lamp, eyes in shadow",
+          "venetian blind slats raking across the face",
+          "unshaven, tired, watchful stillness",
+          "cigarette smoke catching a hard backlight"
+        ],
+        "negative": ["glamour lighting", "clean shaven hero pose", "bright even fill"]
+      },
+      "where": "urban office, night streets",
+      "when": "1940s",
+      "why": "Weathered, watchful, always one drink and one betrayal behind the plot.",
+      "how": "Shot from slightly below in his own office; practical desk lamp as key, venetian-blind slats across the face.",
+      "characters": ["The Hard-Boiled Detective"],
+      "studio": "Warner / RKO crime unit (archetype)",
+      "related": ["star.femme_fatale", "movie.double_indemnity", "script.interrogation"]
+    },
+    {
+      "id": "femme_fatale",
+      "name": "The Femme Fatale",
+      "summary": "Lit like a promise, blocked like a trap. Controls the frame she enters.",
+      "tags": ["noir", "1940s", "female-coded", "dangerous", "glamour"],
+      "detail": "Classical glamour lighting used against its own grain: soft key, strong rim, and a fill so low the shadow side of the face stays unreadable. She is almost always the closest thing to camera in a two-shot, which is how the frame says who is in charge.",
+      "grant": {
+        "prompt": [
+          "soft glamour key with a hard silver rim light",
+          "deep unfilled shadow on the far side of the face",
+          "bias-cut satin, gloves, a hat with a veil",
+          "held eye contact, minimal movement, weight on one hip",
+          "smoke and a shallow depth of field"
+        ],
+        "negative": ["girl-next-door warmth", "flat frontal fill", "candid expression"]
+      }
+    },
+    {
+      "id": "everyman",
+      "name": "The Everyman",
+      "summary": "Ordinary on purpose. The audience's stand-in, so the world reads through them.",
+      "tags": ["neorealism", "contemporary", "sympathetic", "grounded"],
+      "detail": "Shot at eye level on a normal lens — 40 to 50 mm — because any other choice would be a comment. Clothes that were bought, not designed. The performance register is reaction rather than action.",
+      "grant": {
+        "prompt": [
+          "eye-level framing on a 50mm normal lens",
+          "available light, soft and motivated by a window",
+          "unremarkable contemporary clothing, slightly worn",
+          "reactive expression, listening rather than speaking"
+        ],
+        "negative": ["heroic low angle", "styled wardrobe", "dramatic rim light"]
+      }
+    },
+    {
+      "id": "silent_comedian",
+      "name": "The Silent Comedian",
+      "summary": "The whole body is the performance, so the camera must stay wide and stay still.",
+      "tags": ["silent", "1920s", "physical", "comedy", "Pre_1950"],
+      "detail": "The single rule of physical comedy is that the gag must be legible in one unbroken wide shot: cutting in destroys the geometry the joke depends on. Locked-off camera, full figure in frame, deep depth of field so the background gag lands at the same time as the foreground one.",
+      "grant": {
+        "prompt": [
+          "locked-off wide shot, full figure in frame head to toe",
+          "deep focus so foreground and background action both read",
+          "high-key flat lighting, orthochromatic monochrome",
+          "exaggerated full-body physical performance",
+          "period tailoring, oversized or undersized on purpose"
+        ],
+        "negative": ["shallow depth of field", "close-up coverage", "handheld camera"]
+      }
+    },
+    {
+      "id": "method_brooder",
+      "name": "The Method Brooder",
+      "summary": "Interior life played on the face. The camera holds long past comfort.",
+      "tags": ["new-hollywood", "1970s", "interior", "naturalistic"],
+      "detail": "The New Hollywood close-up: long lens, shallow focus, no cut. The performance is mostly not doing things, so the coverage has to be patient enough to let not-doing register.",
+      "grant": {
+        "prompt": [
+          "tight close-up on an 85mm or longer lens, shallow focus",
+          "soft naturalistic side light, practical-motivated",
+          "held expression, minimal movement, thinking visible",
+          "desaturated period colour, slight grain"
+        ],
+        "negative": ["fast cutting", "wide-angle distortion", "theatrical gesture"]
+      }
+    },
+    {
+      "id": "action_lead",
+      "name": "The Action Lead",
+      "summary": "Competence made visible. Framed so the geography of a fight stays readable.",
+      "tags": ["action", "contemporary", "physical", "heroic"],
+      "detail": "The mistake is shooting the punches; the craft is shooting the space. Wider than instinct suggests, camera on a level with the action, and the actor's own body kept in frame through the move so the audience believes they did it.",
+      "grant": {
+        "prompt": [
+          "medium-wide framing that keeps full body in frame through the move",
+          "hard directional key with strong separation from background",
+          "practical, functional wardrobe that shows wear and damage",
+          "controlled physical performance, weight and effort visible"
+        ],
+        "negative": ["shaky insert coverage", "obscured geography", "soft flattering light"]
+      }
+    },
+    {
+      "id": "ingenue",
+      "name": "The Ingénue",
+      "summary": "Lit softer than everything around her, which is the point and the problem.",
+      "tags": ["classic-hollywood", "romantic", "soft", "glamour"],
+      "detail": "The classical convention is a dedicated soft key and an eye light, often a whole separate lighting setup from the scene she is standing in. Worth reaching for deliberately — and worth noticing that reaching for it accidentally is how a film patronises a character.",
+      "grant": {
+        "prompt": [
+          "soft frontal key with a dedicated eye light",
+          "gentle diffusion, halation on highlights",
+          "high-key exposure, low contrast ratio",
+          "open, unguarded expression"
+        ],
+        "negative": ["hard shadow", "low-key contrast", "grain"]
+      }
+    },
+    {
+      "id": "character_actor",
+      "name": "The Character Actor",
+      "summary": "Specific rather than beautiful. Carries an entire backstory in a walk.",
+      "tags": ["ensemble", "naturalistic", "specific", "supporting"],
+      "detail": "Cast for texture: an unusual face, an idiosyncratic rhythm, wardrobe that looks lived in rather than assembled. Framing treats them as part of the world, so they are usually found in the shot rather than presented by it.",
+      "grant": {
+        "prompt": [
+          "found framing — discovered within the shot rather than centred",
+          "practical motivated lighting, unflattering and specific",
+          "worn, particular wardrobe with real history",
+          "idiosyncratic physicality and rhythm"
+        ],
+        "negative": ["hero framing", "beauty light", "symmetrical composition"]
+      }
+    },
+    {
+      "id": "menacing_authority",
+      "name": "The Menacing Authority",
+      "summary": "Power expressed as stillness and as the amount of frame they are given.",
+      "tags": ["antagonist", "institutional", "still", "menacing"],
+      "detail": "Threat reads as composure. Low angle, negative space above the head rather than below, and a refusal to move — everyone else in the scene adjusts around them. Cool sources, hard quality, and one source only.",
+      "grant": {
+        "prompt": [
+          "low angle with headroom above, subject small in a large frame",
+          "single hard cool key, no fill, deep shadow side",
+          "immaculate tailoring or uniform, nothing out of place",
+          "complete stillness, unhurried speech"
+        ],
+        "negative": ["visible effort", "warm light", "handheld urgency"]
+      }
+    },
+    {
+      "id": "chorus_witness",
+      "name": "The Chorus / Witness",
+      "summary": "Sees the film happen. Rarely central, always in frame at the right moment.",
+      "tags": ["ensemble", "observational", "neorealism", "documentary"],
+      "detail": "The neorealist device: a non-professional presence held at the edge of the frame whose reaction tells the audience how to feel about the centre. Wide lens, deep focus, and no coverage of their own.",
+      "grant": {
+        "prompt": [
+          "held at frame edge, deep focus, sharing the shot with the action",
+          "available light, no separate treatment from the scene",
+          "unstyled, regionally specific clothing",
+          "watching, not participating"
+        ],
+        "negative": ["dedicated close-up", "separate key light", "acted reaction"]
+      }
+    },
+    {
+      "id": "screwball_pair",
+      "name": "The Screwball Pair",
+      "summary": "Two people talking faster than they think, framed to keep both in play.",
+      "tags": ["classic-hollywood", "1930s", "comedy", "dialogue", "two-shot"],
+      "detail": "Overlapping dialogue needs a two-shot that holds, because cutting between singles turns an argument into a tennis match. Bright high-key so nothing hides, and blocking that constantly rearranges who is nearer camera.",
+      "grant": {
+        "prompt": [
+          "sustained two-shot, both faces readable, no coverage cut",
+          "high-key three-point lighting, low contrast",
+          "1930s tailoring, immaculate",
+          "overlapping rapid dialogue, constant repositioning"
+        ],
+        "negative": ["shot-reverse-shot singles", "low key", "static blocking"]
+      }
+    },
+    {
+      "id": "wandering_stranger",
+      "name": "The Wandering Stranger",
+      "summary": "Arrives with no past, leaves with no explanation. The landscape is the co-star.",
+      "tags": ["western", "mythic", "wide", "solitary"],
+      "detail": "Almost never in close-up until the last act — the withholding is the characterisation. Extreme wide shots with the figure small against terrain, hard top sun, and a silhouette that has to be identifiable at any distance.",
+      "grant": {
+        "prompt": [
+          "extreme wide shot, figure small against vast landscape",
+          "hard midday sun, deep contrast, long shadow",
+          "instantly readable silhouette — hat, coat, stance",
+          "dust, heat haze, weathered texture"
+        ],
+        "negative": ["early close-up", "soft light", "interior setting"]
+      }
+    },
+    {
+      "id": "anime_protagonist",
+      "name": "The Anime Protagonist",
+      "summary": "Expressive stillness punctuated by a single held pose that carries the scene.",
+      "tags": ["anime", "2D", "stylised", "expressive"],
+      "detail": "Limited animation is a grammar, not a budget: hold the drawing, move the camera and the effects instead, and spend the movement on one impact frame. Line weight, not shading, does the modelling.",
+      "grant": {
+        "prompt": [
+          "cel-shaded flat colour with hard-edged shadow shapes",
+          "expressive variable line weight",
+          "held key pose with speed lines and effect animation around it",
+          "large expressive eyes, simplified facial planes"
+        ],
+        "negative": ["photorealistic rendering", "soft gradient shading", "motion blur"]
+      }
+    },
+    {
+      "id": "stop_motion_figure",
+      "name": "The Stop-Motion Figure",
+      "summary": "Handmade presence. The fingerprints are part of the performance.",
+      "tags": ["stopmotion", "tactile", "handmade", "animation"],
+      "detail": "The whole appeal is the evidence of hand: visible seams, slight boil in the surface between frames, real light falling on real material. Smoothing any of that out removes the reason for the technique.",
+      "grant": {
+        "prompt": [
+          "visible material texture — felt, clay, machined seams",
+          "real practical lighting with genuine soft shadow falloff",
+          "slight frame-to-frame surface boil",
+          "shallow miniature depth of field"
+        ],
+        "negative": ["digital smoothness", "perfect surfaces", "uniform motion"]
+      }
+    },
+    {
+      "id": "documentary_subject",
+      "name": "The Documentary Subject",
+      "summary": "Aware of the camera and negotiating with it. Nothing is blocked.",
+      "tags": ["documentary", "verite", "handheld", "available-light"],
+      "detail": "Direct cinema: the camera arrives late, finds focus in shot, and does not get a second take. Composition is whatever was possible, which is why it reads as true.",
+      "grant": {
+        "prompt": [
+          "handheld, reframing in shot, focus found rather than set",
+          "available light only, mixed colour temperature",
+          "imperfect composition, headroom wrong, subject off-centre",
+          "direct address or awareness of camera"
+        ],
+        "negative": ["lit setup", "locked-off tripod", "composed framing"]
+      }
+    },
+    {
+      "id": "chamber_duo",
+      "name": "The Chamber Duo",
+      "summary": "Two faces, one room, ninety minutes. Everything happens in the cutting pattern.",
+      "tags": ["chamber-drama", "interior", "close-up", "bergman"],
+      "detail": "The Bergman configuration: matched clean singles in tight close-up, held far longer than dialogue requires, until the audience starts reading the face instead of listening to the line. Frontal soft key, black background, no environment.",
+      "grant": {
+        "prompt": [
+          "tight matched close-ups, frontal, black surround",
+          "soft frontal key with strong falloff to darkness",
+          "sustained hold well past the end of the line",
+          "no environmental context in frame"
+        ],
+        "negative": ["establishing wide", "busy background", "fast cutting"]
+      }
+    }
+  ]
+}

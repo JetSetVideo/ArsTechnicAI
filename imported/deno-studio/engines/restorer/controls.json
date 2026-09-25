@@ -1,0 +1,133 @@
+{
+  "$comment": "Single source of truth for the parameter UI. The Deno frontend generates every control from this file; the Python backend validates ranges against it. Keys mirror pipeline.DEFAULT_PARAMS exactly.",
+  "version": 1,
+  "sections": [
+    {
+      "key": "stabilize",
+      "label": "Stabilisation",
+      "hint": "ORB feature tracking with RANSAC, then trajectory smoothing. Cancels gate weave and hand shake.",
+      "controls": [
+        { "key": "mode", "type": "select", "label": "Mode", "options": ["smooth", "lock", "off"],
+          "help": "smooth = keep intentional pans, remove shake. lock = pin every frame to one anchor." },
+        { "key": "motion_model", "type": "select", "label": "Motion model",
+          "options": ["translation", "euclidean", "similarity", "affine", "homography"] },
+        { "key": "max_features", "type": "range", "label": "Max features", "min": 100, "max": 4000, "step": 50 },
+        { "key": "match_ratio", "type": "range", "label": "Match threshold", "min": 0.5, "max": 0.95, "step": 0.01,
+          "help": "Lowe ratio test. Higher accepts more (looser) matches." },
+        { "key": "ransac_reproj", "type": "range", "label": "RANSAC reproj. error", "min": 0.5, "max": 10, "step": 0.1, "unit": "px" },
+        { "key": "smoothing_radius", "type": "range", "label": "Smoothing radius", "min": 1, "max": 60, "step": 1, "unit": "fr" },
+        { "key": "anchor_frame", "type": "number", "label": "Anchor frame", "min": 0, "max": 999999, "step": 1, "showIf": { "mode": "lock" } },
+        { "key": "ecc_refine", "type": "toggle", "label": "ECC sub-pixel refine" },
+        { "key": "ecc_iterations", "type": "range", "label": "ECC iterations", "min": 10, "max": 300, "step": 10, "showIf": { "ecc_refine": true } },
+        { "key": "crop_ratio", "type": "range", "label": "Border crop", "min": 0, "max": 0.2, "step": 0.005, "unit": "%", "scale": 100 },
+        { "key": "border", "type": "select", "label": "Border fill", "options": ["reflect", "replicate", "black"] }
+      ]
+    },
+    {
+      "key": "level",
+      "label": "Roll / True Level",
+      "hint": "Absolute tilt, not shake. Stabilisation smooths changes in roll; this removes roll itself, against a horizon you declare on the band under the picture.",
+      "controls": [
+        { "key": "auto", "type": "toggle", "label": "Follow the measured roll",
+          "help": "Off pins every frame to one manual angle instead." },
+        { "key": "reference", "type": "range", "label": "True level", "min": -15, "max": 15, "step": 0.1, "unit": "°",
+          "help": "The angle the picture should sit at. Drag the grey line on the level band to set it." },
+        { "key": "angle", "type": "range", "label": "Manual angle", "min": -20, "max": 20, "step": 0.1, "unit": "°", "showIf": { "auto": false } },
+        { "key": "strength", "type": "range", "label": "Strength", "min": 0, "max": 1, "step": 0.05 },
+        { "key": "max_correction", "type": "range", "label": "Correction limit", "min": 1, "max": 25, "step": 0.5, "unit": "°",
+          "help": "A frame with no usable line structure must never be thrown on its side by a bad estimate." },
+        { "key": "scale", "type": "range", "label": "Zoom to hide corners", "min": 1, "max": 1.4, "step": 0.005 }
+      ]
+    },
+    {
+      "key": "reframe",
+      "label": "Reframe & Outpaint",
+      "hint": "Pull back to recover the composition the cameraman cut off. The margin beyond the film is filled from neighbouring frames wherever the camera already photographed it.",
+      "controls": [
+        { "key": "zoom", "type": "range", "label": "Zoom", "min": 0.5, "max": 2, "step": 0.01,
+          "help": "Below 1 pulls back, exposing area the frame never covered." },
+        { "key": "offset_x", "type": "range", "label": "Recentre X", "min": -0.5, "max": 0.5, "step": 0.005 },
+        { "key": "offset_y", "type": "range", "label": "Recentre Y", "min": -0.5, "max": 0.5, "step": 0.005 },
+        { "key": "fill", "type": "select", "label": "Margin fill", "options": ["mosaic", "reflect", "black"],
+          "help": "mosaic transplants from neighbouring frames — real photography wherever the camera panned." },
+        { "key": "mosaic_radius", "type": "range", "label": "Neighbours searched", "min": 1, "max": 16, "step": 1, "unit": "fr", "showIf": { "fill": "mosaic" } }
+      ]
+    },
+    {
+      "key": "temporal_fusion",
+      "label": "Temporal Detail Recovery",
+      "hint": "Averages motion-compensated neighbours to lift real detail out of grain. The single strongest quality win on noisy film.",
+      "controls": [
+        { "key": "radius", "type": "range", "label": "Neighbours each side", "min": 1, "max": 8, "step": 1 },
+        { "key": "sigma_color", "type": "range", "label": "Rejection sigma", "min": 4, "max": 60, "step": 1,
+          "help": "Lower rejects more neighbour pixels — safer on movement, less noise reduction." },
+        { "key": "detail_boost", "type": "range", "label": "Detail re-injection", "min": 0, "max": 1, "step": 0.05 }
+      ]
+    },
+    {
+      "key": "deflicker",
+      "label": "Luminance Deflicker",
+      "hint": "Moving-average histogram matching across a sliding window of N frames.",
+      "controls": [
+        { "key": "mode", "type": "select", "label": "Method", "options": ["histogram", "luminance"] },
+        { "key": "window", "type": "range", "label": "Window N", "min": 3, "max": 30, "step": 1, "unit": "fr" },
+        { "key": "strength", "type": "range", "label": "Strength", "min": 0, "max": 1, "step": 0.05 }
+      ]
+    },
+    {
+      "key": "defect",
+      "label": "Dust & Scratch Repair",
+      "hint": "Flags specks that exist in one frame only, then inpaints them.",
+      "controls": [
+        { "key": "sensitivity", "type": "range", "label": "Sensitivity", "min": 1.2, "max": 8, "step": 0.1, "unit": "σ" },
+        { "key": "min_area", "type": "range", "label": "Min blob area", "min": 1, "max": 40, "step": 1, "unit": "px" },
+        { "key": "max_area", "type": "range", "label": "Max blob area", "min": 20, "max": 4000, "step": 20, "unit": "px" },
+        { "key": "dilate", "type": "range", "label": "Mask dilation", "min": 0, "max": 6, "step": 1 },
+        { "key": "inpaint_radius", "type": "range", "label": "Inpaint radius", "min": 1, "max": 12, "step": 1 },
+        { "key": "method", "type": "select", "label": "Algorithm", "options": ["telea", "ns"] },
+        { "key": "use_temporal", "type": "toggle", "label": "Use temporal evidence" }
+      ]
+    },
+    {
+      "key": "denoise",
+      "label": "Denoise",
+      "hint": "Non-local means, luma and chroma weighted separately.",
+      "controls": [
+        { "key": "h_luma", "type": "range", "label": "Luma strength", "min": 0.5, "max": 20, "step": 0.5 },
+        { "key": "h_chroma", "type": "range", "label": "Chroma strength", "min": 0.5, "max": 25, "step": 0.5 },
+        { "key": "template_window", "type": "range", "label": "Template window", "min": 3, "max": 15, "step": 2, "unit": "px" },
+        { "key": "search_window", "type": "range", "label": "Search window", "min": 7, "max": 35, "step": 2, "unit": "px" }
+      ]
+    },
+    {
+      "key": "clahe",
+      "label": "CLAHE / Contrast Balance",
+      "hint": "Adaptive histogram equalisation on the LAB L channel only, so colour is untouched.",
+      "controls": [
+        { "key": "clip_limit", "type": "range", "label": "clipLimit", "min": 0.5, "max": 10, "step": 0.1 },
+        { "key": "tile_grid", "type": "range", "label": "tileGridSize", "min": 4, "max": 16, "step": 1, "unit": "×n" }
+      ]
+    },
+    {
+      "key": "levels",
+      "label": "Levels & Colour",
+      "hint": "Global black/white points, gamma and saturation.",
+      "controls": [
+        { "key": "black", "type": "range", "label": "Black point", "min": 0, "max": 120, "step": 1 },
+        { "key": "white", "type": "range", "label": "White point", "min": 135, "max": 255, "step": 1 },
+        { "key": "gamma", "type": "range", "label": "Gamma", "min": 0.2, "max": 3, "step": 0.02 },
+        { "key": "saturation", "type": "range", "label": "Saturation", "min": 0, "max": 2, "step": 0.05 }
+      ]
+    },
+    {
+      "key": "sharpen",
+      "label": "Sharpen",
+      "hint": "Unsharp mask with a contrast threshold so grain is not amplified.",
+      "controls": [
+        { "key": "amount", "type": "range", "label": "Amount", "min": 0, "max": 2, "step": 0.05 },
+        { "key": "radius", "type": "range", "label": "Radius", "min": 0.3, "max": 6, "step": 0.1, "unit": "σ" },
+        { "key": "threshold", "type": "range", "label": "Threshold", "min": 0, "max": 30, "step": 1 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3521 @@
+{
+  "2001_a_space_odyssey": {
+    "aspect_ratio": "2.20:1",
+    "camera_body": [
+      "Super_Panavision_70",
+      "Mitchell_BFC_65"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Neutral",
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Symmetrical",
+      "Centered"
+    ],
+    "disallowed_moods": [
+      "Cheerful",
+      "Whimsical"
+    ],
+    "disallowed_sources": [],
+    "era": "1960s",
+    "film_stock": [
+      "Kodak_65mm_200T"
+    ],
+    "id": "2001_a_space_odyssey",
+    "lens_family": [
+      "Panavision_Ultra_Speed",
+      "Zeiss_Planar"
+    ],
+    "lens_manufacturer": [
+      "Panavision",
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Artificial"
+    ],
+    "lighting_style": [
+      "High_Key",
+      "Controlled"
+    ],
+    "mood": [
+      "Detached",
+      "Ethereal"
+    ],
+    "movement": [
+      "Static",
+      "Slow_Tracking"
+    ],
+    "name": "2001: A Space Odyssey",
+    "primary_focal_lengths": [
+      50,
+      75,
+      100
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1968
+  },
+  "a_clockwork_orange": {
+    "aspect_ratio": "1.66:1",
+    "camera_body": [
+      "Arriflex_35BL"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "High_Contrast"
+    ],
+    "composition": [
+      "Wide_Angle_Centered",
+      "Symmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5254"
+    ],
+    "id": "a_clockwork_orange",
+    "lens_family": [
+      "Zeiss_Super_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Artificial"
+    ],
+    "lighting_style": [
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Provocative",
+      "Surreal"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "A Clockwork Orange",
+    "primary_focal_lengths": [
+      18,
+      24,
+      35
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1971
+  },
+  "alien": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Industrial_Frames",
+      "Negative_Space"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5247"
+    ],
+    "id": "alien",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Practical_Lights",
+      "Artificial"
+    ],
+    "lighting_style": [
+      "Low_Key"
+    ],
+    "mood": [
+      "Claustrophobic",
+      "Dread"
+    ],
+    "movement": [
+      "Slow_Creep"
+    ],
+    "name": "Alien",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1979
+  },
+  "amelie": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "ARRI_535B"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated",
+      "Stylized"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "amelie",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Soft_Lighting"
+    ],
+    "mood": [
+      "Whimsical",
+      "Romantic"
+    ],
+    "movement": [
+      "Gentle_Dolly"
+    ],
+    "name": "Amelie",
+    "primary_focal_lengths": [
+      27,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 2001
+  },
+  "apocalypse_now": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Panavision_Panaflex",
+      "Arricam_ST"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Asymmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5247"
+    ],
+    "id": "apocalypse_now",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Expressionistic",
+      "Naturalistic"
+    ],
+    "mood": [
+      "Surreal",
+      "Oppressive"
+    ],
+    "movement": [
+      "Slow_Dolly",
+      "Handheld"
+    ],
+    "name": "Apocalypse Now",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75,
+      100
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Close_Up"
+    ],
+    "year": 1979
+  },
+  "barry_lyndon": {
+    "aspect_ratio": "1.66:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated",
+      "Natural"
+    ],
+    "composition": [
+      "Painterly",
+      "Symmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5254"
+    ],
+    "id": "barry_lyndon",
+    "lens_family": [
+      "Zeiss_Planar_f0.7"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Candle",
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Detached",
+      "Melancholic"
+    ],
+    "movement": [
+      "Minimal",
+      "Slow_Zoom"
+    ],
+    "name": "Barry Lyndon",
+    "primary_focal_lengths": [
+      36,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1975
+  },
+  "battle_of_algiers": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Documentary_Style"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1960s",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "battle_of_algiers",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Available_Light",
+      "Naturalistic"
+    ],
+    "mood": [
+      "Urgent",
+      "Documentary"
+    ],
+    "movement": [
+      "Handheld"
+    ],
+    "name": "The Battle of Algiers",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1966
+  },
+  "bicycle_thieves": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Street_Level"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI"
+    ],
+    "era": "Pre_1950",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "bicycle_thieves",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Cooke"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Melancholic",
+      "Hopeful"
+    ],
+    "movement": [
+      "Handheld"
+    ],
+    "name": "Bicycle Thieves",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Wide_Shot"
+    ],
+    "year": 1948
+  },
+  "blade_runner": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Centered",
+      "Symmetrical"
+    ],
+    "disallowed_moods": [
+      "Cheerful",
+      "Hopeful",
+      "Whimsical"
+    ],
+    "disallowed_sources": [],
+    "era": "1980s",
+    "film_stock": [
+      "Eastman_5293",
+      "Eastman_5294"
+    ],
+    "id": "blade_runner",
+    "lens_family": [
+      "Panavision_C_Series"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Neon",
+      "Tungsten",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Low_Key",
+      "Hard_Lighting",
+      "Practical_Motivated"
+    ],
+    "mood": [
+      "Gloomy",
+      "Noir"
+    ],
+    "movement": [
+      "Slow_Dolly",
+      "Static"
+    ],
+    "name": "Blade Runner",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75,
+      100
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1982,
+    "where": "Los Angeles, 2019",
+    "studio": "The Ladd Company / Warner Bros.",
+    "length": 117,
+    "characters": ["Deckard", "Rachael", "Roy Batty"],
+    "score": 8.1,
+    "why": "Neon-lit noir that made cyberpunk a photographic grammar, not a costume.",
+    "how": "High-contrast practical neon, smoke shafts, slow dolly, C-Series anamorphics.",
+    "related": ["movie.alien", "movie.drive", "movie.the_matrix"]
+  },
+  "blue_velvet": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Arriflex_35BL"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Highly_Saturated"
+    ],
+    "composition": [
+      "Centered",
+      "Asymmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1980s",
+    "film_stock": [
+      "Eastman_5247"
+    ],
+    "id": "blue_velvet",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Tungsten",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Expressionistic",
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Unsettling",
+      "Surreal"
+    ],
+    "movement": [
+      "Slow_Push_In"
+    ],
+    "name": "Blue Velvet",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Close_Up"
+    ],
+    "year": 1986
+  },
+  "brazil": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Muted",
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Overdesigned_Frames"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1980s",
+    "film_stock": [
+      "Eastman_5247"
+    ],
+    "id": "brazil",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Artificial",
+      "Fluorescent"
+    ],
+    "lighting_style": [
+      "Expressionistic"
+    ],
+    "mood": [
+      "Absurd",
+      "Oppressive"
+    ],
+    "movement": [
+      "Mechanical"
+    ],
+    "name": "Brazil",
+    "primary_focal_lengths": [
+      24,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1985
+  },
+  "breathless": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Eclair_NPR"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Improvised",
+      "Asymmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1960s",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "breathless",
+    "lens_family": [
+      "Angenieux_Optimo"
+    ],
+    "lens_manufacturer": [
+      "Angenieux"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Available_Light",
+      "Naturalistic"
+    ],
+    "mood": [
+      "Rebellious"
+    ],
+    "movement": [
+      "Handheld"
+    ],
+    "name": "Breathless",
+    "primary_focal_lengths": [
+      18,
+      25,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Close_Up"
+    ],
+    "year": 1960
+  },
+  "casablanca": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Rule_of_Thirds",
+      "Frame_Within_Frame"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "Neon",
+      "HMI"
+    ],
+    "era": "Pre_1950",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "casablanca",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Warner_Bros"
+    ],
+    "lighting_sources": [
+      "Tungsten",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Low_Key",
+      "Soft_Lighting"
+    ],
+    "mood": [
+      "Melancholic",
+      "Romantic"
+    ],
+    "movement": [
+      "Static",
+      "Minimal_Dolly"
+    ],
+    "name": "Casablanca",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Close_Up"
+    ],
+    "year": 1942
+  },
+  "children_of_men": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Arricam_LT"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Handheld_Frames"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision2_500T_5218"
+    ],
+    "id": "children_of_men",
+    "lens_family": [
+      "Zeiss_Master_Prime"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Overcast",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Oppressive",
+      "Urgent"
+    ],
+    "movement": [
+      "Extended_Handheld"
+    ],
+    "name": "Children of Men",
+    "primary_focal_lengths": [
+      18,
+      21,
+      25,
+      32
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 2006
+  },
+  "chinatown": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Desaturated"
+    ],
+    "composition": [
+      "Rule_of_Thirds",
+      "Negative_Space"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5254"
+    ],
+    "id": "chinatown",
+    "lens_family": [
+      "Panavision_C_Series"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Naturalistic",
+      "Low_Key"
+    ],
+    "mood": [
+      "Paranoid",
+      "Noir"
+    ],
+    "movement": [
+      "Static",
+      "Slow_Dolly"
+    ],
+    "name": "Chinatown",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75,
+      100
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Wide_Shot"
+    ],
+    "year": 1974
+  },
+  "citizen_kane": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Deep_Focus",
+      "Low_Angle"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI",
+      "Kino_Flo"
+    ],
+    "era": "Pre_1950",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "citizen_kane",
+    "lens_family": [
+      "Cooke_Speed_Panchro"
+    ],
+    "lens_manufacturer": [
+      "Cooke"
+    ],
+    "lighting_sources": [
+      "Tungsten"
+    ],
+    "lighting_style": [
+      "Low_Key",
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Introspective"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "Citizen Kane",
+    "primary_focal_lengths": [
+      24,
+      25,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1941
+  },
+  "come_and_see": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Disorienting_Framing"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1980s",
+    "film_stock": [
+      "Eastman_5247"
+    ],
+    "id": "come_and_see",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Overcast",
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Traumatic",
+      "Oppressive"
+    ],
+    "movement": [
+      "Slow_Handheld"
+    ],
+    "name": "Come and See",
+    "primary_focal_lengths": [
+      18,
+      25,
+      35
+    ],
+    "shot_sizes": [
+      "Close_Up",
+      "Wide_Shot"
+    ],
+    "year": 1985
+  },
+  "double_indemnity": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome",
+      "High_Contrast_BW"
+    ],
+    "composition": [
+      "High_Contrast",
+      "Venetian_Blinds"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI",
+      "Neon"
+    ],
+    "era": "Pre_1950",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "double_indemnity",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Paramount"
+    ],
+    "lighting_sources": [
+      "Tungsten"
+    ],
+    "lighting_style": [
+      "Low_Key",
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Menacing",
+      "Noir"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "Double Indemnity",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Close_Up"
+    ],
+    "year": 1944
+  },
+  "drive": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Alexa"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Neon",
+      "Cool_Saturated"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "drive",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Neon",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Practical_Motivated"
+    ],
+    "mood": [
+      "Detached",
+      "Noir"
+    ],
+    "movement": [
+      "Slow_Dolly"
+    ],
+    "name": "Drive",
+    "primary_focal_lengths": [
+      27,
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 2011
+  },
+  "enter_the_void": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "RED_One"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Neon",
+      "Highly_Saturated"
+    ],
+    "composition": [
+      "POV_Framing"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "enter_the_void",
+    "lens_family": [
+      "Canon_K35"
+    ],
+    "lens_manufacturer": [
+      "Canon"
+    ],
+    "lighting_sources": [
+      "Neon",
+      "Artificial"
+    ],
+    "lighting_style": [
+      "Expressionistic"
+    ],
+    "mood": [
+      "Hallucinatory",
+      "Surreal"
+    ],
+    "movement": [
+      "Floating"
+    ],
+    "name": "Enter the Void",
+    "primary_focal_lengths": [
+      18,
+      24,
+      35
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 2009
+  },
+  "eyes_wide_shut": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "ARRI_535B"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1990s",
+    "film_stock": [
+      "Eastman_5293"
+    ],
+    "id": "eyes_wide_shut",
+    "lens_family": [
+      "Zeiss_Super_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Tungsten",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Soft_Lighting",
+      "Practical_Motivated"
+    ],
+    "mood": [
+      "Dreamlike",
+      "Surreal"
+    ],
+    "movement": [
+      "Slow_Tracking"
+    ],
+    "name": "Eyes Wide Shut",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "MCU"
+    ],
+    "year": 1999
+  },
+  "harakiri": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Geometric",
+      "Symmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1960s",
+    "film_stock": [
+      "Fuji_Eterna_500T"
+    ],
+    "id": "harakiri",
+    "lens_family": [
+      "Vintage_Anamorphic"
+    ],
+    "lens_manufacturer": [
+      "Canon"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Oppressive",
+      "Tragic"
+    ],
+    "movement": [
+      "Controlled"
+    ],
+    "name": "Harakiri",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1962
+  },
+  "heat": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Panavision_Platinum"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Architectural"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1990s",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "heat",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Practical_Lights",
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Controlled",
+      "Tense"
+    ],
+    "movement": [
+      "Locked_Off"
+    ],
+    "name": "Heat",
+    "primary_focal_lengths": [
+      35,
+      50,
+      100
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1995
+  },
+  "her": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Alexa"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Warm_Saturated",
+      "Pastel"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "her",
+    "lens_family": [
+      "Zeiss_Master_Prime"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Soft_Lighting"
+    ],
+    "mood": [
+      "Intimate",
+      "Melancholic"
+    ],
+    "movement": [
+      "Slow_Tracking"
+    ],
+    "name": "Her",
+    "primary_focal_lengths": [
+      32,
+      50,
+      65,
+      85
+    ],
+    "shot_sizes": [
+      "MCU"
+    ],
+    "year": 2013
+  },
+  "in_the_mood_for_love": {
+    "aspect_ratio": "1.66:1",
+    "camera_body": [
+      "Arricam_ST",
+      "ARRI_535B"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Frame_Within_Frame"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "in_the_mood_for_love",
+    "lens_family": [
+      "Zeiss_Super_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Soft_Lighting"
+    ],
+    "mood": [
+      "Melancholic",
+      "Romantic"
+    ],
+    "movement": [
+      "Slow_Tracking"
+    ],
+    "name": "In the Mood for Love",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "MCU"
+    ],
+    "year": 2000
+  },
+  "jules_et_jim": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Eclair_NPR"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Playful_Framing"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1960s",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "jules_et_jim",
+    "lens_family": [
+      "Vintage_Anamorphic"
+    ],
+    "lens_manufacturer": [
+      "Angenieux"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Soft_Lighting",
+      "Naturalistic"
+    ],
+    "mood": [
+      "Romantic",
+      "Playful"
+    ],
+    "movement": [
+      "Kinetic",
+      "Handheld"
+    ],
+    "name": "Jules et Jim",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Wide_Shot"
+    ],
+    "year": 1962
+  },
+  "la_dolce_vita": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Wide_Frames"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1960s",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "la_dolce_vita",
+    "lens_family": [
+      "Vintage_Anamorphic"
+    ],
+    "lens_manufacturer": [
+      "Technovision"
+    ],
+    "lighting_sources": [
+      "Practical_Lights",
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Existential",
+      "Decadent"
+    ],
+    "movement": [
+      "Slow_Tracking"
+    ],
+    "name": "La Dolce Vita",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1960
+  },
+  "la_haine": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Arriflex_35BL"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Street_Level"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1990s",
+    "film_stock": [
+      "Kodak_Double_X_5222"
+    ],
+    "id": "la_haine",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Practical_Lights",
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic",
+      "Available_Light"
+    ],
+    "mood": [
+      "Angry",
+      "Urgent"
+    ],
+    "movement": [
+      "Handheld"
+    ],
+    "name": "La Haine",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 1995
+  },
+  "lawrence_of_arabia": {
+    "aspect_ratio": "2.20:1",
+    "camera_body": [
+      "Super_Panavision_70"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Wide_Symmetrical",
+      "Negative_Space"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1960s",
+    "film_stock": [
+      "Kodak_65mm_200T",
+      "Eastman_5250"
+    ],
+    "id": "lawrence_of_arabia",
+    "lens_family": [
+      "Panavision_Ultra_Speed"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Epic"
+    ],
+    "movement": [
+      "Static",
+      "Slow_Crane"
+    ],
+    "name": "Lawrence of Arabia",
+    "primary_focal_lengths": [
+      28,
+      35,
+      50,
+      100,
+      482
+    ],
+    "shot_sizes": [
+      "EWS",
+      "Wide_Shot"
+    ],
+    "year": 1962
+  },
+  "mad_max_fury_road": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Alexa_XT"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Warm_Saturated",
+      "Highly_Saturated"
+    ],
+    "composition": [
+      "Centered_Action"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "mad_max_fury_road",
+    "lens_family": [
+      "Zeiss_Master_Prime"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Aggressive",
+      "Chaotic"
+    ],
+    "movement": [
+      "Fast_Tracking"
+    ],
+    "name": "Mad Max: Fury Road",
+    "primary_focal_lengths": [
+      14,
+      21,
+      27,
+      32,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 2015
+  },
+  "memories_of_murder": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Muted",
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Observational"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "memories_of_murder",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Overcast",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Oppressive",
+      "Melancholic"
+    ],
+    "movement": [
+      "Slow_Tracking"
+    ],
+    "name": "Memories of Murder",
+    "primary_focal_lengths": [
+      27,
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 2003
+  },
+  "metropolis": {
+    "aspect_ratio": "1.33:1",
+    "camera_body": [
+      "UFA_Custom"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Symmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI",
+      "Neon",
+      "Kino_Flo"
+    ],
+    "era": "Silent_Era",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "metropolis",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Artificial"
+    ],
+    "lighting_style": [
+      "Expressionistic"
+    ],
+    "mood": [
+      "Oppressive",
+      "Gothic"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "Metropolis",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1927
+  },
+  "moonlight": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Alexa_Mini"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Cool_Saturated"
+    ],
+    "composition": [
+      "Intimate_Framing"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "moonlight",
+    "lens_family": [
+      "Hawk_V_Lite"
+    ],
+    "lens_manufacturer": [
+      "Hawk"
+    ],
+    "lighting_sources": [
+      "Moon",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Soft_Lighting"
+    ],
+    "mood": [
+      "Tender",
+      "Melancholic"
+    ],
+    "movement": [
+      "Slow_Tracking"
+    ],
+    "name": "Moonlight",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Close_Up"
+    ],
+    "year": 2016
+  },
+  "mulholland_drive": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Panavision_Platinum"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Neutral",
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Asymmetrical",
+      "Negative_Space"
+    ],
+    "disallowed_moods": [
+      "Cheerful"
+    ],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "mulholland_drive",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Practical_Lights",
+      "Tungsten"
+    ],
+    "lighting_style": [
+      "Expressionistic",
+      "Low_Key"
+    ],
+    "mood": [
+      "Surreal",
+      "Dreamlike"
+    ],
+    "movement": [
+      "Slow_Push_In",
+      "Unsettling_Static"
+    ],
+    "name": "Mulholland Drive",
+    "primary_focal_lengths": [
+      27,
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "MCU",
+      "Close_Up"
+    ],
+    "year": 2001
+  },
+  "no_country_for_old_men": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Arricam_LT",
+      "ARRI_535B"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Neutral_Desaturated"
+    ],
+    "composition": [
+      "Negative_Space"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision2_500T_5218"
+    ],
+    "id": "no_country_for_old_men",
+    "lens_family": [
+      "Cooke_S4"
+    ],
+    "lens_manufacturer": [
+      "Cooke"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Naturalistic",
+      "Low_Key"
+    ],
+    "mood": [
+      "Menacing",
+      "Bleak"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "No Country for Old Men",
+    "primary_focal_lengths": [
+      27,
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 2007
+  },
+  "oldboy": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Constrained_Framing"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "oldboy",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Fluorescent",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Brutal",
+      "Tragic"
+    ],
+    "movement": [
+      "Extended_Tracking"
+    ],
+    "name": "Oldboy",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 2003
+  },
+  "one_flew_over_cuckoos_nest": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Neutral_Desaturated"
+    ],
+    "composition": [
+      "Observational"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5254"
+    ],
+    "id": "one_flew_over_cuckoos_nest",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Window",
+      "Fluorescent"
+    ],
+    "lighting_style": [
+      "Soft_Natural",
+      "Naturalistic"
+    ],
+    "mood": [
+      "Oppressive",
+      "Tragicomic"
+    ],
+    "movement": [
+      "Minimal"
+    ],
+    "name": "One Flew Over the Cuckoo's Nest",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 1975
+  },
+  "parasite": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Alexa_65"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Neutral_Saturated"
+    ],
+    "composition": [
+      "Architectural_Symmetry"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "parasite",
+    "lens_family": [
+      "ARRI_Prime_DNA"
+    ],
+    "lens_manufacturer": [
+      "ARRI"
+    ],
+    "lighting_sources": [
+      "Practical_Lights",
+      "Window"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Tense",
+      "Tragicomic"
+    ],
+    "movement": [
+      "Slow_Tracking"
+    ],
+    "name": "Parasite",
+    "primary_focal_lengths": [
+      18,
+      25,
+      35,
+      50,
+      65,
+      80
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 2019
+  },
+  "persona": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome",
+      "High_Contrast_BW"
+    ],
+    "composition": [
+      "Extreme_Close_Up"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1960s",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "persona",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "High_Contrast"
+    ],
+    "mood": [
+      "Psychological",
+      "Introspective"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "Persona",
+    "primary_focal_lengths": [
+      50,
+      75,
+      100
+    ],
+    "shot_sizes": [
+      "Close_Up",
+      "ECU"
+    ],
+    "year": 1966
+  },
+  "pulp_fiction": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Panavision_Platinum",
+      "Arricam_ST"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1990s",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "pulp_fiction",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Tungsten",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "High_Key",
+      "Practical_Motivated"
+    ],
+    "mood": [
+      "Stylized",
+      "Playful"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "Pulp Fiction",
+    "primary_focal_lengths": [
+      27,
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 1994
+  },
+  "rashomon": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Dynamic_Framing"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI"
+    ],
+    "era": "1950s",
+    "film_stock": [
+      "Fuji_Eterna_500T"
+    ],
+    "id": "rashomon",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Canon"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic",
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Ambiguous",
+      "Introspective"
+    ],
+    "movement": [
+      "Tracking"
+    ],
+    "name": "Rashomon",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 1950
+  },
+  "requiem_for_a_dream": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Arriflex_435"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Highly_Saturated"
+    ],
+    "composition": [
+      "Aggressive_Closeups"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "requiem_for_a_dream",
+    "lens_family": [
+      "Zeiss_Super_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Artificial"
+    ],
+    "lighting_style": [
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Anxious",
+      "Despairing"
+    ],
+    "movement": [
+      "Fast_Montage"
+    ],
+    "name": "Requiem for a Dream",
+    "primary_focal_lengths": [
+      18,
+      25,
+      35
+    ],
+    "shot_sizes": [
+      "ECU"
+    ],
+    "year": 2000
+  },
+  "roma": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Alexa_65"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Wide_Static_Frames"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "roma",
+    "lens_family": [
+      "ARRI_Prime_65"
+    ],
+    "lens_manufacturer": [
+      "ARRI"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Contemplative",
+      "Nostalgic"
+    ],
+    "movement": [
+      "Slow_Pan"
+    ],
+    "name": "Roma",
+    "primary_focal_lengths": [
+      24,
+      28,
+      35,
+      50,
+      80,
+      100,
+      150
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 2018
+  },
+  "schindlers_list": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Arricam_ST",
+      "ARRI_535B"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Rule_of_Thirds"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1990s",
+    "film_stock": [
+      "Kodak_Double_X_5222"
+    ],
+    "id": "schindlers_list",
+    "lens_family": [
+      "Zeiss_Super_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Practical_Lights",
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic",
+      "Low_Key"
+    ],
+    "mood": [
+      "Somber",
+      "Tragic"
+    ],
+    "movement": [
+      "Handheld"
+    ],
+    "name": "Schindler's List",
+    "primary_focal_lengths": [
+      25,
+      32,
+      40,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 1993
+  },
+  "seven_samurai": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Dynamic_Blocking"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI"
+    ],
+    "era": "1950s",
+    "film_stock": [
+      "Fuji_Eterna_500T"
+    ],
+    "id": "seven_samurai",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Canon"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Epic",
+      "Intense"
+    ],
+    "movement": [
+      "Tracking"
+    ],
+    "name": "Seven Samurai",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1954
+  },
+  "solaris": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Muted",
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Minimalist"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5247"
+    ],
+    "id": "solaris",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Artificial",
+      "Window"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Existential",
+      "Contemplative"
+    ],
+    "movement": [
+      "Slow"
+    ],
+    "name": "Solaris",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Close_Up"
+    ],
+    "year": 1972
+  },
+  "stalker": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated",
+      "Sepia"
+    ],
+    "composition": [
+      "Negative_Space"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5247"
+    ],
+    "id": "stalker",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Overcast",
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Meditative",
+      "Ethereal"
+    ],
+    "movement": [
+      "Slow_Tracking"
+    ],
+    "name": "Stalker",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1979
+  },
+  "star_wars_anh": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Classic_Composition"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5247"
+    ],
+    "id": "star_wars_anh",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Artificial",
+      "Sun"
+    ],
+    "lighting_style": [
+      "High_Key"
+    ],
+    "mood": [
+      "Adventurous",
+      "Epic"
+    ],
+    "movement": [
+      "Crane",
+      "Dolly"
+    ],
+    "name": "Star Wars: A New Hope",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75,
+      100
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1977
+  },
+  "sunset_boulevard": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Asymmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI"
+    ],
+    "era": "1950s",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "sunset_boulevard",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Paramount"
+    ],
+    "lighting_sources": [
+      "Tungsten",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Expressionistic",
+      "Low_Key"
+    ],
+    "mood": [
+      "Haunting",
+      "Gothic"
+    ],
+    "movement": [
+      "Slow_Dolly"
+    ],
+    "name": "Sunset Boulevard",
+    "primary_focal_lengths": [
+      35,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Wide_Shot"
+    ],
+    "year": 1950
+  },
+  "taxi_driver": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Arricam_LT",
+      "ARRI_35BL"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5254"
+    ],
+    "id": "taxi_driver",
+    "lens_family": [
+      "Zeiss_Super_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Neon",
+      "Tungsten"
+    ],
+    "lighting_style": [
+      "Low_Key",
+      "Practical_Motivated"
+    ],
+    "mood": [
+      "Menacing",
+      "Lonely"
+    ],
+    "movement": [
+      "Slow_Dolly"
+    ],
+    "name": "Taxi Driver",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "MCU",
+      "Close_Up"
+    ],
+    "year": 1976
+  },
+  "the_dark_knight": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "IMAX_MSM_9802",
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "IMAX_500T",
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "the_dark_knight",
+    "lens_family": [
+      "Hasselblad_V",
+      "Panavision_C_Series"
+    ],
+    "lens_manufacturer": [
+      "Hasselblad",
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Artificial",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Low_Key"
+    ],
+    "mood": [
+      "Menacing",
+      "Chaotic"
+    ],
+    "movement": [
+      "IMAX_Crane"
+    ],
+    "name": "The Dark Knight",
+    "primary_focal_lengths": [
+      50,
+      80,
+      100
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 2008
+  },
+  "the_french_connection": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Arriflex_35BL"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Rough_Framing"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5254"
+    ],
+    "id": "the_french_connection",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Available_Light",
+      "Naturalistic"
+    ],
+    "mood": [
+      "Gritty",
+      "Urgent"
+    ],
+    "movement": [
+      "Handheld"
+    ],
+    "name": "The French Connection",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Wide_Shot"
+    ],
+    "year": 1971
+  },
+  "the_godfather": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Mitchell_BNC",
+      "Mitchell_BNCR"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Desaturated"
+    ],
+    "composition": [
+      "Centered",
+      "Negative_Space"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5254"
+    ],
+    "id": "the_godfather",
+    "lens_family": [
+      "Bausch_Lomb_Baltar"
+    ],
+    "lens_manufacturer": [
+      "Bausch_Lomb"
+    ],
+    "lighting_sources": [
+      "Tungsten",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Low_Key",
+      "Soft_Lighting"
+    ],
+    "mood": [
+      "Menacing",
+      "Intimate"
+    ],
+    "movement": [
+      "Static",
+      "Slow_Dolly"
+    ],
+    "name": "The Godfather",
+    "primary_focal_lengths": [
+      40,
+      50,
+      75
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Close_Up"
+    ],
+    "year": 1972
+  },
+  "the_grand_budapest_hotel": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Alexa_XT"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Highly_Saturated",
+      "Pastel"
+    ],
+    "composition": [
+      "Symmetrical",
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "the_grand_budapest_hotel",
+    "lens_family": [
+      "Zeiss_Master_Prime"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Artificial"
+    ],
+    "lighting_style": [
+      "High_Key"
+    ],
+    "mood": [
+      "Whimsical",
+      "Nostalgic"
+    ],
+    "movement": [
+      "Mechanical_Dolly"
+    ],
+    "name": "The Grand Budapest Hotel",
+    "primary_focal_lengths": [
+      21,
+      25,
+      27,
+      32,
+      40
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 2014
+  },
+  "the_lighthouse": {
+    "aspect_ratio": "1.19:1",
+    "camera_body": [
+      "Panavision_Millennium_XL2"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome",
+      "High_Contrast_BW"
+    ],
+    "composition": [
+      "Claustrophobic"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Double_X_5222"
+    ],
+    "id": "the_lighthouse",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Unhinged",
+      "Claustrophobic"
+    ],
+    "movement": [
+      "Rigid"
+    ],
+    "name": "The Lighthouse",
+    "primary_focal_lengths": [
+      25,
+      32,
+      40
+    ],
+    "shot_sizes": [
+      "Close_Up",
+      "Medium_Shot"
+    ],
+    "year": 2019
+  },
+  "the_maltese_falcon": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI"
+    ],
+    "era": "Pre_1950",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "the_maltese_falcon",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Warner_Bros"
+    ],
+    "lighting_sources": [
+      "Tungsten"
+    ],
+    "lighting_style": [
+      "Low_Key"
+    ],
+    "mood": [
+      "Suspicious",
+      "Noir"
+    ],
+    "movement": [
+      "Minimal"
+    ],
+    "name": "The Maltese Falcon",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Close_Up"
+    ],
+    "year": 1941
+  },
+  "the_matrix": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Panavision_Platinum"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Cool_Desaturated",
+      "Green_Tint"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1990s",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "the_matrix",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Artificial"
+    ],
+    "lighting_style": [
+      "Hard_Lighting"
+    ],
+    "mood": [
+      "Stylized",
+      "Paranoid"
+    ],
+    "movement": [
+      "Controlled_Dolly"
+    ],
+    "name": "The Matrix",
+    "primary_focal_lengths": [
+      27,
+      35,
+      50,
+      75,
+      100
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Wide_Shot"
+    ],
+    "year": 1999
+  },
+  "the_mirror": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Muted",
+      "Sepia"
+    ],
+    "composition": [
+      "Poetic"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1970s",
+    "film_stock": [
+      "Eastman_5254"
+    ],
+    "id": "the_mirror",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Window",
+      "Sun"
+    ],
+    "lighting_style": [
+      "Soft_Natural",
+      "Naturalistic"
+    ],
+    "mood": [
+      "Introspective",
+      "Dreamlike"
+    ],
+    "movement": [
+      "Floating"
+    ],
+    "name": "The Mirror",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot",
+      "Wide_Shot"
+    ],
+    "year": 1975
+  },
+  "the_seventh_seal": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Arriflex_35"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome",
+      "High_Contrast_BW"
+    ],
+    "composition": [
+      "Iconic_Silhouettes",
+      "Symmetrical"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI"
+    ],
+    "era": "1950s",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "the_seventh_seal",
+    "lens_family": [
+      "Zeiss_Standard_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "High_Contrast"
+    ],
+    "mood": [
+      "Existential",
+      "Contemplative"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "The Seventh Seal",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1957
+  },
+  "the_shawshank_redemption": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Arricam_ST"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Rule_of_Thirds"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1990s",
+    "film_stock": [
+      "Eastman_5293",
+      "Eastman_5294"
+    ],
+    "id": "the_shawshank_redemption",
+    "lens_family": [
+      "Zeiss_Super_Speed"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Soft_Lighting"
+    ],
+    "mood": [
+      "Hopeful",
+      "Melancholic"
+    ],
+    "movement": [
+      "Slow_Dolly"
+    ],
+    "name": "The Shawshank Redemption",
+    "primary_focal_lengths": [
+      25,
+      35,
+      50,
+      85
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 1994
+  },
+  "the_thin_red_line": {
+    "aspect_ratio": "2.39:1",
+    "camera_body": [
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated",
+      "Natural"
+    ],
+    "composition": [
+      "Organic_Wide_Frames"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "1990s",
+    "film_stock": [
+      "Kodak_Vision_500T_5279"
+    ],
+    "id": "the_thin_red_line",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Contemplative",
+      "Ethereal"
+    ],
+    "movement": [
+      "Floating"
+    ],
+    "name": "The Thin Red Line",
+    "primary_focal_lengths": [
+      21,
+      27,
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 1998
+  },
+  "the_tree_of_life": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Panavision_Panaflex"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Saturated",
+      "Natural"
+    ],
+    "composition": [
+      "Organic_Framing"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision3_500T_5219"
+    ],
+    "id": "the_tree_of_life",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Sun"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Transcendent",
+      "Nostalgic"
+    ],
+    "movement": [
+      "Floating_Handheld"
+    ],
+    "name": "The Tree of Life",
+    "primary_focal_lengths": [
+      14,
+      17,
+      21,
+      27,
+      35
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Close_Up"
+    ],
+    "year": 2011
+  },
+  "there_will_be_blood": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Panavision_XL",
+      "Arricam_LT"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Warm_Desaturated"
+    ],
+    "composition": [
+      "Negative_Space"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [
+      "Kodak_Vision2_500T_5218"
+    ],
+    "id": "there_will_be_blood",
+    "lens_family": [
+      "Panavision_Primo"
+    ],
+    "lens_manufacturer": [
+      "Panavision"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Naturalistic",
+      "Low_Key"
+    ],
+    "mood": [
+      "Oppressive",
+      "Epic"
+    ],
+    "movement": [
+      "Slow_Crane"
+    ],
+    "name": "There Will Be Blood",
+    "primary_focal_lengths": [
+      27,
+      35,
+      50,
+      75,
+      100
+    ],
+    "shot_sizes": [
+      "Wide_Shot"
+    ],
+    "year": 2007
+  },
+  "tokyo_story": {
+    "aspect_ratio": "1.37:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Low_Angle",
+      "Static"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI"
+    ],
+    "era": "1950s",
+    "film_stock": [
+      "Fuji_Eterna_500T"
+    ],
+    "id": "tokyo_story",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Canon"
+    ],
+    "lighting_sources": [
+      "Sun",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Naturalistic"
+    ],
+    "mood": [
+      "Contemplative",
+      "Melancholic"
+    ],
+    "movement": [
+      "Static"
+    ],
+    "name": "Tokyo Story",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Medium_Shot"
+    ],
+    "year": 1953
+  },
+  "un_chien_andalou": {
+    "aspect_ratio": "1.33:1",
+    "camera_body": [
+      "Pathe_Studio"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Disruptive"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED",
+      "HMI",
+      "Neon"
+    ],
+    "era": "Silent_Era",
+    "film_stock": [
+      "Eastman_Plus_X"
+    ],
+    "id": "un_chien_andalou",
+    "lens_family": [
+      "Vintage_Spherical"
+    ],
+    "lens_manufacturer": [
+      "Pathe"
+    ],
+    "lighting_sources": [
+      "Artificial"
+    ],
+    "lighting_style": [
+      "Expressionistic"
+    ],
+    "mood": [
+      "Surreal"
+    ],
+    "movement": [
+      "Unpredictable"
+    ],
+    "name": "Un Chien Andalou",
+    "primary_focal_lengths": [
+      35,
+      50
+    ],
+    "shot_sizes": [
+      "Close_Up",
+      "Wide_Shot"
+    ],
+    "year": 1929
+  },
+  "under_the_skin": {
+    "aspect_ratio": "1.85:1",
+    "camera_body": [
+      "Alexa"
+    ],
+    "camera_type": "Digital",
+    "color_tone": [
+      "Cool_Desaturated"
+    ],
+    "composition": [
+      "Abstract"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [],
+    "era": "Modern",
+    "film_stock": [],
+    "id": "under_the_skin",
+    "lens_family": [
+      "Zeiss_Ultra_Prime"
+    ],
+    "lens_manufacturer": [
+      "Zeiss"
+    ],
+    "lighting_sources": [
+      "Overcast",
+      "Practical_Lights"
+    ],
+    "lighting_style": [
+      "Minimal",
+      "Naturalistic"
+    ],
+    "mood": [
+      "Alienated",
+      "Eerie"
+    ],
+    "movement": [
+      "Observational"
+    ],
+    "name": "Under the Skin",
+    "primary_focal_lengths": [
+      16,
+      24,
+      32,
+      50
+    ],
+    "shot_sizes": [
+      "Wide_Shot",
+      "Medium_Shot"
+    ],
+    "year": 2013
+  },
+  "vertigo": {
+    "aspect_ratio": "2.35:1",
+    "camera_body": [
+      "Mitchell_BNC"
+    ],
+    "camera_type": "Film",
+    "color_tone": [
+      "Saturated",
+      "Stylized"
+    ],
+    "composition": [
+      "Centered"
+    ],
+    "disallowed_moods": [],
+    "disallowed_sources": [
+      "LED"
+    ],
+    "era": "1950s",
+    "film_stock": [
+      "Kodak_Vision3_500T_5219"
+    ],
+    "id": "vertigo",
+    "lens_family": [
+      "Vintage_Anamorphic"
+    ],
+    "lens_manufacturer": [
+      "Paramount"
+    ],
+    "lighting_sources": [
+      "Tungsten"
+    ],
+    "lighting_style": [
+      "Expressionistic"
+    ],
+    "mood": [
+      "Obsessive",
+      "Dreamlike"
+    ],
+    "movement": [
+      "Dolly_Zoom"
+    ],
+    "name": "Vertigo",
+    "primary_focal_lengths": [
+      18,
+      35,
+      50,
+      100
+    ],
+    "shot_sizes": [
+      "Close_Up",
+      "Medium_Shot"
+    ],
+    "year": 1958
+  }
+}

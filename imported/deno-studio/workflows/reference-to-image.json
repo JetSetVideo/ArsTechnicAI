@@ -1,0 +1,331 @@
+{
+  "id": "reference-to-image",
+  "name": "Two references into one image",
+  "note": "A film supplies the camera, an archetype supplies the presence; Blend states which one won the camera. Shot overrides the framing, Prompt renders it for the chosen model, and Generate Image shows the exact string before you spend anything.",
+  "savedAt": 1789684961273,
+  "media_type": "movie",
+  "graph": {
+    "id": "reference-to-image",
+    "projectId": null,
+    "nodes": {
+      "film": {
+        "id": "film",
+        "type": "ref.card",
+        "name": "Reference",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "w": 250,
+          "h": 138
+        },
+        "values": {
+          "reference_id": {
+            "kind": "Text",
+            "value": "movie.blade_runner"
+          },
+          "weight": {
+            "kind": "Number",
+            "value": 1
+          }
+        },
+        "authoredBy": {
+          "reference_id": "user",
+          "weight": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "who": {
+        "id": "who",
+        "type": "ref.card",
+        "name": "Reference",
+        "position": {
+          "x": 0,
+          "y": 240
+        },
+        "size": {
+          "w": 250,
+          "h": 138
+        },
+        "values": {
+          "reference_id": {
+            "kind": "Text",
+            "value": "star.hardboiled_detective"
+          },
+          "weight": {
+            "kind": "Number",
+            "value": 0.6
+          }
+        },
+        "authoredBy": {
+          "reference_id": "user",
+          "weight": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "blend": {
+        "id": "blend",
+        "type": "ref.blend",
+        "name": "Blend References",
+        "position": {
+          "x": 304,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 118
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "shot": {
+        "id": "shot",
+        "type": "ref.shot",
+        "name": "Shot",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "size": {
+          "w": 260,
+          "h": 198
+        },
+        "values": {
+          "shot_size": {
+            "kind": "Text",
+            "value": "MCU"
+          },
+          "focal_length": {
+            "kind": "Number",
+            "value": 50
+          },
+          "time_of_day": {
+            "kind": "Enum",
+            "value": "Night"
+          },
+          "mood": {
+            "kind": "Text",
+            "value": "Contemplative"
+          }
+        },
+        "authoredBy": {
+          "shot_size": "user",
+          "focal_length": "user",
+          "time_of_day": "user",
+          "mood": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "prompt": {
+        "id": "prompt",
+        "type": "ref.prompt",
+        "name": "Prompt",
+        "position": {
+          "x": 904,
+          "y": 0
+        },
+        "size": {
+          "w": 250,
+          "h": 178
+        },
+        "values": {
+          "subject": {
+            "kind": "Text",
+            "value": "a detective under a neon sign, rain on the collar"
+          },
+          "target": {
+            "kind": "Enum",
+            "value": "flux"
+          },
+          "detail": {
+            "kind": "Enum",
+            "value": "detailed"
+          }
+        },
+        "authoredBy": {
+          "subject": "user",
+          "target": "user",
+          "detail": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "gen": {
+        "id": "gen",
+        "type": "gen.image",
+        "name": "Generate Image",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "size": {
+          "w": 264,
+          "h": 238
+        },
+        "values": {
+          "model": {
+            "kind": "Enum",
+            "value": "comfy:flux-dev"
+          },
+          "width": {
+            "kind": "Number",
+            "value": 1024
+          },
+          "height": {
+            "kind": "Number",
+            "value": 1024
+          },
+          "seed": {
+            "kind": "Number",
+            "value": -1
+          }
+        },
+        "authoredBy": {
+          "model": "user",
+          "width": "user",
+          "height": "user",
+          "seed": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "save": {
+        "id": "save",
+        "type": "out.save",
+        "name": "Save",
+        "position": {
+          "x": 1504,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 138
+        },
+        "values": {
+          "name": {
+            "kind": "Text",
+            "value": "neon-detective"
+          }
+        },
+        "authoredBy": {
+          "name": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      }
+    },
+    "edges": {
+      "e_6dde37da8d2b": {
+        "id": "e_6dde37da8d2b",
+        "from": {
+          "node": "film",
+          "port": "style"
+        },
+        "to": {
+          "node": "blend",
+          "port": "styles"
+        },
+        "order": 0
+      },
+      "e_03e0ba8d11f7": {
+        "id": "e_03e0ba8d11f7",
+        "from": {
+          "node": "who",
+          "port": "style"
+        },
+        "to": {
+          "node": "blend",
+          "port": "styles"
+        },
+        "order": 1
+      },
+      "e_f1c669e2be6b": {
+        "id": "e_f1c669e2be6b",
+        "from": {
+          "node": "blend",
+          "port": "style"
+        },
+        "to": {
+          "node": "shot",
+          "port": "base"
+        },
+        "order": 0
+      },
+      "e_8a86ce940b99": {
+        "id": "e_8a86ce940b99",
+        "from": {
+          "node": "shot",
+          "port": "style"
+        },
+        "to": {
+          "node": "prompt",
+          "port": "style"
+        },
+        "order": 0
+      },
+      "e_29c0409b5542": {
+        "id": "e_29c0409b5542",
+        "from": {
+          "node": "shot",
+          "port": "style"
+        },
+        "to": {
+          "node": "gen",
+          "port": "style"
+        },
+        "order": 0
+      },
+      "e_73f92507bea9": {
+        "id": "e_73f92507bea9",
+        "from": {
+          "node": "prompt",
+          "port": "positive"
+        },
+        "to": {
+          "node": "gen",
+          "port": "prompt"
+        },
+        "order": 0
+      },
+      "e_4358d5f6be71": {
+        "id": "e_4358d5f6be71",
+        "from": {
+          "node": "prompt",
+          "port": "negative"
+        },
+        "to": {
+          "node": "gen",
+          "port": "negative"
+        },
+        "order": 0
+      },
+      "e_5e98b0a29f4c": {
+        "id": "e_5e98b0a29f4c",
+        "from": {
+          "node": "gen",
+          "port": "image"
+        },
+        "to": {
+          "node": "save",
+          "port": "image"
+        },
+        "order": 0
+      }
+    },
+    "stacks": {},
+    "revision": 15
+  }
+}

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inspector · Ars Technic AI</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="inspector.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔍</text></svg>">
+</head>
+<body class="inspector-body">
+
+<header class="insp-bar">
+  <div class="insp-group">
+    <span class="insp-title">Inspector</span>
+    <span class="pill" id="insp-project">—</span>
+  </div>
+
+  <div class="insp-group" role="tablist" aria-label="View mode">
+    <button class="seg-btn active" data-view="processed">Restored</button>
+    <button class="seg-btn" data-view="source">Source</button>
+    <button class="seg-btn" data-view="split">Split</button>
+  </div>
+
+  <div class="insp-group">
+    <label class="insp-zoom">Zoom
+      <select id="insp-zoom">
+        <option value="fit" selected>Fit</option>
+        <option value="1">100%</option>
+        <option value="2">200%</option>
+        <option value="4">400%</option>
+        <option value="8">800%</option>
+      </select>
+    </label>
+    <button class="tool" id="insp-grain" title="Toggle a pixel grid at high zoom">▦</button>
+  </div>
+
+  <div class="insp-group insp-right">
+    <span class="pill" id="insp-segment">no section</span>
+    <span class="pill" id="insp-status">idle</span>
+  </div>
+</header>
+
+<div class="insp-stage" id="insp-stage">
+  <canvas id="insp-canvas"></canvas>
+  <div class="insp-empty" id="insp-empty">
+    <h2>No project</h2>
+    <p>Open the Inspector from the main window with a project loaded.</p>
+  </div>
+</div>
+
+<!-- ============================ TRANSPORT ============================ -->
+<footer class="insp-transport">
+
+  <div class="insp-scrub-wrap">
+    <canvas id="insp-scrub" height="46"></canvas>
+  </div>
+
+  <div class="insp-controls">
+
+    <div class="insp-group">
+      <button class="tool" id="insp-first" title="First frame (Home)">⏮</button>
+      <button class="tool" id="insp-back10" title="Back 10 frames (Shift+←)">⏪</button>
+      <button class="tool" id="insp-prev" title="Previous frame (← or ,)">◀</button>
+      <button class="tool play" id="insp-play" title="Play / pause (Space)">▶</button>
+      <button class="tool" id="insp-next" title="Next frame (→ or .)">▶|</button>
+      <button class="tool" id="insp-fwd10" title="Forward 10 frames (Shift+→)">⏩</button>
+      <button class="tool" id="insp-last" title="Last frame (End)">⏭</button>
+    </div>
+
+    <div class="insp-group">
+      <input type="number" id="insp-frame" min="0" step="1" value="0">
+      <span class="muted" id="insp-total">/ 0</span>
+      <span class="muted mono" id="insp-tc">00:00:00.00</span>
+    </div>
+
+    <!-- ------------------------- LOOP CONTROLS ------------------------- -->
+    <div class="insp-group loopbox" id="loopbox">
+      <button class="tool loop" id="insp-loop" title="Loop the marked range (L)">🔁</button>
+      <button class="tool" id="insp-mark-in" title="Mark loop in-point at this frame (I)">[</button>
+      <span class="loop-readout mono" id="insp-loop-readout">— · —</span>
+      <button class="tool" id="insp-mark-out" title="Mark loop out-point at this frame (O)">]</button>
+      <button class="tool" id="insp-loop-clear" title="Clear the loop range">✕</button>
+      <button class="btn small" id="insp-cache" title="Render the loop range once so it plays back smoothly">Cache loop</button>
+      <button class="btn small" id="insp-make-section" title="Create a section from the loop range">→ Section</button>
+    </div>
+
+    <div class="insp-group">
+      <label class="insp-fps">Rate
+        <input type="number" id="insp-fps" min="1" max="60" step="1" value="12">
+      </label>
+      <label class="chk"><input type="checkbox" id="insp-sync" checked> Sync</label>
+    </div>
+  </div>
+
+  <div class="insp-cachebar hidden" id="insp-cachebar">
+    <div class="insp-cachefill" id="insp-cachefill"></div>
+    <span id="insp-cachetext"></span>
+  </div>
+
+  <div class="insp-hints">
+    <span><kbd>←</kbd><kbd>→</kbd> step</span>
+    <span><kbd>Shift</kbd>+step ×10</span>
+    <span><kbd>Space</kbd> play</span>
+    <span><kbd>I</kbd>/<kbd>O</kbd> loop in/out</span>
+    <span><kbd>L</kbd> loop</span>
+    <span><kbd>S</kbd> source</span>
+    <span>drag the strip to scrub, drag inside it to mark a range</span>
+  </div>
+</footer>
+
+<script type="module" src="inspector.js"></script>
+</body>
+</html>

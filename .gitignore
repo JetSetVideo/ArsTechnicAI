@@ -38,7 +38,7 @@ next-env.d.ts
 deno.lock
 
 # Storage
-storage/
+/storage/   # anchored: an unanchored "storage/" also ignored lib/storage/, which is source
 
 # Local workspace data (user-specific, rebuilt from disk scan)
 .ars-data/
@@ -47,3 +47,5 @@ storage/
 # Prisma
 prisma/migrations/
 
+# Screenshot evidence from tools/shot.ts — local, regenerable, and large
+shots/

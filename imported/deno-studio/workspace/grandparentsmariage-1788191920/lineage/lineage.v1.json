@@ -1,0 +1,94 @@
+{
+  "format": "arstechnic.hybrid/1",
+  "nodes": [
+    {
+      "id": "n5:v1:5a77a375",
+      "origin_type": "generated",
+      "label": "CLAHE / Contrast Balance · f0",
+      "created_at": "2026-09-17T22:27:38.500Z"
+    }
+  ],
+  "edges": [],
+  "columns": {
+    "format": "arstechnic.columnar/1",
+    "rows": 1,
+    "columns": {
+      "record_id": {
+        "kind": "string",
+        "values": [
+          "col_log_1"
+        ]
+      },
+      "asset_id": {
+        "kind": "string",
+        "values": [
+          "n5:v1:5a77a375"
+        ]
+      },
+      "node": {
+        "kind": "string",
+        "values": [
+          "n5"
+        ]
+      },
+      "node_type": {
+        "kind": "string",
+        "values": [
+          "stage.clahe"
+        ]
+      },
+      "node_name": {
+        "kind": "string",
+        "values": [
+          "CLAHE / Contrast Balance"
+        ]
+      },
+      "frame": {
+        "kind": "number",
+        "values": [
+          0
+        ]
+      },
+      "enabled": {
+        "kind": "boolean",
+        "values": [
+          true
+        ]
+      },
+      "clip_limit": {
+        "kind": "number",
+        "values": [
+          2
+        ]
+      },
+      "tile_grid": {
+        "kind": "number",
+        "values": [
+          8
+        ]
+      },
+      "execution_time_ms": {
+        "kind": "number",
+        "values": [
+          73.7
+        ]
+      },
+      "width_px": {
+        "kind": "number",
+        "values": [
+          720
+        ]
+      },
+      "height_px": {
+        "kind": "number",
+        "values": [
+          576
+        ]
+      }
+    }
+  },
+  "counters": {
+    "asset": 1,
+    "record": 1
+  }
+}

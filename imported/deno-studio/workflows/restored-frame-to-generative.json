@@ -1,0 +1,326 @@
+{
+  "id": "restored-frame-to-generative",
+  "name": "Reimagine a restored frame",
+  "note": "Restoration first, generation second: the graded frame becomes the reference for an image-to-image pass, so the model works from real photography rather than from nothing. Strength decides how far it may travel.",
+  "savedAt": 1789684961275,
+  "media_type": "reel",
+  "graph": {
+    "id": "restored-frame-to-generative",
+    "projectId": null,
+    "nodes": {
+      "src": {
+        "id": "src",
+        "type": "source.sequence",
+        "name": "Video",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 138
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "frame": {
+        "id": "frame",
+        "type": "source.frame",
+        "name": "Frame Selection",
+        "position": {
+          "x": 304,
+          "y": 0
+        },
+        "size": {
+          "w": 212,
+          "h": 118
+        },
+        "values": {
+          "index": {
+            "kind": "Number",
+            "value": 0
+          }
+        },
+        "authoredBy": {
+          "index": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "stab": {
+        "id": "stab",
+        "type": "stage.stabilize",
+        "name": "Stabilisation",
+        "position": {
+          "x": 600,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 238
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "clahe": {
+        "id": "clahe",
+        "type": "stage.clahe",
+        "name": "CLAHE / Contrast Balance",
+        "position": {
+          "x": 904,
+          "y": 0
+        },
+        "size": {
+          "w": 248,
+          "h": 158
+        },
+        "values": {
+          "enabled": {
+            "kind": "Flag",
+            "value": true
+          }
+        },
+        "authoredBy": {
+          "enabled": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "film": {
+        "id": "film",
+        "type": "ref.card",
+        "name": "Reference",
+        "position": {
+          "x": 600,
+          "y": 240
+        },
+        "size": {
+          "w": 250,
+          "h": 138
+        },
+        "values": {
+          "reference_id": {
+            "kind": "Text",
+            "value": "movie.the_godfather"
+          }
+        },
+        "authoredBy": {
+          "reference_id": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "gen": {
+        "id": "gen",
+        "type": "gen.image",
+        "name": "Generate Image",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "size": {
+          "w": 264,
+          "h": 238
+        },
+        "values": {
+          "model": {
+            "kind": "Enum",
+            "value": "comfy:flux-dev"
+          },
+          "prompt": {
+            "kind": "Text",
+            "value": "the same wedding, restored and colour-graded"
+          },
+          "strength": {
+            "kind": "Number",
+            "value": 0.35
+          },
+          "seed": {
+            "kind": "Number",
+            "value": 7
+          }
+        },
+        "authoredBy": {
+          "model": "user",
+          "prompt": "user",
+          "strength": "user",
+          "seed": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "view": {
+        "id": "view",
+        "type": "out.view",
+        "name": "Viewer",
+        "position": {
+          "x": 1504,
+          "y": 0
+        },
+        "size": {
+          "w": 236,
+          "h": 98
+        },
+        "values": {},
+        "authoredBy": {},
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      },
+      "save": {
+        "id": "save",
+        "type": "out.save",
+        "name": "Save",
+        "position": {
+          "x": 1504,
+          "y": 240
+        },
+        "size": {
+          "w": 236,
+          "h": 138
+        },
+        "values": {
+          "name": {
+            "kind": "Text",
+            "value": "reimagined"
+          }
+        },
+        "authoredBy": {
+          "name": "user"
+        },
+        "state": "idle",
+        "revision": 0,
+        "collapsed": false
+      }
+    },
+    "edges": {
+      "e_524b186d7546": {
+        "id": "e_524b186d7546",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "frame",
+          "port": "sequence"
+        },
+        "order": 0
+      },
+      "e_699fed4bb072": {
+        "id": "e_699fed4bb072",
+        "from": {
+          "node": "src",
+          "port": "sequence"
+        },
+        "to": {
+          "node": "stab",
+          "port": "neighbours"
+        },
+        "order": 0
+      },
+      "e_8c9c3a48937f": {
+        "id": "e_8c9c3a48937f",
+        "from": {
+          "node": "frame",
+          "port": "image"
+        },
+        "to": {
+          "node": "stab",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_3d9fb2d7828e": {
+        "id": "e_3d9fb2d7828e",
+        "from": {
+          "node": "stab",
+          "port": "image"
+        },
+        "to": {
+          "node": "clahe",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_e1d134ca6226": {
+        "id": "e_e1d134ca6226",
+        "from": {
+          "node": "clahe",
+          "port": "image"
+        },
+        "to": {
+          "node": "gen",
+          "port": "reference"
+        },
+        "order": 0
+      },
+      "e_0a3c9971eb72": {
+        "id": "e_0a3c9971eb72",
+        "from": {
+          "node": "film",
+          "port": "style"
+        },
+        "to": {
+          "node": "gen",
+          "port": "style"
+        },
+        "order": 0
+      },
+      "e_093b1b272638": {
+        "id": "e_093b1b272638",
+        "from": {
+          "node": "gen",
+          "port": "image"
+        },
+        "to": {
+          "node": "view",
+          "port": "image"
+        },
+        "order": 0
+      },
+      "e_0431bad5c742": {
+        "id": "e_0431bad5c742",
+        "from": {
+          "node": "clahe",
+          "port": "image"
+        },
+        "to": {
+          "node": "view",
+          "port": "compare"
+        },
+        "order": 0
+      },
+      "e_5e98b0a29f4c": {
+        "id": "e_5e98b0a29f4c",
+        "from": {
+          "node": "gen",
+          "port": "image"
+        },
+        "to": {
+          "node": "save",
+          "port": "image"
+        },
+        "order": 0
+      }
+    },
+    "stacks": {},
+    "revision": 17
+  }
+}

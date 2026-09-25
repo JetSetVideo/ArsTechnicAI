@@ -1,0 +1,1395 @@
+{
+  "akira": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Neon",
+      "Cool_Saturated"
+    ],
+    "composition": [
+      "Dynamic",
+      "Centered"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "akira",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Apocalyptic",
+      "Chaotic",
+      "Intense"
+    ],
+    "motion_style": "Full",
+    "name": "Akira",
+    "reference_works": [
+      "Akira"
+    ],
+    "surface_detail": "Textured",
+    "virtual_camera": "Digital_Pan"
+  },
+  "arcane": {
+    "color_application": "Painterly",
+    "color_tone": [
+      "Neon",
+      "Cool_Saturated",
+      "Warm_Accents"
+    ],
+    "composition": [
+      "Cinematic",
+      "Frame_Within_Frame"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "ThreeD",
+    "id": "arcane",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Variable",
+    "medium": "Hybrid",
+    "mood": [
+      "Dark",
+      "Epic",
+      "Emotional"
+    ],
+    "motion_style": "Full",
+    "name": "Arcane",
+    "reference_works": [
+      "Arcane"
+    ],
+    "surface_detail": "Painterly",
+    "virtual_camera": "Free_3D"
+  },
+  "attack_on_titan": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Warm_Desaturated",
+      "High_Contrast"
+    ],
+    "composition": [
+      "Dynamic",
+      "Scale_Emphasis"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "attack_on_titan",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Variable",
+    "medium": "Hybrid",
+    "mood": [
+      "Epic",
+      "Dread",
+      "Intense"
+    ],
+    "motion_style": "Full",
+    "name": "Attack on Titan",
+    "reference_works": [
+      "Attack on Titan"
+    ],
+    "surface_detail": "Textured",
+    "virtual_camera": "Free_3D"
+  },
+  "blender_stylized": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Saturated",
+      "Bold"
+    ],
+    "composition": [
+      "Centered",
+      "Symmetrical"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "ThreeD",
+    "id": "blender_stylized",
+    "lighting_model": "Graphic",
+    "line_treatment": "Clean",
+    "medium": "3D",
+    "mood": [
+      "Whimsical",
+      "Stylized"
+    ],
+    "motion_style": "Full",
+    "name": "Blender Stylized",
+    "reference_works": [
+      "Blender Open Movies"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Free_3D"
+  },
+  "book_illustration": {
+    "color_application": "Soft",
+    "color_tone": [
+      "Warm",
+      "Muted"
+    ],
+    "composition": [
+      "Storybook",
+      "Centered"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [
+      "Full",
+      "Exaggerated",
+      "Fluid"
+    ],
+    "domain": "Illustration",
+    "id": "book_illustration",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "Variable",
+    "medium": "2D",
+    "mood": [
+      "Whimsical",
+      "Nostalgic",
+      "Tender"
+    ],
+    "motion_style": "None",
+    "name": "Book Illustration",
+    "reference_works": [
+      "Beatrix Potter",
+      "Maurice Sendak",
+      "Quentin Blake"
+    ],
+    "surface_detail": "Painterly",
+    "virtual_camera": "Locked"
+  },
+  "comic_western": {
+    "color_application": "Flat",
+    "color_tone": [
+      "Saturated",
+      "Bold"
+    ],
+    "composition": [
+      "Dynamic",
+      "Action_Lines"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [
+      "Full",
+      "Fluid"
+    ],
+    "domain": "Illustration",
+    "id": "comic_western",
+    "lighting_model": "Graphic",
+    "line_treatment": "Inked",
+    "medium": "2D",
+    "mood": [
+      "Epic",
+      "Intense",
+      "Dramatic"
+    ],
+    "motion_style": "None",
+    "name": "Western Comics",
+    "reference_works": [
+      "Marvel Comics",
+      "DC Comics",
+      "Dark Horse"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Locked"
+  },
+  "concept_art": {
+    "color_application": "Painterly",
+    "color_tone": [
+      "Muted",
+      "Natural"
+    ],
+    "composition": [
+      "Negative_Space",
+      "Depth_Layering"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [
+      "Full",
+      "Exaggerated",
+      "Fluid"
+    ],
+    "domain": "Illustration",
+    "id": "concept_art",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Sketchy",
+    "medium": "2D",
+    "mood": [
+      "Epic",
+      "Mysterious",
+      "Atmospheric"
+    ],
+    "motion_style": "None",
+    "name": "Concept Art",
+    "reference_works": [
+      "Syd Mead",
+      "Craig Mullins",
+      "Feng Zhu"
+    ],
+    "surface_detail": "Painterly",
+    "virtual_camera": "Locked"
+  },
+  "cowboy_bebop": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Cool_Desaturated",
+      "Warm_Accents"
+    ],
+    "composition": [
+      "Cinematic",
+      "Rule_of_Thirds"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "cowboy_bebop",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Noir",
+      "Melancholic",
+      "Cool"
+    ],
+    "motion_style": "Full",
+    "name": "Cowboy Bebop",
+    "reference_works": [
+      "Cowboy Bebop"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Digital_Pan"
+  },
+  "cyberpunk_edgerunners": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Neon",
+      "Cool_Saturated",
+      "High_Contrast"
+    ],
+    "composition": [
+      "Dynamic",
+      "Urban"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "cyberpunk_edgerunners",
+    "lighting_model": "Glow",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Intense",
+      "Nihilistic",
+      "Frantic"
+    ],
+    "motion_style": "Full",
+    "name": "Cyberpunk: Edgerunners",
+    "reference_works": [
+      "Cyberpunk: Edgerunners"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Digital_Pan"
+  },
+  "dark_seinen": {
+    "color_application": "Monochrome_Ink",
+    "color_tone": [
+      "Monochrome",
+      "High_Contrast_BW"
+    ],
+    "composition": [
+      "Negative_Space",
+      "Asymmetrical"
+    ],
+    "disallowed_cameras": [
+      "Free_3D",
+      "Simulated_Handheld"
+    ],
+    "disallowed_motion": [],
+    "domain": "Manga",
+    "id": "dark_seinen",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Inked",
+    "medium": "2D",
+    "mood": [
+      "Menacing",
+      "Oppressive",
+      "Nihilistic"
+    ],
+    "motion_style": "None",
+    "name": "Dark Seinen",
+    "reference_works": [
+      "Berserk",
+      "Vagabond",
+      "Vinland Saga",
+      "Blame!"
+    ],
+    "surface_detail": "Hatched",
+    "virtual_camera": "Locked"
+  },
+  "death_note": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Cool_Desaturated",
+      "High_Contrast"
+    ],
+    "composition": [
+      "Dramatic_Angles",
+      "Negative_Space"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "death_note",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Suspenseful",
+      "Paranoid",
+      "Psychological"
+    ],
+    "motion_style": "Limited",
+    "name": "Death Note",
+    "reference_works": [
+      "Death Note"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Digital_Pan"
+  },
+  "digital_painting": {
+    "color_application": "Painterly",
+    "color_tone": [
+      "Rich",
+      "Natural"
+    ],
+    "composition": [
+      "Depth_Layering",
+      "Rule_of_Thirds"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [
+      "Full",
+      "Exaggerated",
+      "Fluid"
+    ],
+    "domain": "Illustration",
+    "id": "digital_painting",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "None",
+    "medium": "2D",
+    "mood": [
+      "Epic",
+      "Atmospheric",
+      "Dramatic"
+    ],
+    "motion_style": "None",
+    "name": "Digital Painting",
+    "reference_works": [
+      "ArtStation trending"
+    ],
+    "surface_detail": "Painterly",
+    "virtual_camera": "Locked"
+  },
+  "disney_3d": {
+    "color_application": "Full",
+    "color_tone": [
+      "Saturated",
+      "Warm"
+    ],
+    "composition": [
+      "Symmetrical",
+      "Depth_Layering"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "ThreeD",
+    "id": "disney_3d",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "None",
+    "medium": "3D",
+    "mood": [
+      "Whimsical",
+      "Romantic",
+      "Epic"
+    ],
+    "motion_style": "Full",
+    "name": "Disney 3D",
+    "reference_works": [
+      "Frozen",
+      "Moana",
+      "Tangled",
+      "Encanto"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Free_3D"
+  },
+  "dreamworks": {
+    "color_application": "Full",
+    "color_tone": [
+      "Saturated",
+      "Warm"
+    ],
+    "composition": [
+      "Dynamic",
+      "Centered"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "ThreeD",
+    "id": "dreamworks",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "None",
+    "medium": "3D",
+    "mood": [
+      "Playful",
+      "Energetic",
+      "Adventurous"
+    ],
+    "motion_style": "Exaggerated",
+    "name": "DreamWorks",
+    "reference_works": [
+      "Shrek",
+      "How to Train Your Dragon",
+      "Kung Fu Panda"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Free_3D"
+  },
+  "editorial": {
+    "color_application": "Limited",
+    "color_tone": [
+      "Bold",
+      "Limited_Palette"
+    ],
+    "composition": [
+      "Centered",
+      "Negative_Space"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [
+      "Full",
+      "Exaggerated",
+      "Fluid"
+    ],
+    "domain": "Illustration",
+    "id": "editorial",
+    "lighting_model": "Graphic",
+    "line_treatment": "Variable",
+    "medium": "2D",
+    "mood": [
+      "Conceptual",
+      "Bold",
+      "Provocative"
+    ],
+    "motion_style": "None",
+    "name": "Editorial Illustration",
+    "reference_works": [
+      "New Yorker covers",
+      "The Atlantic illustrations"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Locked"
+  },
+  "evangelion": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Cool_Desaturated",
+      "High_Contrast"
+    ],
+    "composition": [
+      "Centered",
+      "Geometric"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "evangelion",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Anxious",
+      "Existential",
+      "Surreal"
+    ],
+    "motion_style": "Limited",
+    "name": "Neon Genesis Evangelion",
+    "reference_works": [
+      "Neon Genesis Evangelion",
+      "End of Evangelion"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Digital_Pan"
+  },
+  "fullmetal_alchemist": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Warm_Saturated",
+      "Natural"
+    ],
+    "composition": [
+      "Dynamic",
+      "Rule_of_Thirds"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "fullmetal_alchemist",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Epic",
+      "Emotional",
+      "Intense"
+    ],
+    "motion_style": "Full",
+    "name": "Fullmetal Alchemist: Brotherhood",
+    "reference_works": [
+      "Fullmetal Alchemist: Brotherhood"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Digital_Pan"
+  },
+  "gainax": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Saturated",
+      "Bold"
+    ],
+    "composition": [
+      "Dynamic",
+      "Asymmetrical"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "gainax",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Variable",
+    "medium": "2D",
+    "mood": [
+      "Rebellious",
+      "Surreal",
+      "Epic"
+    ],
+    "motion_style": "Exaggerated",
+    "name": "Gainax",
+    "reference_works": [
+      "FLCL",
+      "Gurren Lagann",
+      "Neon Genesis Evangelion"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Digital_Pan"
+  },
+  "ghost_in_the_shell": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Cool_Desaturated",
+      "Neon"
+    ],
+    "composition": [
+      "Architectural",
+      "Negative_Space"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "ghost_in_the_shell",
+    "lighting_model": "Stylized_Rim",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Philosophical",
+      "Noir",
+      "Contemplative"
+    ],
+    "motion_style": "Full",
+    "name": "Ghost in the Shell",
+    "reference_works": [
+      "Ghost in the Shell",
+      "Ghost in the Shell 2: Innocence"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Digital_Pan"
+  },
+  "graphic_novel": {
+    "color_application": "Limited",
+    "color_tone": [
+      "Muted",
+      "Limited_Palette"
+    ],
+    "composition": [
+      "Cinematic",
+      "Frame_Within_Frame"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [
+      "Full",
+      "Exaggerated"
+    ],
+    "domain": "Illustration",
+    "id": "graphic_novel",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Inked",
+    "medium": "2D",
+    "mood": [
+      "Noir",
+      "Intimate",
+      "Contemplative"
+    ],
+    "motion_style": "None",
+    "name": "Graphic Novel",
+    "reference_works": [
+      "Watchmen",
+      "Maus",
+      "Persepolis",
+      "Sin City"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Motion_Comic"
+  },
+  "horror_manga": {
+    "color_application": "Monochrome_Ink",
+    "color_tone": [
+      "Monochrome",
+      "High_Contrast_BW"
+    ],
+    "composition": [
+      "Constrained_Framing",
+      "Negative_Space"
+    ],
+    "disallowed_cameras": [
+      "Free_3D",
+      "Simulated_Handheld"
+    ],
+    "disallowed_motion": [],
+    "domain": "Manga",
+    "id": "horror_manga",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Inked",
+    "medium": "2D",
+    "mood": [
+      "Eerie",
+      "Dread",
+      "Claustrophobic"
+    ],
+    "motion_style": "None",
+    "name": "Horror Manga",
+    "reference_works": [
+      "Uzumaki",
+      "Tomie",
+      "Parasyte",
+      "The Drifting Classroom"
+    ],
+    "surface_detail": "Hatched",
+    "virtual_camera": "Locked"
+  },
+  "josei": {
+    "color_application": "Monochrome_Ink",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Negative_Space",
+      "Centered"
+    ],
+    "disallowed_cameras": [
+      "Free_3D",
+      "Simulated_Handheld"
+    ],
+    "disallowed_motion": [],
+    "domain": "Manga",
+    "id": "josei",
+    "lighting_model": "Minimal",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Melancholic",
+      "Intimate",
+      "Contemplative"
+    ],
+    "motion_style": "None",
+    "name": "Josei",
+    "reference_works": [
+      "Nana",
+      "Paradise Kiss",
+      "Honey and Clover"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Locked"
+  },
+  "kyoto_animation": {
+    "color_application": "Soft",
+    "color_tone": [
+      "Warm_Saturated",
+      "Pastel"
+    ],
+    "composition": [
+      "Rule_of_Thirds",
+      "Centered"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "kyoto_animation",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Tender",
+      "Whimsical",
+      "Nostalgic"
+    ],
+    "motion_style": "Full",
+    "name": "Kyoto Animation",
+    "reference_works": [
+      "Violet Evergarden",
+      "A Silent Voice",
+      "K-On!",
+      "Clannad"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Digital_Pan"
+  },
+  "makoto_shinkai": {
+    "color_application": "Soft",
+    "color_tone": [
+      "Warm_Saturated",
+      "Vibrant"
+    ],
+    "composition": [
+      "Depth_Layering",
+      "Negative_Space"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "makoto_shinkai",
+    "lighting_model": "Glow",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Melancholic",
+      "Romantic",
+      "Nostalgic"
+    ],
+    "motion_style": "Full",
+    "name": "Makoto Shinkai",
+    "reference_works": [
+      "Your Name",
+      "Weathering With You",
+      "5 Centimeters Per Second"
+    ],
+    "surface_detail": "Painterly",
+    "virtual_camera": "Parallax"
+  },
+  "mappa": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Cool_Desaturated",
+      "High_Contrast"
+    ],
+    "composition": [
+      "Dynamic",
+      "Centered_Action"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "mappa",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Clean",
+    "medium": "Hybrid",
+    "mood": [
+      "Intense",
+      "Dark",
+      "Chaotic"
+    ],
+    "motion_style": "Full",
+    "name": "MAPPA",
+    "reference_works": [
+      "Attack on Titan S4",
+      "Jujutsu Kaisen",
+      "Chainsaw Man"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Free_3D"
+  },
+  "mob_psycho_100": {
+    "color_application": "Flat",
+    "color_tone": [
+      "Vibrant",
+      "Bold"
+    ],
+    "composition": [
+      "Dynamic",
+      "Asymmetrical"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "mob_psycho_100",
+    "lighting_model": "Glow",
+    "line_treatment": "Sketchy",
+    "medium": "2D",
+    "mood": [
+      "Energetic",
+      "Surreal",
+      "Playful"
+    ],
+    "motion_style": "Exaggerated",
+    "name": "Mob Psycho 100",
+    "reference_works": [
+      "Mob Psycho 100"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Digital_Pan"
+  },
+  "one_punch_man": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Saturated",
+      "Bold"
+    ],
+    "composition": [
+      "Dynamic",
+      "Action_Lines"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "one_punch_man",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Epic",
+      "Intense",
+      "Satirical"
+    ],
+    "motion_style": "Full",
+    "name": "One Punch Man",
+    "reference_works": [
+      "One Punch Man"
+    ],
+    "surface_detail": "Textured",
+    "virtual_camera": "Digital_Pan"
+  },
+  "pixar": {
+    "color_application": "Full",
+    "color_tone": [
+      "Warm_Saturated",
+      "Vibrant"
+    ],
+    "composition": [
+      "Rule_of_Thirds",
+      "Depth_Layering"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "ThreeD",
+    "id": "pixar",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "None",
+    "medium": "3D",
+    "mood": [
+      "Whimsical",
+      "Tender",
+      "Nostalgic"
+    ],
+    "motion_style": "Full",
+    "name": "Pixar",
+    "reference_works": [
+      "Toy Story",
+      "WALL-E",
+      "Up",
+      "Inside Out",
+      "Coco"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Free_3D"
+  },
+  "samurai_champloo": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Warm_Desaturated",
+      "Natural"
+    ],
+    "composition": [
+      "Dynamic",
+      "Rule_of_Thirds"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "samurai_champloo",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Variable",
+    "medium": "2D",
+    "mood": [
+      "Cool",
+      "Energetic",
+      "Rebellious"
+    ],
+    "motion_style": "Full",
+    "name": "Samurai Champloo",
+    "reference_works": [
+      "Samurai Champloo"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Digital_Pan"
+  },
+  "satoshi_kon": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Neutral",
+      "Natural"
+    ],
+    "composition": [
+      "Frame_Within_Frame",
+      "Asymmetrical"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "satoshi_kon",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Surreal",
+      "Psychological",
+      "Dreamlike"
+    ],
+    "motion_style": "Full",
+    "name": "Satoshi Kon",
+    "reference_works": [
+      "Perfect Blue",
+      "Paprika",
+      "Millennium Actress",
+      "Tokyo Godfathers"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Digital_Pan"
+  },
+  "shojo": {
+    "color_application": "Monochrome_Ink",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Centered",
+      "Decorative"
+    ],
+    "disallowed_cameras": [
+      "Free_3D",
+      "Simulated_Handheld"
+    ],
+    "disallowed_motion": [],
+    "domain": "Manga",
+    "id": "shojo",
+    "lighting_model": "Symbolic",
+    "line_treatment": "Variable",
+    "medium": "2D",
+    "mood": [
+      "Romantic",
+      "Tender",
+      "Whimsical"
+    ],
+    "motion_style": "None",
+    "name": "Shojo",
+    "reference_works": [
+      "Sailor Moon",
+      "Fruits Basket",
+      "Ouran High School Host Club"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Locked"
+  },
+  "shonen": {
+    "color_application": "Monochrome_Ink",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Dynamic",
+      "Action_Lines"
+    ],
+    "disallowed_cameras": [
+      "Free_3D",
+      "Simulated_Handheld"
+    ],
+    "disallowed_motion": [],
+    "domain": "Manga",
+    "id": "shonen",
+    "lighting_model": "Graphic",
+    "line_treatment": "Inked",
+    "medium": "2D",
+    "mood": [
+      "Energetic",
+      "Triumphant",
+      "Intense"
+    ],
+    "motion_style": "None",
+    "name": "Shonen",
+    "reference_works": [
+      "Dragon Ball",
+      "Naruto",
+      "One Piece",
+      "My Hero Academia"
+    ],
+    "surface_detail": "Hatched",
+    "virtual_camera": "Locked"
+  },
+  "slice_of_life_manga": {
+    "color_application": "Monochrome_Ink",
+    "color_tone": [
+      "Monochrome"
+    ],
+    "composition": [
+      "Centered",
+      "Rule_of_Thirds"
+    ],
+    "disallowed_cameras": [
+      "Free_3D",
+      "Simulated_Handheld"
+    ],
+    "disallowed_motion": [],
+    "domain": "Manga",
+    "id": "slice_of_life_manga",
+    "lighting_model": "Minimal",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Serene",
+      "Whimsical",
+      "Nostalgic"
+    ],
+    "motion_style": "None",
+    "name": "Slice of Life Manga",
+    "reference_works": [
+      "Yotsuba&!",
+      "Barakamon",
+      "Silver Spoon"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Locked"
+  },
+  "spider_verse": {
+    "color_application": "Limited",
+    "color_tone": [
+      "Vibrant",
+      "Neon",
+      "Bold"
+    ],
+    "composition": [
+      "Dynamic",
+      "Comic_Panels"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "ThreeD",
+    "id": "spider_verse",
+    "lighting_model": "Graphic",
+    "line_treatment": "Variable",
+    "medium": "Hybrid",
+    "mood": [
+      "Energetic",
+      "Rebellious",
+      "Playful"
+    ],
+    "motion_style": "Snappy",
+    "name": "Spider-Verse",
+    "reference_works": [
+      "Spider-Man: Into the Spider-Verse",
+      "Across the Spider-Verse"
+    ],
+    "surface_detail": "Textured",
+    "virtual_camera": "Free_3D"
+  },
+  "steins_gate": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Warm_Desaturated",
+      "Natural"
+    ],
+    "composition": [
+      "Intimate",
+      "Rule_of_Thirds"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "steins_gate",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Suspenseful",
+      "Mysterious",
+      "Melancholic"
+    ],
+    "motion_style": "Limited",
+    "name": "Steins;Gate",
+    "reference_works": [
+      "Steins;Gate"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Digital_Pan"
+  },
+  "stop_motion": {
+    "color_application": "Full",
+    "color_tone": [
+      "Warm",
+      "Muted"
+    ],
+    "composition": [
+      "Centered",
+      "Depth_Layering"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "ThreeD",
+    "id": "stop_motion",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "None",
+    "medium": "StopMotion",
+    "mood": [
+      "Whimsical",
+      "Tactile",
+      "Nostalgic"
+    ],
+    "motion_style": "Limited",
+    "name": "Stop Motion",
+    "reference_works": [
+      "Coraline",
+      "Kubo and the Two Strings",
+      "Isle of Dogs",
+      "Fantastic Mr. Fox"
+    ],
+    "surface_detail": "Textured",
+    "virtual_camera": "Free_3D"
+  },
+  "studio_ghibli": {
+    "color_application": "Soft",
+    "color_tone": [
+      "Warm_Saturated",
+      "Natural"
+    ],
+    "composition": [
+      "Depth_Layering",
+      "Negative_Space"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "studio_ghibli",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "Variable",
+    "medium": "2D",
+    "mood": [
+      "Whimsical",
+      "Nostalgic",
+      "Serene"
+    ],
+    "motion_style": "Full",
+    "name": "Studio Ghibli",
+    "reference_works": [
+      "Spirited Away",
+      "My Neighbor Totoro",
+      "Princess Mononoke",
+      "Howl's Moving Castle"
+    ],
+    "surface_detail": "Painterly",
+    "virtual_camera": "Parallax"
+  },
+  "trigger": {
+    "color_application": "Flat",
+    "color_tone": [
+      "Highly_Saturated",
+      "Bold"
+    ],
+    "composition": [
+      "Dynamic",
+      "Diagonal"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "trigger",
+    "lighting_model": "Graphic",
+    "line_treatment": "Variable",
+    "medium": "2D",
+    "mood": [
+      "Energetic",
+      "Rebellious",
+      "Chaotic"
+    ],
+    "motion_style": "Exaggerated",
+    "name": "Studio Trigger",
+    "reference_works": [
+      "Kill la Kill",
+      "Promare",
+      "Gurren Lagann"
+    ],
+    "surface_detail": "Flat",
+    "virtual_camera": "Digital_Pan"
+  },
+  "ufotable": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Vibrant",
+      "High_Contrast"
+    ],
+    "composition": [
+      "Dynamic",
+      "Symmetrical"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "ufotable",
+    "lighting_model": "Glow",
+    "line_treatment": "Clean",
+    "medium": "Hybrid",
+    "mood": [
+      "Epic",
+      "Intense",
+      "Dramatic"
+    ],
+    "motion_style": "Full",
+    "name": "Ufotable",
+    "reference_works": [
+      "Demon Slayer",
+      "Fate/Zero",
+      "Fate/Stay Night UBW"
+    ],
+    "surface_detail": "Smooth",
+    "virtual_camera": "Free_3D"
+  },
+  "unreal_cinematic": {
+    "color_application": "Full",
+    "color_tone": [
+      "Natural",
+      "Desaturated"
+    ],
+    "composition": [
+      "Cinematic",
+      "Rule_of_Thirds"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "ThreeD",
+    "id": "unreal_cinematic",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "None",
+    "medium": "3D",
+    "mood": [
+      "Epic",
+      "Cinematic",
+      "Realistic"
+    ],
+    "motion_style": "Full",
+    "name": "Unreal Cinematic",
+    "reference_works": [
+      "The Mandalorian Virtual Production",
+      "Game Cinematics"
+    ],
+    "surface_detail": "Photoreal",
+    "virtual_camera": "Free_3D"
+  },
+  "violet_evergarden": {
+    "color_application": "Soft",
+    "color_tone": [
+      "Warm_Saturated",
+      "Pastel"
+    ],
+    "composition": [
+      "Depth_Layering",
+      "Symmetrical"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "violet_evergarden",
+    "lighting_model": "Naturalistic_Simulated",
+    "line_treatment": "Clean",
+    "medium": "2D",
+    "mood": [
+      "Melancholic",
+      "Tender",
+      "Nostalgic"
+    ],
+    "motion_style": "Full",
+    "name": "Violet Evergarden",
+    "reference_works": [
+      "Violet Evergarden"
+    ],
+    "surface_detail": "Painterly",
+    "virtual_camera": "Parallax"
+  },
+  "watercolor": {
+    "color_application": "Soft",
+    "color_tone": [
+      "Muted",
+      "Desaturated"
+    ],
+    "composition": [
+      "Negative_Space",
+      "Organic"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [
+      "Full",
+      "Exaggerated",
+      "Fluid"
+    ],
+    "domain": "Illustration",
+    "id": "watercolor",
+    "lighting_model": "Minimal",
+    "line_treatment": "Sketchy",
+    "medium": "2D",
+    "mood": [
+      "Serene",
+      "Ethereal",
+      "Nostalgic"
+    ],
+    "motion_style": "None",
+    "name": "Watercolor",
+    "reference_works": [
+      "Traditional watercolor illustration"
+    ],
+    "surface_detail": "Painterly",
+    "virtual_camera": "Locked"
+  },
+  "wit_studio": {
+    "color_application": "Cel",
+    "color_tone": [
+      "Warm_Saturated"
+    ],
+    "composition": [
+      "Dynamic",
+      "Action_Lines"
+    ],
+    "disallowed_cameras": [],
+    "disallowed_motion": [],
+    "domain": "Anime",
+    "id": "wit_studio",
+    "lighting_model": "Dramatic",
+    "line_treatment": "Variable",
+    "medium": "2D",
+    "mood": [
+      "Epic",
+      "Intense",
+      "Dramatic"
+    ],
+    "motion_style": "Full",
+    "name": "Wit Studio",
+    "reference_works": [
+      "Attack on Titan S1-3",
+      "Vinland Saga",
+      "Spy x Family"
+    ],
+    "surface_detail": "Textured",
+    "virtual_camera": "Digital_Pan"
+  }
+}

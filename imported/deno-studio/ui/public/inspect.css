@@ -1,0 +1,493 @@
+/*
+ * inspect.css — the tabbed inspector (ui/inspect.ts).
+ *
+ * One tab strip, four panes; each pane scrolls on its own and the Restorer
+ * frame fills its pane, so there is never a scroll inside a scroll. Fonts follow
+ * the profile scale: clamp(8px, calc(var(--fs-base) * k), 32px).
+ */
+
+#inspector {
+  overflow: hidden;
+}
+
+.insp-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--border-1);
+  background: var(--surface-1);
+  position: relative;
+  z-index: 3;
+}
+
+.insp-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 4px 7px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.insp-tab:hover {
+  opacity: 0.85;
+}
+.insp-tab.is-on {
+  opacity: 1;
+  background: var(--surface-2);
+  border-color: var(--border-2);
+  margin-bottom: -1px;
+  padding-bottom: 8px;
+}
+.insp-tab:focus-visible {
+  outline: 2px solid var(--actor-user);
+  outline-offset: -2px;
+}
+
+.insp-badge {
+  font-weight: 500;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.6429), 32px);
+  min-width: 1.6em;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: #cfcfe0;
+  text-align: center;
+  line-height: 1.5;
+}
+.insp-badge:empty,
+.insp-badge[hidden] {
+  display: none;
+}
+.insp-badge.is-error {
+  background: #5a2620;
+  color: #f2b8ad;
+}
+
+.insp-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+}
+.insp-pane[hidden] {
+  display: none;
+}
+.insp-pane-frame {
+  overflow: hidden;
+}
+.insp-pane-frame #desk-tools {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  border-top: 0;
+  border-bottom: 0;
+}
+
+/* Depth gets the pane, not a fixed 188px strip. */
+#insp-pane-depth #carousel {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 188px;
+  max-height: 520px;
+}
+
+/* ---- Node pane ------------------------------------------------------------ */
+
+#inspect-body {
+  padding: 8px 12px 16px;
+}
+
+.insp-empty {
+  padding: 14px 14px 18px;
+}
+.insp-empty[hidden] {
+  display: none;
+}
+.insp-empty-title {
+  margin: 0 0 10px;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 1.0714), 32px);
+  font-weight: 600;
+  color: #ececf4;
+  overflow-wrap: anywhere;
+}
+.insp-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  margin: 0 0 14px;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+}
+.insp-facts dt {
+  opacity: 0.55;
+}
+.insp-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.insp-title-row {
+  gap: 8px;
+}
+.insp-swatch {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 22px;
+  border-radius: 2px;
+}
+.insp-meta {
+  display: block;
+  margin: 0 0 8px 16px;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.6429), 32px);
+  opacity: 0.5;
+}
+
+.insp-section {
+  margin: 12px 0 0;
+  border-top: 1px solid var(--border-1);
+  padding-top: 8px;
+}
+.insp-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.6429), 32px);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.insp-count {
+  letter-spacing: 0;
+  padding: 0 5px;
+  border-radius: 7px;
+  background: var(--surface-3);
+}
+
+.insp-port-filter {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 6px;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+}
+
+.insp-row {
+  align-items: center;
+  position: relative;
+}
+.insp-row[hidden] {
+  display: none;
+}
+.insp-row[data-port] > span:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.insp-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.insp-row.is-ai > span:first-child {
+  color: var(--actor-ai);
+  opacity: 1;
+}
+.insp-row.is-ai::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--actor-ai);
+}
+.insp-reset {
+  flex: 0 0 auto;
+  width: 1.6em;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.45;
+  cursor: pointer;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.8571), 32px);
+}
+.insp-reset:hover {
+  opacity: 1;
+}
+.insp-reset[hidden] {
+  visibility: hidden;
+  display: inline-block;
+}
+
+.insp-links,
+.insp-wires {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin: 2px 0 6px;
+}
+.insp-wire-dir {
+  width: 3em;
+  opacity: 0.5;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+}
+.insp-link {
+  border: 1px solid var(--border-2);
+  background: var(--surface-2);
+  color: inherit;
+  border-radius: 4px;
+  padding: 2px 7px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+}
+.insp-link:hover {
+  border-color: var(--actor-user);
+}
+
+.insp-version {
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+  padding: 2px 0;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.insp-version.is-retired {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+.insp-diff {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 8px;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+  table-layout: fixed;
+}
+.insp-diff td {
+  padding: 2px 4px 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-0);
+}
+.insp-diff td:first-child {
+  width: 34%;
+  opacity: 0.6;
+}
+.insp-diff td:nth-child(3) {
+  width: 1.4em;
+  opacity: 0.4;
+}
+.insp-diff td:nth-child(4) {
+  color: #f0d68a;
+}
+
+/* Stack progress sits under the tabs, whichever pane is open. */
+.insp-tabs + .stack-run,
+.insp-tabs + .insp-row {
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-1);
+}
+
+/* What a reference or generate node resolves to — the text it would send. */
+.insp-resolved {
+  margin: 0 0 8px;
+}
+.insp-resolved-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+  opacity: 0.6;
+}
+.insp-resolved-body {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-1);
+  border-radius: 4px;
+  background: var(--surface-0);
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+  line-height: 1.45;
+  color: #c9c9d8;
+  max-height: 11em;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* Pick any two recorded versions to diff. */
+.insp-compare {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+.insp-compare select {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+}
+
+/* ---- Models & keys ---------------------------------------------------- *
+ *
+ * A provider is either reachable or not, and until now that was decided by an
+ * environment variable nobody could see. This is that state, made editable.
+ */
+.models-back {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 5vh 16px;
+  background: rgba(6, 6, 10, 0.72);
+  overflow-y: auto;
+}
+.models-back[hidden] {
+  display: none;
+}
+.models-panel {
+  width: min(720px, 100%);
+  border: 1px solid var(--border-3);
+  border-radius: 10px;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-3);
+  padding: 16px 18px 20px;
+}
+.models-panel header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.models-panel h2 {
+  margin: 0;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 1.0714), 32px);
+  font-weight: 600;
+  color: #ececf4;
+}
+.model-card {
+  border-top: 1px solid var(--border-1);
+  padding: 12px 0 10px;
+}
+.model-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.model-head b {
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.9286), 32px);
+}
+.model-count {
+  opacity: 0.5;
+}
+.model-status {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.6429), 32px);
+}
+.model-card.is-stored .model-status,
+.model-card.is-environment .model-status {
+  color: #9fd6b4;
+  border-color: #2f5b43;
+}
+.model-card.is-none .model-status {
+  color: #e0b57a;
+  border-color: #5d4526;
+}
+.model-hint {
+  margin: 4px 0 0;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+  opacity: 0.6;
+  line-height: 1.5;
+}
+.model-row {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+.model-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border-2);
+  border-radius: 4px;
+  background: var(--surface-0);
+  color: inherit;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7857), 32px);
+}
+.model-plan {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  align-items: end;
+  margin-top: 10px;
+}
+.model-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.model-field span {
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.6429), 32px);
+  opacity: 0.55;
+}
+.model-field input {
+  min-width: 0;
+  padding: 3px 7px;
+  border: 1px solid var(--border-2);
+  border-radius: 4px;
+  background: var(--surface-0);
+  color: inherit;
+  font-size: clamp(8px, calc(var(--fs-base, 14px) * 0.7143), 32px);
+}
+
+/* A subject's own material, in the pane that describes it. */
+.insp-media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0;
+}
+.insp-media img {
+  width: 62px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border-2);
+  background: var(--surface-0);
+}

@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-09-17T15:04:03.969Z",
+  "capture_id": "cap_vlm_20260917t15035_lab_workstation",
+  "screen_profile": "lab-workstation",
+  "resolution": {
+    "width": 2560,
+    "height": 1440
+  },
+  "telemetry": {
+    "current_fps": 0,
+    "vram_usage_mb": null,
+    "system_ram_mb": 3,
+    "draw_calls": 0
+  },
+  "lineage_context": {
+    "active_node_id": null,
+    "parent_asset_id": null,
+    "graph_node_depth": null,
+    "columnar_record_id": null
+  },
+  "context": {
+    "active_route": "/blueprint/",
+    "radial_menu_open": false,
+    "bottom_terminal_expanded": true,
+    "theme": "dark_custom"
+  },
+  "evaluation_target": {
+    "macro_region": "workshop_shell",
+    "micro_region": "panel_layout",
+    "intent": "Verify the expanded-multi-dock layout and 16–24px base typography at 2560×1440."
+  }
+}

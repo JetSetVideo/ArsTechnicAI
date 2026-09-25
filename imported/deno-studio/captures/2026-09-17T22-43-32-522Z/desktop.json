@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-09-17T22:43:41.960Z",
+  "capture_id": "cap_vlm_20260917t22433_desktop",
+  "screen_profile": "desktop",
+  "resolution": {
+    "width": 1440,
+    "height": 900
+  },
+  "telemetry": {
+    "current_fps": 45.9,
+    "vram_usage_mb": null,
+    "system_ram_mb": 19,
+    "draw_calls": 20
+  },
+  "lineage_context": {
+    "active_node_id": null,
+    "parent_asset_id": null,
+    "graph_node_depth": null,
+    "columnar_record_id": null
+  },
+  "context": {
+    "active_route": "/blueprint/",
+    "radial_menu_open": false,
+    "bottom_terminal_expanded": false,
+    "theme": "dark_custom"
+  },
+  "evaluation_target": {
+    "macro_region": "workshop_shell",
+    "micro_region": "pre_run_gate_dialog",
+    "intent": "Verify the pre-run gate lists paths, loops, branches, memory, tokens and cost above a docked four-panel layout."
+  }
+}
