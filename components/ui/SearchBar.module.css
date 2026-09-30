@@ -1,4 +1,5 @@
 .searchBar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
@@ -57,9 +58,34 @@
   position: relative;
 }
 
-.searchIcon {
-  color: var(--text-muted);
-  flex-shrink: 0;
+.iconBtn {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0; border: none; background: none;
+  color: var(--text-muted); cursor: pointer; flex-shrink: 0; order: 0;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.iconActive { color: #fff; transform: rotate(90deg); order: 5; }
+.suggest {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30;
+  margin: 0; padding: 4px; list-style: none;
+  background: var(--bg-elevated, #222228); border: 1px solid var(--border-color);
+  border-radius: 8px; box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+}
+.suggest button {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 6px 8px; border: none; border-radius: 6px;
+  background: none; color: var(--text-primary); font-size: 0.75rem; cursor: pointer; text-align: left;
+}
+.suggestActive, .suggest button:hover { background: rgba(255,255,255,0.06); }
+.suggestKind { color: var(--text-muted); font-size: 0.625rem; }
+.suggestMeta { padding: 4px 8px; color: var(--text-muted); font-size: 0.625rem; }
+@media (max-width: 800px) {
+  .searchBar:not(.open) { width: 32px; max-width: 32px; padding: 0; justify-content: center; overflow: hidden; }
+  .searchBar:not(.open) .scopeButtons,
+  .searchBar:not(.open) .inputWrapper,
+  .searchBar:not(.open) .shortcut,
+  .searchBar:not(.open) .suggest { display: none; }
+  .searchBar.open { position: absolute; left: 8px; right: 48px; width: auto; max-width: none; z-index: 40; overflow: visible; }
 }
 
 .input {

@@ -205,7 +205,7 @@ export const AppShell: React.FC = () => {
           </>
         ) : (
           <button
-            className={styles.collapsedExplorerToggle}
+            className={styles.collapsedExplorerRail}
             onClick={() => togglePanel('explorer')}
             title="Open Explorer (⌘1)"
           >

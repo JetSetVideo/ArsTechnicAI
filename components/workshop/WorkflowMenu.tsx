@@ -22,6 +22,8 @@ interface WorkflowMenuProps {
    * Workshop pipeline; clicking one opens that project's Workshop.
    */
   scope: 'project' | 'global';
+  /** Render the list under the trigger, inside the explorer, instead of a floating panel. */
+  inline?: boolean;
   projectId?: string;
   projectName?: string;
   /**
@@ -42,7 +44,7 @@ function timeAgo(ts: number): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, projectName, renderTrigger }) => {
+export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, projectName, renderTrigger, inline }) => {
   const router = useRouter();
   const triggerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -254,8 +256,11 @@ export const WorkflowMenu: React.FC<WorkflowMenuProps> = ({ scope, projectId, pr
             <FolderClock size={15} /> Workflows <ChevronDown size={11} />
           </button>
         )}
+        {inline && open && (
+          <div className={styles.inlinePanel}>{renderPanelBody()}</div>
+        )}
       </div>
-      {panel}
+      {!inline && panel}
     </>
   );
 };

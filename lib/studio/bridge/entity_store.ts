@@ -16,6 +16,7 @@
  * Reading takes the highest version. Nothing here deletes.
  */
 
+import { host } from "../host.ts";
 import {
   applyEdit,
   attachMedia,
@@ -46,13 +47,13 @@ function safeId(id: string): string | null {
 async function maxVersion(dir: string, pattern: RegExp, want: "file" | "dir"): Promise<number> {
   let max = 0;
   try {
-    for await (const entry of Deno.readDir(dir)) {
+    for await (const entry of host.readDir(dir)) {
       if (want === "file" ? !entry.isFile : !entry.isDirectory) continue;
       const m = entry.name.match(pattern);
       if (m) max = Math.max(max, Number(m[1]));
     }
   } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
+    if (!(error instanceof host.errors.NotFound)) throw error;
   }
   return max;
 }
@@ -62,7 +63,7 @@ async function readEntity(workspace: string, id: string): Promise<Entity | null>
   const version = await maxVersion(dir, ENTITY_FILE, "file");
   if (version === 0) return null;
   try {
-    return JSON.parse(await Deno.readTextFile(`${dir}/entity.v${version}.json`)) as Entity;
+    return JSON.parse(await host.readTextFile(`${dir}/entity.v${version}.json`)) as Entity;
   } catch {
     return null;
   }
@@ -70,9 +71,9 @@ async function readEntity(workspace: string, id: string): Promise<Entity | null>
 
 async function writeEntity(workspace: string, entity: Entity): Promise<number> {
   const dir = `${entitiesRoot(workspace)}/${entity.id}`;
-  await Deno.mkdir(dir, { recursive: true });
+  await host.mkdir(dir, { recursive: true });
   const next = (await maxVersion(dir, ENTITY_FILE, "file")) + 1;
-  await Deno.writeTextFile(
+  await host.writeTextFile(
     `${dir}/entity.v${next}.json`,
     JSON.stringify(entity, null, 2) + "\n",
     { createNew: true },
@@ -84,13 +85,13 @@ async function writeEntity(workspace: string, entity: Entity): Promise<number> {
 export async function listEntities(workspace: string): Promise<Entity[]> {
   const out: Entity[] = [];
   try {
-    for await (const entry of Deno.readDir(entitiesRoot(workspace))) {
+    for await (const entry of host.readDir(entitiesRoot(workspace))) {
       if (!entry.isDirectory || !safeId(entry.name)) continue;
       const entity = await readEntity(workspace, entry.name);
       if (entity) out.push(entity);
     }
   } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
+    if (!(error instanceof host.errors.NotFound)) throw error;
   }
   return out.sort((a, b) => b.updatedAt - a.updatedAt);
 }
@@ -181,7 +182,7 @@ export async function addMedia(
   }
 
   const dir = `${entitiesRoot(workspace)}/${safe}/media`;
-  await Deno.mkdir(dir, { recursive: true });
+  await host.mkdir(dir, { recursive: true });
   let version = (await maxVersion(dir, VERSION_DIR, "dir")) + 1;
   const extension = EXTENSION[type] ?? "bin";
   const stem = (input.filename ?? (input.drawn ? "drawing" : "file"))
@@ -193,13 +194,13 @@ export async function addMedia(
 
   for (let attempt = 0; attempt < 16; attempt++, version++) {
     try {
-      await Deno.mkdir(`${dir}/v${version}`);
+      await host.mkdir(`${dir}/v${version}`);
     } catch (error) {
-      if (error instanceof Deno.errors.AlreadyExists) continue;
+      if (error instanceof host.errors.AlreadyExists) continue;
       throw error;
     }
     const relative = `entities/${safe}/media/v${version}/${stem}.${extension}`;
-    await Deno.writeFile(`${workspace}/${relative}`, input.bytes, { createNew: true });
+    await host.writeFile(`${workspace}/${relative}`, input.bytes, { createNew: true });
     const media: EntityMedia = {
       id: `m${version}`,
       kind: input.drawn && kind === "image" ? "drawing" : kind,

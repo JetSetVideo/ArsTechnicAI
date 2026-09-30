@@ -445,9 +445,12 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
 
   const filteredNodes = sortNodes(filterTree(rootNodes, filter, filterType));
 
-  const filteredCloud = filter
-    ? cloudAssets.filter((a) => a.name.toLowerCase().includes(filter.toLowerCase()) || a.prompt?.toLowerCase().includes(filter.toLowerCase()))
-    : cloudAssets;
+  const filteredCloud = cloudAssets.filter((a) => {
+    const q = filter.toLowerCase().trim();
+    const nameOk = !q || a.name.toLowerCase().includes(q) || a.prompt?.toLowerCase().includes(q);
+    const typeOk = filterType === 'all' || filterType === 'folder' || a.type === filterType;
+    return nameOk && typeOk;
+  });
 
   return (
     <aside id="explorer-panel-left-sidebar" className={styles.explorer} style={{ width }} data-density="compact">
@@ -501,33 +504,32 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        {tab === 'local' && (
-          <div className={styles.filterControls}>
-            <select
-              className={styles.filterSelect}
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              title="Filter by type"
+        <div className={styles.filterControls}>
+          {[
+            ['all', 'All'],
+            ['folder', 'Folders'],
+            ['image', 'Images'],
+            ['video', 'Videos'],
+            ['audio', 'Audio'],
+            ['text', 'Text'],
+            ['model_3d', '3D'],
+          ].filter(([id]) => tab === 'cloud' ? id !== 'folder' : true).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={`${styles.filterChip} ${filterType === id ? styles.filterChipOn : ''}`}
+              onClick={() => setFilterType(id)}
             >
-              <option value="all">All Types</option>
-              <option value="folder">Folders</option>
-              <option value="image">Images</option>
-              <option value="video">Videos</option>
-              <option value="audio">Audio</option>
-              <option value="text">Text</option>
-              <option value="model_3d">3D Models</option>
-            </select>
-            <select
-              className={styles.filterSelect}
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'name' | 'date')}
-              title="Sort order"
-            >
-              <option value="name">A-Z</option>
-              <option value="date">Recent</option>
-            </select>
-          </div>
-        )}
+              {label}
+            </button>
+          ))}
+          {tab === 'local' && (
+            <>
+              <button type="button" className={`${styles.filterChip} ${sortBy === 'name' ? styles.filterChipOn : ''}`} onClick={() => setSortBy('name')}>A–Z</button>
+              <button type="button" className={`${styles.filterChip} ${sortBy === 'date' ? styles.filterChipOn : ''}`} onClick={() => setSortBy('date')}>Recent</button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Local tab */}

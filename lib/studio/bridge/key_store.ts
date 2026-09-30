@@ -29,6 +29,7 @@
  */
 
 import { provider, PROVIDERS } from "../core/providers.ts";
+import { host } from "../host.ts";
 
 export interface PlanNote {
   /** What the user calls this subscription: "Pro", "pay as you go". */
@@ -79,7 +80,7 @@ function fileFor(root: string): string {
 
 async function read(root: string): Promise<StoreFile> {
   try {
-    const parsed = JSON.parse(await Deno.readTextFile(fileFor(root))) as StoreFile;
+    const parsed = JSON.parse(await host.readTextFile(fileFor(root))) as StoreFile;
     if (parsed && typeof parsed === "object" && parsed.providers) return parsed;
   } catch {
     // No store yet, or an unreadable one: an empty store is the safe answer.
@@ -89,11 +90,11 @@ async function read(root: string): Promise<StoreFile> {
 }
 
 async function write(root: string, file: StoreFile): Promise<void> {
-  await Deno.mkdir(root, { recursive: true });
+  await host.mkdir(root, { recursive: true });
   const path = fileFor(root);
-  await Deno.writeTextFile(path, JSON.stringify(file, null, 2) + "\n");
+  await host.writeTextFile(path, JSON.stringify(file, null, 2) + "\n");
   try {
-    await Deno.chmod(path, 0o600);
+    await host.chmod(path, 0o600);
   } catch {
     // chmod is unavailable on some filesystems; the file is still ours.
   }
@@ -104,7 +105,7 @@ const tailOf = (key: string): string | null => key.length >= 4 ? key.slice(-4) :
 /** Every provider, with whether it can be called and where that comes from. */
 export async function providerStatuses(
   root: string,
-  env: (name: string) => string | undefined = (n) => Deno.env.get(n),
+  env: (name: string) => string | undefined = (n) => host.env.get(n),
   modelCount: (id: string) => number = () => 0,
 ): Promise<ProviderStatus[]> {
   const store = await read(root);
@@ -204,7 +205,7 @@ export async function setPlan(root: string, id: string, plan: PlanNote): Promise
 export async function resolveKey(
   root: string,
   id: string,
-  env: (name: string) => string | undefined = (n) => Deno.env.get(n),
+  env: (name: string) => string | undefined = (n) => host.env.get(n),
 ): Promise<string | null> {
   const spec = provider(id);
   if (!spec?.keyEnv) return null;

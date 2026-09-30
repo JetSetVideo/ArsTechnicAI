@@ -4,6 +4,7 @@
    ============================================================ */
 
 .wrap { position: relative; }
+.inlinePanel { margin: 4px 8px 4px 18px; max-height: 240px; overflow: auto; border: 1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius: 8px; padding: 6px; background: rgba(0,0,0,0.25); }
 
 .trigger {
   display: inline-flex;

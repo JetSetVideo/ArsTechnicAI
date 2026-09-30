@@ -100,6 +100,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
   const [localEndpoint, setLocalEndpoint] = useState(settings.aiProvider.endpoint || '');
   const [localModel, setLocalModel] = useState(settings.aiProvider.model);
   const [subscriptionPlan, setSubscriptionPlan] = useState('Free');
+  const [planNote, setPlanNote] = useState(false);
 
   // Health
   const [accountHealth, setAccountHealth] = useState<any>(null);
@@ -225,7 +226,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                 <button key={tab.id}
                   className={`${styles.tab} ${activeTab === tab.id ? styles.active : ''}`}
                   onClick={() => setActiveTab(tab.id)}
-                  style={{ gap: 8, padding: '6px 10px', fontSize: '0.7rem' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: '0.7rem' }}>
                   {tab.icon}<span>{tab.label}</span>
                 </button>
               ))}
@@ -238,16 +239,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
               {activeTab === 'account' && (
                 <div className={styles.section}>
                   {/* Subscription */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
                     <div>
                       <h3 style={{ margin: 0 }}>Account</h3>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Manage your profile and subscription</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px', background: 'rgba(0,212,170,0.06)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: 20 }}>
-                      <CreditCard size={14} color="var(--accent-primary)" />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{subscriptionPlan}</span>
-                    </div>
+                    <button type="button" onClick={() => setPlanNote(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px', background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.45)', borderRadius: 20, color: '#fb923c', cursor: 'pointer', flexShrink: 0 }}>
+                      <CreditCard size={14} color="#fb923c" />
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{subscriptionPlan}</span>
+                    </button>
                   </div>
+                  {planNote && <p style={{ margin: '0 0 12px', color: '#fb923c', fontSize: '0.75rem' }}>No commercial plan available, to be implemented later.</p>}
 
                   {/* Profile Picture */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
@@ -260,7 +262,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                       {!profilePic && <UserRound size={28} color="var(--text-muted)" />}
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{authUser?.pseudonym || authUser?.email || 'Not connected'}</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: (authUser?.pseudonym || authUser?.email) ? 'var(--text-primary)' : '#ff2a4a' }}>{authUser?.pseudonym || authUser?.email || 'Not connected'}</div>
                       <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{authUser?.email || ''}</div>
                       {isAuthenticated && (
                         <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
@@ -893,6 +895,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                           <option>Content only</option>
                         </select>
                       </label>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Workshop search bar</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {[
+                        ['ars:search:files', 'Search files by default'],
+                        ['ars:search:google', 'Search Google by default'],
+                        ['ars:search:suggestions', 'Show the 3 closest names'],
+                      ].map(([key, label]) => (
+                        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: 'var(--bg-tertiary)', borderRadius: 5 }}>
+                          <input
+                            type="checkbox"
+                            defaultChecked={typeof window === 'undefined' ? key !== 'ars:search:google' : (localStorage.getItem(key) ?? (key === 'ars:search:google' ? '0' : '1')) === '1'}
+                            style={{ accentColor: 'var(--accent-primary)' }}
+                            onChange={(e) => {
+                              localStorage.setItem(key, e.target.checked ? '1' : '0');
+                              window.dispatchEvent(new Event('ars-search-prefs'));
+                            }}
+                          />
+                          <span style={{ fontSize: '0.6875rem' }}>{label}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
 

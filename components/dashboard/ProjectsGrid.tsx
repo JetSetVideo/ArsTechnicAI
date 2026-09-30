@@ -533,8 +533,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
 
   return (
     <div className={styles.container}>
-      {/* Filters */}
-      <div className={styles.filters}>
+      {/* Filters live in the home bar. This row stayed as a second, conflicting set. */}
+      {false && <div className={styles.filters}>
         <button
           className={`${styles.filterButton} ${showFavoritesOnly ? styles.filterActive : ''}`}
           onClick={toggleShowFavoritesOnly}
@@ -591,10 +591,10 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
             onChange={(event) => setMinimumAssets(Math.max(0, Number(event.target.value) || 0))}
           />
         </label>
-      </div>
+      </div>}
 
-      {/* Library sync status — compact one-liner */}
-      <div className={styles.librarySyncRow}>
+      {/* Inventory count lives in the explorer. This row counted a different path and read as zero. */}
+      {false && <div className={styles.librarySyncRow}>
         <HardDrive size={11} />
         <span className={styles.librarySyncLabel}>
           Library · <strong>{libraryAssets.length}</strong> assets
@@ -618,15 +618,10 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
         >
           <RefreshCcw size={10} />
         </button>
-      </div>
+      </div>}
 
-      {/* Projects Grid */}
+      {/* Projects Grid — the bar owns the single New Project control. */}
       <div className={styles.grid}>
-        {/* New Project Card */}
-        <button className={styles.newProjectCard} onClick={handleNewProject}>
-          <Plus size={32} />
-          <span>New Project</span>
-        </button>
 
         {/* Skeleton placeholders during initial load */}
         {isLoadingProjects && Array.from({ length: 4 }).map((_, i) => (
@@ -903,9 +898,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
           body={externalFilters?.platform || externalFilters?.source
             ? 'Try removing the active filters to see all projects.'
             : 'Create your first project and start generating.'}
-          action={!externalFilters?.platform && !externalFilters?.source
-            ? { label: 'New Project', onClick: handleNewProject, icon: <Plus size={13} /> }
-            : undefined}
+          action={undefined}
           className={styles.emptyState}
         />
       )}

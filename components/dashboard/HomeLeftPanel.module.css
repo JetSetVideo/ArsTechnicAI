@@ -13,6 +13,15 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 800px) {
+  .panel {
+    position: absolute;
+    z-index: 6;
+    height: 100%;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35);
+  }
+}
+
 .panelCollapsed {
   width: 36px;
   min-width: 36px;
@@ -44,9 +53,18 @@
 .collapsedIcons button:hover { color: var(--accent-primary); background: rgba(0,212,170,0.08); }
 
 .panelHeader {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; border-bottom: 1px solid hsla(210, 15%, 85%, 0.05);
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+  padding: 8px 8px; border-bottom: 1px solid hsla(210, 15%, 85%, 0.05);
   flex-shrink: 0;
+}
+.panelHeader > button {
+  background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 3px 5px; border-radius: 4px;
+}
+.fileActions { display: flex; gap: 6px; padding: 4px 8px 6px; }
+.fileActions button {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: 1px solid hsla(210, 15%, 85%, 0.08); color: var(--text-secondary);
+  font-size: 0.6875rem; border-radius: 5px; padding: 3px 6px; cursor: pointer;
 }
 .panelTitle {
   font-size: 0.625rem; font-weight: 600; color: var(--text-muted);
@@ -72,6 +90,14 @@
   transition: all 0.12s ease;
 }
 .quickAction:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+.quickActionActive { color: var(--text-primary); background: rgba(255,255,255,0.06); }
+.inventory {
+  display: flex; gap: 8px; align-items: baseline;
+  padding: 0; font-size: 0.6875rem; color: var(--text-muted);
+}
+.inventory strong { color: var(--text-secondary); font-weight: 600; font-size: 0.75rem; }
+.toolGroup { display: flex; flex-direction: column; }
+.toolItem { font-weight: 400; text-transform: none; letter-spacing: 0; }
 
 .panelDivider {
   height: 1px; background: hsla(210, 15%, 85%, 0.05);

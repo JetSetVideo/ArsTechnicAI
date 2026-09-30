@@ -72,6 +72,21 @@
   background: var(--accent-primary);
 }
 
+.collapsedExplorerRail {
+  flex-shrink: 0;
+  width: 36px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10px;
+  border: none;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  z-index: 30;
+}
+.collapsedExplorerRail:hover { color: var(--text-primary); background: var(--bg-tertiary); }
 .collapsedExplorerToggle {
   position: absolute;
   top: 8px;

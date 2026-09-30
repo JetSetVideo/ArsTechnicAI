@@ -16,6 +16,7 @@
  * Nothing here deletes. There is no function to.
  */
 
+import { host } from "../host.ts";
 import { HybridLineage, type HybridSnapshot } from "../core/hybrid.ts";
 import { canonicalise } from "../core/hash.ts";
 
@@ -25,13 +26,13 @@ const VERSION_DIR = /^v(\d+)$/;
 async function maxVersion(dir: string, pattern: RegExp, want: "file" | "dir"): Promise<number> {
   let max = 0;
   try {
-    for await (const entry of Deno.readDir(dir)) {
+    for await (const entry of host.readDir(dir)) {
       if (want === "file" ? !entry.isFile : !entry.isDirectory) continue;
       const m = entry.name.match(pattern);
       if (m) max = Math.max(max, Number(m[1]));
     }
   } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
+    if (!(error instanceof host.errors.NotFound)) throw error;
   }
   return max;
 }
@@ -45,7 +46,7 @@ export async function loadLatestLineage(projectDir: string): Promise<LoadedLinea
   const dir = `${projectDir}/lineage`;
   const version = await maxVersion(dir, LINEAGE_FILE, "file");
   if (version === 0) return { version: 0, snapshot: null };
-  const text = await Deno.readTextFile(`${dir}/lineage.v${version}.json`);
+  const text = await host.readTextFile(`${dir}/lineage.v${version}.json`);
   return { version, snapshot: JSON.parse(text) as HybridSnapshot };
 }
 
@@ -112,15 +113,15 @@ export async function saveLineage(projectDir: string, snapshot: unknown): Promis
     }
   }
   const dir = `${projectDir}/lineage`;
-  await Deno.mkdir(dir, { recursive: true });
+  await host.mkdir(dir, { recursive: true });
   const next = version + 1;
   const rel = `lineage/lineage.v${next}.json`;
   try {
-    await Deno.writeTextFile(`${projectDir}/${rel}`, JSON.stringify(normalised, null, 2) + "\n", {
+    await host.writeTextFile(`${projectDir}/${rel}`, JSON.stringify(normalised, null, 2) + "\n", {
       createNew: true,
     });
   } catch (error) {
-    if (error instanceof Deno.errors.AlreadyExists) {
+    if (error instanceof host.errors.AlreadyExists) {
       return { ok: false, status: 409, reason: "Another save landed first. Reload and retry." };
     }
     throw error;
@@ -143,18 +144,18 @@ export async function writeVersionedAsset(
   const safe = sanitiseAssetName(name);
   if (!safe) return { ok: false, status: 400, reason: "That asset name has no usable characters." };
   const root = `${projectDir}/assets`;
-  await Deno.mkdir(root, { recursive: true });
+  await host.mkdir(root, { recursive: true });
   // Claim a version directory atomically: mkdir without `recursive` fails if it exists.
   let n = (await maxVersion(root, VERSION_DIR, "dir")) + 1;
   for (let attempt = 0; attempt < 16; attempt++, n++) {
     try {
-      await Deno.mkdir(`${root}/v${n}`);
+      await host.mkdir(`${root}/v${n}`);
     } catch (error) {
-      if (error instanceof Deno.errors.AlreadyExists) continue;
+      if (error instanceof host.errors.AlreadyExists) continue;
       throw error;
     }
     const rel = `assets/v${n}/${safe}`;
-    await Deno.writeFile(`${projectDir}/${rel}`, bytes, { createNew: true });
+    await host.writeFile(`${projectDir}/${rel}`, bytes, { createNew: true });
     return { ok: true, version: n, path: rel };
   }
   return { ok: false, status: 409, reason: "Could not claim a version directory." };

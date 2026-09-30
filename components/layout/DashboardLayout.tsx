@@ -10,7 +10,7 @@ import {
   Search, UserRound, LayoutGrid, Image as ImageIcon,
   Sparkles, Film, Send, ChevronDown, Zap, BrainCircuit,
   Wand2, Music, Share2, Instagram, Twitter, Youtube,
-  Plus, Layers, Download, ChevronUp, Settings2, Box,
+  Plus, Layers, Download, ChevronUp, Settings2, Box, Star,
   Sliders, Camera, Sun, Focus, Aperture, Users, BookOpen,
   Palette, Ruler, Grid, Eye, Move, ArrowUpDown,
   Pencil, Eraser, MapPin, X,
@@ -22,7 +22,6 @@ import { ConnectionBanner } from '../ui/ConnectionBanner';
 import { SettingsModal } from './SettingsModal';
 import { HomeLeftPanel } from '../dashboard/HomeLeftPanel';
 import { PipelineStatusCard } from '../dashboard/PipelineStatusCard';
-import { HomeLeftToolbar } from '../dashboard/HomeLeftToolbar';
 import { ThreeDViewer } from '../dashboard/ThreeDViewer';
 import { useProjectSync, saveProjectWorkspaceState } from '../../hooks/useProjectSync';
 import { useSettingsStore, PROVIDER_DEFAULT_MODELS } from '../../stores/settingsStore';
@@ -204,8 +203,12 @@ export function DashboardLayout() {
   // Panel states
   const [leftPanelPath, setLeftPanelPath] = useState<string>('');
   const [heroExpanded, setHeroExpanded] = useState(false);
-  const [showPlatforms, setShowPlatforms] = useState(true);
+  const [creatorMode, setCreatorMode] = useState<'generate' | 'template'>('generate');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [showPlatforms, setShowPlatforms] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showMoreParams, setShowMoreParams] = useState(false);
   const [showComposition, setShowComposition] = useState(false);
   const [showCharacter, setShowCharacter] = useState(false);
   const [showLighting, setShowLighting] = useState(false);
@@ -299,6 +302,9 @@ export function DashboardLayout() {
   const [selectedLighting, setSelectedLighting] = useState('studio-3pt');
   const [selectedCamera, setSelectedCamera] = useState('portrait-85');
   const [realWorldLocation, setRealWorldLocation] = useState('');
+  const [sceneTime, setSceneTime] = useState('present');
+  const [sceneEmotion, setSceneEmotion] = useState('neutral');
+  const [projectVariable, setProjectVariable] = useState('');
   const [referenceAssetIds, setReferenceAssetIds] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -341,6 +347,8 @@ export function DashboardLayout() {
   const currentProject = useUserStore((s) => s.currentProject);
   const health = useTelemetryStore((s) => s.health);
   const addProject = useProjectsStore((s) => s.addProject);
+  const showFavoritesOnly = useProjectsStore((s) => s.showFavoritesOnly);
+  const toggleShowFavoritesOnly = useProjectsStore((s) => s.toggleShowFavoritesOnly);
   const toast = useToastStore();
   const settings = useSettingsStore((s) => s.settings);
   const fileAssets = useFileStore((s) => s.assets);
@@ -442,12 +450,15 @@ export function DashboardLayout() {
     if (realWorldLocation.trim()) {
       full = `${full}, set in ${realWorldLocation.trim()}, real-world location with authentic geography and architecture`;
     }
+    if (sceneTime && sceneTime !== 'present') full = `${full}, time of day ${sceneTime}`;
+    if (sceneEmotion && sceneEmotion !== 'neutral') full = `${full}, emotional tone ${sceneEmotion}`;
+    if (projectVariable.trim()) full = `${full}, project variable ${projectVariable.trim()}`;
 
     // Quality suffix
     full = `${full}, 8K resolution, ultra detailed, professional photography`;
 
     return full;
-  }, [prompt, selectedStyle, selectedComposition, selectedLighting, selectedCamera, realWorldLocation]);
+  }, [prompt, selectedStyle, selectedComposition, selectedLighting, selectedCamera, realWorldLocation, sceneTime, sceneEmotion, projectVariable]);
 
   const handleGenerate = useCallback(async (promptOverride?: string) => {
     const promptText = typeof promptOverride === 'string' ? promptOverride : prompt;
@@ -650,26 +661,33 @@ export function DashboardLayout() {
 
   return (
     <div id="dashboard-layout-root-page-region" className={styles.root}>
-      <ConnectionBanner />
-
       {/* Top Bar */}
       <header id="dashboard-layout-header-primary-at-top" className={styles.topBar}>
         <Link href="/home" className={styles.brand} title="Dashboard Home">
           <span className={styles.brandArs}>Ars</span>
           <span className={styles.brandTechnic}>Technic</span>
-          <span className={styles.brandAI}>AI</span>
+          <span className={`${styles.brandAI} ${styles.spectrum}`}>AI</span>
         </Link>
-        <div className={styles.searchBox}>
+        <div className={`${styles.searchBox} ${searchOpen ? styles.searchOpen : ''}`}>
+          <button type="button" className={styles.searchToggle} aria-label={searchOpen ? 'Close search' : 'Open search'} aria-expanded={searchOpen} onClick={() => {
+            setSearchOpen((open) => !open);
+            if (window.matchMedia('(pointer: coarse)').matches) searchInputRef.current?.focus();
+          }}>
+            <Search size={14} />
+          </button>
           <Search size={14} className={styles.searchIcon} />
-          <input type="text" placeholder="Search projects, assets, tags…" value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)} className={styles.searchInput} />
+          <input ref={searchInputRef} type="text" inputMode="search" enterKeyHint="search" placeholder="Search projects, assets, tags…" value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)} className={styles.searchInput}
+            onFocus={() => setSearchOpen(true)} />
         </div>
         <div className={styles.topBarRight}>
-          <button className={styles.avatarBtn} onClick={() => { setSettingsTab('account'); setSettingsOpen(true); }}>
+          <button className={styles.avatarBtn} title={health?.status === 'ok' ? 'Connected — account and settings' : 'Degraded — account and settings'} onClick={() => { setSettingsTab('account'); setSettingsOpen(true); }}>
             <div className={`${styles.avatar} ${connectedClass}`}><UserRound size={13} /></div>
           </button>
         </div>
       </header>
+
+      <ConnectionBanner />
 
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} defaultTab={settingsTab} />
 
@@ -678,15 +696,12 @@ export function DashboardLayout() {
         <HomeLeftPanel
           onSelectFolder={(path) => setLeftPanelPath(path)}
           onNewFolder={() => {}}
-          onNewProject={() => setTriggerNewProject(k => k + 1)}
-          onOpenCharacterCreator={() => { setHeroExpanded(true); setShowCharacter(true); }}
-          onOpenTemplate={() => { setHeroExpanded(true); setShowTemplates(true); }}
+          onToggleAssetCreator={() => { setCreatorMode('generate'); setHeroExpanded((open) => !open); }}
+          assetCreatorOpen={heroExpanded && creatorMode === 'generate'}
+          onOpenTemplate={() => { setCreatorMode('template'); setHeroExpanded(true); setShowMoreParams(true); setShowTemplates(true); }}
+          onToolAction={handleToolbarAction}
+          activeTool={activeToolbarAction}
           selectedPath={leftPanelPath}
-        />
-
-        <HomeLeftToolbar
-          onAction={handleToolbarAction}
-          activeAction={activeToolbarAction}
         />
 
         <div className={styles.mainContent}>
@@ -707,7 +722,20 @@ export function DashboardLayout() {
               </button>
             </nav>
 
-            {/* Faceted filter chips */}
+            <button
+              className={`${styles.filterChip} ${showFavoritesOnly ? styles.filterChipActive : ''}`}
+              onClick={toggleShowFavoritesOnly}
+            >
+              <Star size={11} /> Favorites
+            </button>
+            <Button variant="primary" size="sm" icon={<Plus size={14} />}
+              className={`${styles.spectrumShadow} ${styles.newProject}`}
+              onClick={() => setTriggerNewProject(k => k + 1)}>New Project</Button>
+          </div>
+
+          {/* ── MAIN PROJECT/ASSET GRID — always above the fold ─ */}
+          <main id="content-grid-main-scrollable" className={styles.main}>
+            <PipelineStatusCard />
             <div id="faceted-filter-chips-row" className={styles.filterChipsRow}>
               {/* Platform filter */}
               <div className={styles.filterDropWrap} data-filter-drop="platform">
@@ -796,13 +824,6 @@ export function DashboardLayout() {
               )}
             </div>
 
-            <Button variant="primary" size="sm" icon={<Plus size={14} />}
-              onClick={() => setTriggerNewProject(k => k + 1)}>New Project</Button>
-          </div>
-
-          {/* ── MAIN PROJECT/ASSET GRID — always above the fold ─ */}
-          <main id="content-grid-main-scrollable" className={styles.main}>
-            <PipelineStatusCard />
             {mainTab === 'projects' ? (
               <ProjectsGrid onOpenProject={handleOpenProject} searchQuery={searchQuery} externalFilters={activeFilters} triggerNew={triggerNewProject} />
             ) : (
@@ -899,35 +920,29 @@ export function DashboardLayout() {
           )}
 
           {/* ── QUICK-CREATE HERO — compact by default ────────── */}
-          <section id="creation-hero-section-main" className={`${styles.hero} ${heroExpanded ? styles.heroExpanded : ''}`}>
+          {heroExpanded && <section id="creation-hero-section-main" className={`${styles.hero} ${styles.heroExpanded}`}>
             <div className={styles.heroInner}>
 
               {/* Pipeline visualizer */}
-              <div id="pipeline-visualizer-steps-row" className={styles.pipelineRow} aria-label="Creative pipeline stages">
-                {[
-                  { label: 'Script', done: false },
-                  { label: 'Mood Board', done: false },
-                  { label: 'Prompts', done: !!prompt.trim() },
-                  { label: 'Generate', done: generatedImages.length > 0 },
-                  { label: 'Storyboard', done: false },
-                  { label: 'Timeline', done: false },
-                  { label: 'Publish', done: false },
-                ].map((step, i, arr) => (
-                  <React.Fragment key={step.label}>
-                    <div className={`${styles.pipelineStep} ${step.done ? styles.pipelineStepDone : ''}`}
-                      title={`Pipeline phase: ${step.label}`}>
-                      <span className={styles.pipelineDot} />
-                      <span className={styles.pipelineLabel}>{step.label}</span>
-                    </div>
-                    {i < arr.length - 1 && <span className={styles.pipelineArrow} aria-hidden="true">›</span>}
-                  </React.Fragment>
-                ))}
+              <div id="pipeline-visualizer-steps-row" className={styles.branchTree} aria-label="Asset branches">
+                <div className={styles.branchRoot}>Prompt{prompt.trim() ? ' · written' : ''}</div>
+                <div className={styles.branchChildren}>
+                  <div>├ Generate{generatedImages.length ? ` · ${generatedImages.length}` : ''}</div>
+                  <div>│ ├ Image · {selectedStyle}</div>
+                  <div>│ └ Edit · references {selectedReferenceAssets.length}</div>
+                  <div>└ Publish · {currentPlatform.label}</div>
+                </div>
               </div>
 
               {/* Compact prompt strip — always visible */}
-              <div id="prompt-input-group-flex" className={styles.promptGroup}>
+              {creatorMode === 'generate' && <div id="prompt-input-group-flex" className={styles.promptGroup}>
+                <textarea ref={promptRef}
+                  id="prompt-textarea-multiline"
+                  className={styles.promptInputCompact}
+                  placeholder="Describe what you want to create… (⌘↵ to generate)"
+                  value={prompt} onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={handleKeyDown} rows={3} />
                 <div className={styles.promptCompactRow}>
-                  {/* Platform chips — inline compact */}
                   <div id="platform-selector-row" className={styles.platformTabsCompact}>
                     {PLATFORMS.filter(p => p.id !== 'custom').map(p => (
                       <button key={p.id}
@@ -939,13 +954,6 @@ export function DashboardLayout() {
                       </button>
                     ))}
                   </div>
-
-                  <textarea ref={promptRef}
-                    id="prompt-textarea-multiline"
-                    className={styles.promptInputCompact}
-                    placeholder="Describe what you want to create… (⌘↵ to generate)"
-                    value={prompt} onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={handleKeyDown} rows={2} />
 
                   <div className={styles.promptCompactActions}>
                     {/* Style picker */}
@@ -976,7 +984,7 @@ export function DashboardLayout() {
                       ))}
                     </div>
 
-                    <button id="generate-button-primary-gradient" className={styles.generateBtn}
+                    <button id="generate-button-primary-gradient" className={`${styles.generateBtn} ${styles.spectrum}`}
                       onClick={() => void handleGenerate()}
                       disabled={!canGenerate}
                       title={
@@ -1092,10 +1100,12 @@ export function DashboardLayout() {
                     )}
                   </div>
                 </div>
-              </div>
+              </div>}
 
-              {/* ── Expanded area: all creative tools ─────────── */}
-              {heroExpanded && (
+              <button type="button" className={styles.sectionToggle} onClick={() => setShowMoreParams((v) => !v)}>
+                {showMoreParams ? 'Hide extra parameters' : 'More parameters'}
+              </button>
+              {showMoreParams && (
                 <div id="creation-hero-advanced-panel" className={styles.heroAdvancedPanel}>
 
                   {/* Negative prompt */}
@@ -1105,40 +1115,27 @@ export function DashboardLayout() {
                       value={negativePrompt} onChange={e => setNegativePrompt(e.target.value)} />
                   </div>
 
-                  {/* Platform selector full */}
-                  <button className={styles.sectionToggle} onClick={() => setShowPlatforms(!showPlatforms)}>
-                    <Settings2 size={12} />
-                    Platform & Dimensions
-                    {showPlatforms ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                  </button>
-                  {showPlatforms && (
-                    <div className={styles.platformRow}>
-                      <div className={styles.platformTabs}>
-                        {PLATFORMS.filter(p => p.id !== 'custom').map(p => (
-                          <button key={p.id}
-                            className={`${styles.platformTab} ${selectedPlatform === p.id ? styles.platformTabActive : ''}`}
-                            onClick={() => setSelectedPlatform(p.id)}>
-                            {p.icon} {p.label}
-                            <span className={styles.platformRatio}>{p.ratio}</span>
-                          </button>
-                        ))}
-                        <button
-                          className={`${styles.platformTab} ${selectedPlatform === 'custom' ? styles.platformTabActive : ''}`}
-                          onClick={() => setSelectedPlatform('custom')}>
-                          <Settings2 size={13} /> Custom
-                        </button>
-                      </div>
-                      {selectedPlatform === 'custom' && (
-                        <div className={styles.customDims}>
-                          <input type="number" value={customWidth} onChange={e => setCustomWidth(Number(e.target.value) || 1024)}
-                            className={styles.dimInput} min={64} max={4096} placeholder="Width" />
-                          <span>×</span>
-                          <input type="number" value={customHeight} onChange={e => setCustomHeight(Number(e.target.value) || 1024)}
-                            className={styles.dimInput} min={64} max={4096} placeholder="Height" />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className={styles.expertGrid}>
+                    <label className={styles.expertField}>Time
+                      <select value={sceneTime} onChange={(e) => setSceneTime(e.target.value)}>
+                        <option value="present">Present</option>
+                        <option value="dawn">Dawn</option>
+                        <option value="golden hour">Golden hour</option>
+                        <option value="night">Night</option>
+                      </select>
+                    </label>
+                    <label className={styles.expertField}>Emotion
+                      <select value={sceneEmotion} onChange={(e) => setSceneEmotion(e.target.value)}>
+                        <option value="neutral">Neutral</option>
+                        <option value="calm">Calm</option>
+                        <option value="tense">Tense</option>
+                        <option value="joyful">Joyful</option>
+                      </select>
+                    </label>
+                    <label className={styles.expertField}>Project variable
+                      <input value={projectVariable} onChange={(e) => setProjectVariable(e.target.value)} placeholder="e.g. hero-age=32" />
+                    </label>
+                  </div>
 
                   {/* Advanced cinematic controls */}
                   <button className={styles.advancedToggle} onClick={() => setShowAdvanced(!showAdvanced)}>
@@ -1214,76 +1211,6 @@ export function DashboardLayout() {
                           ))}
                         </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Image count full row */}
-                  <div className={styles.promptControls}>
-                    <div className={styles.controlGroup}>
-                      <span className={styles.controlLabel}>Images</span>
-                      {IMAGE_COUNTS.filter(n => n <= 8).map(n => (
-                        <button key={n} className={`${styles.countBtn} ${imageCount === n ? styles.countBtnActive : ''}`}
-                          onClick={() => setImageCount(n)}>{n}</button>
-                      ))}
-                      {imageCount > 8 && <button className={styles.countBtnActive}>{imageCount}</button>}
-                      <button className={styles.countMoreBtn} onClick={() => {
-                        const idx = IMAGE_COUNTS.indexOf(imageCount);
-                        setImageCount(IMAGE_COUNTS[(idx + 1) % IMAGE_COUNTS.length]);
-                      }} title="More options">…</button>
-                    </div>
-                  </div>
-
-                  {/* Character Creator */}
-                  <button className={styles.sectionToggle} onClick={() => setShowCharacter(!showCharacter)}>
-                    <Users size={12} />
-                    Character Creator
-                    {showCharacter ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                  </button>
-                  {showCharacter && (
-                    <div className={styles.characterPanel}>
-                      <div className={styles.charGrid}>
-                        <div className={styles.charField}>
-                          <label>Character Name</label>
-                          <input type="text" className={styles.charInput} placeholder="e.g. Commander Zara"
-                            value={charName} onChange={e => setCharName(e.target.value)} />
-                        </div>
-                        <div className={styles.charField}>
-                          <label>Appearance</label>
-                          <textarea className={styles.charTextarea} rows={2} placeholder="Hair, eyes, skin, build, height…"
-                            value={charAppearance} onChange={e => setCharAppearance(e.target.value)} />
-                        </div>
-                        <div className={styles.charField}>
-                          <label>Outfit / Wardrobe</label>
-                          <input type="text" className={styles.charInput} placeholder="e.g. Tactical armor, red cape"
-                            value={charOutfit} onChange={e => setCharOutfit(e.target.value)} />
-                        </div>
-                        <div className={styles.charField}>
-                          <label>Pose</label>
-                          <select className={styles.charSelect} value={charPose} onChange={e => setCharPose(e.target.value)}>
-                            <option value="standing">Standing</option>
-                            <option value="action">Action</option>
-                            <option value="sitting">Sitting</option>
-                            <option value="portrait">Portrait</option>
-                            <option value="dynamic">Dynamic</option>
-                          </select>
-                        </div>
-                        <div className={styles.charField}>
-                          <label>Background</label>
-                          <select className={styles.charSelect} value={charBackground} onChange={e => setCharBackground(e.target.value)}>
-                            <option value="studio">Studio (plain)</option>
-                            <option value="gradient">Gradient</option>
-                            <option value="environment">Environment scene</option>
-                            <option value="transparent">Transparent</option>
-                          </select>
-                        </div>
-                        <div className={styles.charField}>
-                          <label>Background Color</label>
-                          <input type="color" className={styles.charColor} value={charBgColor} onChange={e => setCharBgColor(e.target.value)} />
-                        </div>
-                      </div>
-                      <button className={styles.charGenerateBtn} onClick={handleGenerateCharacter} disabled={!canGenerate}>
-                        <Sparkles size={12} /> {isGenerating ? 'Generating…' : 'Generate Character Sheet'}
-                      </button>
                     </div>
                   )}
 
@@ -1376,7 +1303,7 @@ export function DashboardLayout() {
                 </div>
               )}
             </div>
-          </section>
+          </section>}
 
         </div>
       </div>

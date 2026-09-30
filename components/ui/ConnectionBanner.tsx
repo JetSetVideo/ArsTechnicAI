@@ -13,7 +13,7 @@ import { X, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 import type { HealthResponse } from '@/pages/api/health';
 import styles from './ConnectionBanner.module.css';
 
-const EPHEMERAL_DELAY_MS = 3000; // Green banner auto-dismisses after 3s
+const EPHEMERAL_DELAY_MS = 2500; // Every status leaves after 2.5s; it sits under the nav, not over it.
 const HEALTH_REQUEST_TIMEOUT_MS = 6000;
 const HEALTH_RETRY_DELAY_MS = 1200;
 
@@ -86,10 +86,8 @@ export const ConnectionBanner: React.FC = () => {
     setDismissed(true);
   }, []);
 
-  // Ephemeral: when green (ok), auto-dismiss after delay
   useEffect(() => {
-    if (!data || data.status !== 'ok' || dismissed || loading) return;
-
+    if (!data || dismissed || loading) return;
     const t = setTimeout(() => setDismissed(true), EPHEMERAL_DELAY_MS);
     return () => clearTimeout(t);
   }, [data, dismissed, loading]);

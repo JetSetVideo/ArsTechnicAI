@@ -3,10 +3,10 @@
  * Connected to real fileStore data. Shows folder tree,
  * asset categories with live counts, quick actions.
  */
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   FolderOpen, FolderPlus, FileText, Image, Film, Music,
-  ChevronRight, ChevronDown, Plus, Trash2, Copy,
+  ChevronRight, ChevronDown, Trash2, Copy, Sparkles, Pencil, Download,
   Users, BookOpen, Palette, RefreshCw, FolderClock,
 } from 'lucide-react';
 import { useFileStore } from '../../stores/fileStore';
@@ -30,7 +30,11 @@ interface HomeLeftPanelProps {
   onNewFolder?: () => void;
   onNewProject?: () => void;
   onOpenCharacterCreator?: () => void;
+  onToggleAssetCreator?: () => void;
+  assetCreatorOpen?: boolean;
   onOpenTemplate?: () => void;
+  onToolAction?: (id: string) => void;
+  activeTool?: string;
   selectedPath?: string;
 }
 
@@ -137,15 +141,43 @@ const FolderItem: React.FC<{
   );
 };
 
+const TOOL_GROUPS: { id: string; label: string; tools: { id: string; label: string }[] }[] = [
+  { id: 'generate', label: 'Generate', tools: [
+    { id: 'gen-image', label: 'Image' },
+    { id: 'gen-video', label: 'Video' },
+    { id: 'gen-music', label: 'Sound' },
+    { id: 'character', label: 'Character' },
+    { id: 'template', label: 'Template' },
+  ]},
+  { id: 'draw', label: 'Draw', tools: [
+    { id: 'brush', label: 'Brush' },
+    { id: 'eraser', label: 'Eraser' },
+    { id: 'text', label: 'Text' },
+  ]},
+  { id: 'export', label: 'Export', tools: [
+    { id: 'export', label: 'Export' },
+    { id: 'publish', label: 'Publish' },
+  ]},
+];
+
 export const HomeLeftPanel: React.FC<HomeLeftPanelProps> = ({
-  onSelectFolder, onNewFolder, onNewProject, onOpenCharacterCreator, onOpenTemplate, selectedPath,
+  onSelectFolder, onNewFolder, onToggleAssetCreator, assetCreatorOpen,
+  onOpenCharacterCreator, onOpenTemplate, onToolAction, activeTool, selectedPath,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [shelvesOpen, setShelvesOpen] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 800px)').matches) setCollapsed(true);
+  }, []);
 
   // Connect to real stores
   const rootNodes = useFileStore((s) => s.rootNodes);
   const assets = useFileStore((s) => s.assets);
+  const createFolder = useFileStore((s) => s.createFolder);
   const projectCount = useProjectsStore((s) => s.projects.length);
 
   // Build dynamic folder tree from real data
@@ -195,7 +227,7 @@ export const HomeLeftPanel: React.FC<HomeLeftPanelProps> = ({
           <button title="Assets" onClick={() => { setCollapsed(false); onSelectFolder?.('all-assets'); }}>
             <FolderOpen size={14} />
           </button>
-          <button title="Characters" onClick={() => { setCollapsed(false); onOpenCharacterCreator?.(); }}>
+          <button title="Asset Creator" onClick={() => { setCollapsed(false); (onToggleAssetCreator ?? onOpenCharacterCreator)?.(); }}>
             <Users size={14} />
           </button>
           <button title="Templates" onClick={() => { setCollapsed(false); onOpenTemplate?.(); }}>
@@ -209,57 +241,81 @@ export const HomeLeftPanel: React.FC<HomeLeftPanelProps> = ({
   return (
     <div className={styles.panel}>
       <div className={styles.panelHeader}>
-        <span className={styles.panelTitle}>Explorer</span>
-        <div className={styles.panelActions}>
-          <button onClick={handleRefresh} title="Refresh"><RefreshCw size={11} /></button>
-          <button onClick={onNewFolder} title="New Folder"><FolderPlus size={13} /></button>
-          <button onClick={onNewProject} title="New Project"><Plus size={13} /></button>
-          <button onClick={() => setCollapsed(true)} title="Collapse"><ChevronRight size={13} /></button>
+        <button onClick={() => setCollapsed(true)} title="Collapse"><ChevronRight size={13} /></button>
+        <div className={styles.inventory}>
+          <span>Workspace</span>
+          <strong>{totalAssets} assets</strong>
+          <strong>{projectCount} {projectCount === 1 ? 'project' : 'projects'}</strong>
         </div>
       </div>
 
       <div className={styles.panelBody}>
-        {/* Stats row */}
-        <div style={{ display: 'flex', gap: 12, padding: '4px 12px', fontSize: '0.5625rem', color: 'var(--text-muted)' }}>
-          <span>{totalAssets} assets</span>
-          <span>{projectCount} projects</span>
-        </div>
-
-        {/* Quick Actions */}
         <div className={styles.quickActions}>
-          <button className={styles.quickAction} onClick={onNewProject}>
-            <Plus size={12} /> New Project
-          </button>
-          <button className={styles.quickAction} onClick={onOpenCharacterCreator}>
-            <Palette size={12} /> Character Creator
+          {TOOL_GROUPS.map((group) => (
+            <div key={group.id} className={styles.toolGroup}>
+              <button className={styles.quickAction} onClick={() => {
+                setOpenGroup(openGroup === group.id ? null : group.id);
+                if (group.id === 'generate') onToolAction?.('gen-image');
+              }}>
+                {group.id === 'generate' ? <Sparkles size={12} /> : group.id === 'draw' ? <Pencil size={12} /> : <Download size={12} />}
+                {openGroup === group.id ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {group.label}
+              </button>
+              {openGroup === group.id && group.tools.map((tool) => (
+                <button
+                  key={tool.id}
+                  className={`${styles.quickAction} ${styles.toolItem} ${activeTool === tool.id ? styles.quickActionActive : ''}`}
+                  onClick={() => onToolAction?.(tool.id)}
+                >
+                  {tool.label}
+                </button>
+              ))}
+            </div>
+          ))}
+          <button
+            className={`${styles.quickAction} ${assetCreatorOpen ? styles.quickActionActive : ''}`}
+            onClick={onToggleAssetCreator ?? onOpenCharacterCreator}
+            aria-expanded={assetCreatorOpen}
+          >
+            <Palette size={12} /> Asset Creator
           </button>
           <button className={styles.quickAction} onClick={onOpenTemplate}>
             <BookOpen size={12} /> New Template
           </button>
           <WorkflowMenu
             scope="global"
-            renderTrigger={({ toggle }) => (
-              <button className={styles.quickAction} onClick={toggle}>
+            inline
+            renderTrigger={({ toggle, open }) => (
+              <button className={styles.quickAction} onClick={toggle} aria-expanded={open}>
                 <FolderClock size={12} /> Workflows
               </button>
             )}
           />
+          <button className={styles.quickAction} onClick={() => setShelvesOpen((open) => !open)} aria-expanded={shelvesOpen}>
+            <FolderOpen size={12} /> {shelvesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Files
+          </button>
         </div>
-
-        <div className={styles.panelDivider} />
-
-        {/* Folder Tree — live from fileStore */}
-        <div className={styles.folderTree}>
-          {folderTree.map(node => (
-            <FolderItem
-              key={node.id}
-              node={node}
-              depth={0}
-              selectedPath={selectedPath}
-              onSelect={handleSelect}
-            />
-          ))}
-        </div>
+        {shelvesOpen && (
+          <div className={styles.folderTree}>
+            <div className={styles.fileActions}>
+              <button title="Refresh the file list" onClick={handleRefresh}><RefreshCw size={11} /> Refresh</button>
+              <button title="New folder in the workspace" onClick={() => {
+                const name = window.prompt('Folder name');
+                if (!name?.trim()) return;
+                createFolder(selectedPath && !selectedPath.startsWith('all-') ? selectedPath : '/', name.trim());
+                onNewFolder?.();
+              }}><FolderPlus size={12} /> Folder</button>
+            </div>
+            {folderTree.map(node => (
+              <FolderItem
+                key={node.id}
+                node={node}
+                depth={0}
+                selectedPath={selectedPath}
+                onSelect={handleSelect}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

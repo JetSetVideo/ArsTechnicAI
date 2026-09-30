@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "ES2020",
+    "allowImportingTsExtensions": true,
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -18,5 +19,15 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "tools"]
+  "exclude": [
+    "node_modules",
+    "tools",
+    "lib/studio/server.ts",
+    "lib/studio/check_runtime.ts",
+    "lib/studio/tests",
+    "lib/studio/tools",
+    "lib/studio/codegen",
+    "lib/studio/ui",
+    "lib/studio/.attic"
+  ]
 }

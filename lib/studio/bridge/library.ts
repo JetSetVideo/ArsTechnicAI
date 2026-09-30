@@ -27,6 +27,7 @@
  * one that opens and says so.
  */
 
+import { host } from "../host.ts";
 import { movieReferences, parseReferences, enrichReferences, ReferenceLibrary } from "../core/library.ts";
 import type { Reference, ReferenceFile } from "../core/library.ts";
 import { PresetIndex } from "../core/cinema/presets.ts";
@@ -75,7 +76,7 @@ export const PRESET_MAPPINGS: PresetMappings = Object.freeze({
 
 /** Where the library lives. `ARS_LIBRARY_ROOT` moves it, for a packaged build. */
 export function libraryRoot(): string {
-  return Deno.env.get("ARS_LIBRARY_ROOT") ??
+  return host.env.get("ARS_LIBRARY_ROOT") ??
     new URL("../library", import.meta.url).pathname;
 }
 
@@ -101,7 +102,7 @@ export interface LoadedLibrary {
 
 async function readJson<T>(path: string, problems: string[], what: string): Promise<T | null> {
   try {
-    return JSON.parse(await Deno.readTextFile(path)) as T;
+    return JSON.parse(await host.readTextFile(path)) as T;
   } catch (error) {
     problems.push(`${what}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
@@ -143,7 +144,7 @@ export async function loadLibrary(root = libraryRoot()): Promise<LoadedLibrary> 
 
   const thumbs = new Set<string>();
   try {
-    for await (const entry of Deno.readDir(`${root}/thumbs/movies`)) {
+    for await (const entry of host.readDir(`${root}/thumbs/movies`)) {
       if (entry.isFile && entry.name.endsWith(".jpg")) {
         thumbs.add(entry.name.slice(0, -4));
       }
@@ -164,7 +165,7 @@ export async function loadLibrary(root = libraryRoot()): Promise<LoadedLibrary> 
   // `references/*.json` is all it takes to add a category's worth of cards.
   try {
     const files: string[] = [];
-    for await (const entry of Deno.readDir(`${root}/references`)) {
+    for await (const entry of host.readDir(`${root}/references`)) {
       if (entry.isFile && entry.name.endsWith(".json")) files.push(entry.name);
     }
     files.sort();

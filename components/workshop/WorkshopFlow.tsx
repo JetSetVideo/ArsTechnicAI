@@ -61,6 +61,7 @@ export const WorkshopFlow: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [viewFitted, setViewFitted] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
@@ -318,11 +319,20 @@ export const WorkshopFlow: React.FC = () => {
         <button className={styles.tbtn} onClick={() => setViewport({ ...viewport, zoom: Math.max(0.2, viewport.zoom / 1.2) })}>
           <ZoomOut size={14} />
         </button>
-        <button className={styles.tbtn} onClick={fitView} title="Fit whole pipeline in view">
-          <Scan size={14} />
-        </button>
-        <button className={styles.tbtn} onClick={() => setViewport({ x: 60, y: 40, zoom: 0.85 })} title="Reset view">
-          <Maximize size={14} />
+        <button
+          className={styles.tbtn}
+          title={viewFitted ? 'Precise view' : 'Fit whole pipeline in view'}
+          onClick={() => {
+            if (viewFitted) {
+              setViewport({ x: 60, y: 40, zoom: 0.85 });
+              setViewFitted(false);
+            } else {
+              fitView();
+              setViewFitted(true);
+            }
+          }}
+        >
+          {viewFitted ? <Maximize size={14} /> : <Scan size={14} />}
         </button>
 
         <div className={styles.spacer} />
