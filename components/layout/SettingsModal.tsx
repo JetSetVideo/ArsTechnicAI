@@ -77,12 +77,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
   const authUser = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const updateAuthUser = useAuthStore((s) => s.updateUser);
+  const getAuthHeader = useAuthStore((s) => s.getAuthHeader);
+  // The API returns roles[] (services/auth/authService); there is no single `role` field.
+  // Show the highest one (hierarchy from services/auth/ARCHITECTURE.md).
+  const ROLE_RANK = ['SUPERADMIN', 'ADMIN', 'CREATOR', 'USER', 'VIEWER'];
+  const primaryRole = ROLE_RANK.find((r) => authUser?.roles?.includes(r)) ?? authUser?.roles?.[0] ?? 'USER';
 
   // Profile editing
   const [editingPseudonym, setEditingPseudonym] = useState(false);
   const [pseudonymDraft, setPseudonymDraft] = useState('');
   const [pseudonymSaving, setPseudonymSaving] = useState(false);
-  const [profilePic, setProfilePic] = useState(authUser?.avatarUrl || '');
+  const [pseudonymError, setPseudonymError] = useState('');
+  const [profilePic, setProfilePic] = useState(authUser?.profileImage || '');
+
+  // Restored from before a63d587, which removed it while the Enter key / ✓ button still call it.
+  const savePseudonym = async () => {
+    const next = pseudonymDraft.trim();
+    if (!next || next === authUser?.pseudonym) {
+      setEditingPseudonym(false);
+      return;
+    }
+    setPseudonymSaving(true);
+    setPseudonymError('');
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ pseudonym: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to save pseudonym');
+      updateAuthUser({ pseudonym: data.pseudonym ?? next });
+      setEditingPseudonym(false);
+    } catch (err) {
+      setPseudonymError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setPseudonymSaving(false);
+    }
+  };
 
   // AI credentials
   const [aiCredentials, setAICredentials] = useState<AICredential[]>([]);
@@ -287,7 +320,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                       {isAuthenticated && (
                         <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                           <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: '0.5625rem', background: 'rgba(99,102,241,0.1)', color: 'var(--accent-secondary)' }}>
-                            {authUser?.role || 'User'}
+                            {primaryRole}
                           </span>
                           {accountHealth && (
                             <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: '0.5625rem',
@@ -312,7 +345,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                             <input style={inputStyle} value={pseudonymDraft} onChange={e => setPseudonymDraft(e.target.value)}
                               autoFocus maxLength={30} onKeyDown={e => { if (e.key === 'Enter') { savePseudonym(); } if (e.key === 'Escape') setEditingPseudonym(false); }} />
                             <button onClick={savePseudonym} disabled={pseudonymSaving} style={{ background: 'none', border: 'none', color: 'var(--success)', cursor: 'pointer' }}><Check size={16} /></button>
-                            <button onClick={() => setEditingPseudonym(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={16} /></button>
+                            <button onClick={() => { setEditingPseudonym(false); setPseudonymError(''); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={16} /></button>
                           </div>
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -320,6 +353,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                             <button onClick={() => { setPseudonymDraft(authUser?.pseudonym || ''); setEditingPseudonym(true); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Pencil size={12} /></button>
                           </div>
                         )}
+                        {pseudonymError && <div role="alert" style={{ color: '#ff2a4a', fontSize: '0.75rem', marginTop: 4 }}>{pseudonymError}</div>}
                       </div>
 
                       {/* Info rows */}
@@ -766,7 +800,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                     <span style={labelStyle}>Your Role</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 6 }}>
                       <Crown size={16} color="#f59e0b" />
-                      <span style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{authUser?.role || 'User'}</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{primaryRole}</span>
                     </div>
                   </div>
 
@@ -775,7 +809,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {['Create projects', 'Delete assets', 'Invite users', 'Manage billing', 'System config'].map(p => (
                         <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                          <input type="checkbox" checked disabled={authUser?.role === 'USER'} />
+                          <input type="checkbox" checked disabled={primaryRole === 'USER'} />
                           <span>{p}</span>
                         </label>
                       ))}

@@ -38,6 +38,27 @@
                                              └──────────────┘
 ```
 
+### Browser Session (what the UI actually uses)
+
+The app UI does **not** sign in through NextAuth. `AuthModal` / `SettingsModal` /
+`AuthContext` call the custom JWT routes and keep the session in one store:
+
+| Piece | Path |
+|-------|------|
+| API — login / register / me / Google | `pages/api/auth/{login,register,me,google}.ts`, `pages/api/auth/google/callback.ts` → `services/auth/authService.ts` |
+| Browser client | `lib/auth/client.ts` (same-origin, or `NEXT_PUBLIC_API_URL` for a split frontend) |
+| Session store | `stores/authStore.ts` — Zustand, persisted as `ars-auth`; `{ user (roles[]), token, tokenExpiresAt }`; cleared on load when < 5 min from expiry; `getAuthHeader()` for Bearer calls |
+| Google OAuth landing | `pages/auth/callback.tsx` — verifies `auth_token` via `/api/auth/me`, stores the session, `replace('/home')`; errors → `/auth/error?error=<code>` |
+| Protected API | `middleware/authMiddleware.ts` `withAuth()` (Bearer) |
+
+`pages/auth/signin.tsx` / `register.tsx` and `[...nextauth].ts` remain for the NextAuth
+providers but do not populate `ars-auth`.
+
+The client/login/signup/OAuth-callback flow was previously a separate Next.js app
+(`ArsTechnicAI-Server`, App Router, port 3001); it is merged here. To keep running the
+frontend on another machine, point `NEXT_PUBLIC_API_URL` at this server, set
+`FRONTEND_URL` to that frontend, and list it in `CORS_ALLOWED_ORIGINS`.
+
 ### Roles (Current)
 
 | Role | Description | Privileges |

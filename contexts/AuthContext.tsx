@@ -7,6 +7,7 @@
  */
 import React, { createContext, useContext } from 'react';
 import { useAuthStore, type AuthUser } from '@/stores/authStore';
+import { authClient } from '@/lib/auth/client';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -31,13 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Login failed');
+    const data = await authClient.login({ email, password });
     setAuth(data.user, data.token, data.expiresIn);
   };
 
@@ -48,13 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     pseudonym: string,
     password: string
   ) => {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstName, lastName, email, pseudonym, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Registration failed');
+    const data = await authClient.register({ firstName, lastName, email, pseudonym, password });
     setAuth(data.user, data.token, data.expiresIn);
   };
 

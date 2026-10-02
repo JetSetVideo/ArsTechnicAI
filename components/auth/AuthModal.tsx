@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Eye, EyeOff, Mail, User, Lock, AtSign } from 'lucide-react';
 import { FaGoogle } from 'react-icons/fa';
 import { useAuthStore } from '@/stores/authStore';
+import { authClient } from '@/lib/auth/client';
 
 export interface AuthModalProps {
   isOpen: boolean;
@@ -139,13 +140,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
     setIsLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login failed');
+      const data = await authClient.login({ email: loginEmail, password: loginPassword });
       setAuth(data.user, data.token, data.expiresIn);
       reset();
       onClose();
@@ -168,19 +163,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     setIsLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName: regFirstName.trim(),
-          lastName: regLastName.trim(),
-          email: regEmail.trim(),
-          pseudonym: regPseudonym.trim(),
-          password: regPassword,
-        }),
+      const data = await authClient.register({
+        firstName: regFirstName.trim(),
+        lastName: regLastName.trim(),
+        email: regEmail.trim(),
+        pseudonym: regPseudonym.trim(),
+        password: regPassword,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Registration failed');
       setAuth(data.user, data.token, data.expiresIn);
       reset();
       onClose();
@@ -191,15 +180,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  // The API answers { url } — the old `typeof json === 'string'` check never matched,
+  // so the button silently did nothing. Errors (e.g. 503 not configured) are now shown.
   const handleGoogleSignIn = async () => {
+    setError(null);
+    setIsLoading(true);
     try {
-      const res = await fetch('/api/auth/google', { method: 'POST' });
-      const googleAuthUrl = await res.json();
-      if (typeof googleAuthUrl === 'string') {
-        window.location.href = googleAuthUrl;
-      }
-    } catch {
-      setError({ message: 'Google sign-in failed. Please try again.' });
+      window.location.href = await authClient.googleAuthUrl();
+    } catch (err) {
+      setError({ message: err instanceof Error ? err.message : 'Google sign-in failed. Please try again.' });
+      setIsLoading(false);
     }
   };
 
@@ -318,6 +308,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           {/* Google */}
           <button
             onClick={handleGoogleSignIn}
+            disabled={isLoading}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
               gap: '0.625rem', padding: '0.625rem', marginBottom: '1.25rem',

@@ -6,13 +6,20 @@ const ERRORS: Record<string, string> = {
   Configuration: 'Server configuration error. Contact the administrator.',
   AccessDenied: 'Access denied.',
   Verification: 'Verification link expired or already used.',
+  // Custom JWT / Google OAuth flow (pages/api/auth/google/callback.ts → pages/auth/callback.tsx)
+  access_denied: 'Google sign-in was cancelled.',
+  missing_code: 'Google did not return an authorization code. Please try again.',
+  missing_token: 'Sign-in did not return a session. Please try again.',
+  invalid_token: 'Your session could not be verified. Please sign in again.',
+  incomplete_profile: 'Your Google account did not share an email address.',
   Default: 'An authentication error occurred.',
 };
 
 export default function ErrorPage() {
   const router = useRouter();
-  const errorCode = router.query.error as string | undefined;
-  const message = ERRORS[errorCode ?? ''] ?? ERRORS.Default;
+  const errorCode = typeof router.query.error === 'string' ? router.query.error : undefined;
+  // The OAuth callback forwards server messages verbatim; show them rather than a generic line.
+  const message = ERRORS[errorCode ?? ''] ?? (errorCode && errorCode.length <= 200 ? errorCode : ERRORS.Default);
 
   return (
     <div className={styles.page}>
@@ -25,8 +32,8 @@ export default function ErrorPage() {
         <div className={styles.errorBanner} style={{ marginTop: '1rem' }}>
           {message}
         </div>
-        <a href="/auth/signin" className={styles.primaryBtn} style={{ marginTop: '1rem', textAlign: 'center', display: 'block' }}>
-          Back to sign in
+        <a href="/home" className={styles.primaryBtn} style={{ marginTop: '1rem', textAlign: 'center', display: 'block' }}>
+          Back to Ars Technic AI
         </a>
       </div>
     </div>
