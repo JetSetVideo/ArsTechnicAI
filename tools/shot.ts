@@ -168,6 +168,9 @@ async function shoot(
       "--no-default-browser-check",
       "--disable-gpu",
       "--hide-scrollbars",
+      // Ubuntu 23.10+ restricts unprivileged user namespaces (AppArmor), so Chromium aborts with
+      // "No usable sandbox!" and never offers a page target. This tool only loads the local app.
+      ...(Deno.build.os === "linux" ? ["--no-sandbox"] : []),
       "about:blank",
     ],
     stdout: "null",

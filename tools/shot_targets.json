@@ -21,5 +21,21 @@
     "width": 1440,
     "height": 900,
     "probe": "return { headings: [...document.querySelectorAll('h1,h2')].map(h => h.textContent.trim()).slice(0, 6) };"
+  },
+  {
+    "name": "auth-callback-error",
+    "path": "/auth/callback?auth_error=access_denied",
+    "width": 1440,
+    "height": 900,
+    "settle": 2500,
+    "probe": "return { path: location.pathname, text: document.body.innerText.replace(/\\s+/g,' ').slice(0, 200), hasToken: !!JSON.parse(localStorage.getItem('ars-auth') || 'null')?.state?.token };"
+  },
+  {
+    "name": "auth-error-oauth-code",
+    "path": "/auth/error?error=invalid_token",
+    "width": 1440,
+    "height": 900,
+    "settle": 1500,
+    "probe": "return { text: document.body.innerText.replace(/\\s+/g,' ').slice(0, 200), backHref: document.querySelector('a')?.getAttribute('href') };"
   }
 ]
