@@ -19,6 +19,7 @@ import { Button } from '../ui/Button';
 import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
 import { STAGES, STAGE_ORDER } from '@/lib/pipeline/catalog';
+import { formatShortcut, shortcutFromEvent } from '@/lib/shortcuts';
 import { useUserStore } from '@/stores/userStore';
 import { useAuthStore } from '@/stores/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -101,6 +102,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
   const [localModel, setLocalModel] = useState(settings.aiProvider.model);
   const [subscriptionPlan, setSubscriptionPlan] = useState('Free');
   const [planNote, setPlanNote] = useState(false);
+  const [capturingUndo, setCapturingUndo] = useState(false);
+
+  useEffect(() => {
+    if (!capturingUndo) return;
+    const onKey = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        setCapturingUndo(false);
+        return;
+      }
+      const chord = shortcutFromEvent(event);
+      if (!chord) return;
+      updateSettings({ shortcuts: { undo: chord } });
+      setCapturingUndo(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [capturingUndo, updateSettings]);
 
   // Health
   const [accountHealth, setAccountHealth] = useState<any>(null);
@@ -528,6 +548,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                   </div>
 
                   <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                    <span style={{ ...labelStyle, fontWeight: 700 }}>Workshop result</span>
+                    <p className={styles.description} style={{ marginTop: 4 }}>The picture from the node you just ran, drawn behind the graph.</p>
+                  </div>
+
+                  <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" id="result-backdrop" checked={appearance.resultBackdrop ?? true}
+                      onChange={e => updateAppearance({ resultBackdrop: e.target.checked })} />
+                    <label htmlFor="result-backdrop" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                      Show workflow result behind the nodes
+                    </label>
+                  </div>
+
+                  <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                    <span style={{ ...labelStyle, fontWeight: 700 }}>Pipeline map</span>
+                    <p className={styles.description} style={{ marginTop: 4 }}>The overview in the bottom-right of the workshop.</p>
+                  </div>
+
+                  <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" id="map-visible" checked={appearance.mapVisible ?? true}
+                      onChange={e => updateAppearance({ mapVisible: e.target.checked })} />
+                    <label htmlFor="map-visible" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                      Show pipeline map
+                    </label>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Map width: {appearance.mapWidth ?? 148}px</span>
+                    <input type="range" min={72} max={280} step={4} value={appearance.mapWidth ?? 148}
+                      onChange={e => updateAppearance({ mapWidth: Number(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Map height: {appearance.mapHeight ?? 78}px</span>
+                    <input type="range" min={40} max={160} step={2} value={appearance.mapHeight ?? 78}
+                      onChange={e => updateAppearance({ mapHeight: Number(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Map opacity: {Math.round((appearance.mapOpacity ?? 0.42) * 100)}%</span>
+                    <input type="range" min={15} max={100} step={1} value={Math.round((appearance.mapOpacity ?? 0.42) * 100)}
+                      onChange={e => updateAppearance({ mapOpacity: Number(e.target.value) / 100 })}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
+                  </div>
+
+                  <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
                     <span style={{ ...labelStyle, fontWeight: 700 }}>Workshop Stage Colors</span>
                     <p className={styles.description} style={{ marginTop: 4 }}>Override the default color of each pipeline stage lane.</p>
                   </div>
@@ -811,6 +878,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                 <div className={styles.section}>
                   <h3>Keyboard Shortcuts</h3>
                   <p className={styles.description}>Speed up your workflow with these keyboard shortcuts.</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: 4, marginBottom: 8 }}>
+                    <kbd style={{
+                      padding: '2px 8px', background: 'rgba(0,212,170,0.1)', border: '1px solid rgba(0,212,170,0.3)',
+                      borderRadius: 4, fontSize: '0.625rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)',
+                      minWidth: 80, textAlign: 'center',
+                    }}>{capturingUndo ? 'Press keys' : formatShortcut(settings.shortcuts?.undo ?? 'mod+z')}</kbd>
+                    <span style={{ fontSize: '0.6875rem', color: 'var(--text-primary)', flex: 1 }}>Undo workshop edit</span>
+                    <button
+                      type="button"
+                      onClick={() => setCapturingUndo(true)}
+                      style={{ border: '1px solid var(--border-color)', background: 'none', color: 'var(--text-primary)', borderRadius: 4, fontSize: '0.625rem', padding: '3px 8px', cursor: 'pointer' }}
+                    >
+                      {capturingUndo ? 'Listening…' : 'Change'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSettings({ shortcuts: { undo: 'mod+z' } })}
+                      style={{ border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '0.625rem', cursor: 'pointer' }}
+                    >
+                      Reset
+                    </button>
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 380, overflow: 'auto' }}>
                     {[
                       { keys: 'G', desc: 'Focus prompt input' },
@@ -822,7 +911,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                       { keys: 'R', desc: 'Rectangle shape' },
                       { keys: 'O', desc: 'Ellipse shape' },
                       { keys: 'I', desc: 'Color picker' },
-                      { keys: 'Ctrl+Z', desc: 'Undo' },
                       { keys: 'Ctrl+Shift+Z', desc: 'Redo' },
                       { keys: 'Ctrl+S', desc: 'Save project' },
                       { keys: 'Ctrl+E', desc: 'Export' },

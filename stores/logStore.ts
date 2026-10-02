@@ -16,6 +16,8 @@ interface LogState {
   /** All entries (raw + digests) for the current project, newest first. */
   getEntriesForCurrentProject: () => ActionLogEntry[];
   undo: () => ActionLogEntry | undefined;
+  /** The newest returnable workshop edit is marked returned. The line stays. */
+  markLatestReturned: () => void;
 }
 
 function currentProjectId(): string | undefined {
@@ -82,6 +84,26 @@ export const useLogStore = create<LogState>()(
           }));
         }
         return undoableEntry;
+      },
+
+      markLatestReturned: () => {
+        const projectId = currentProjectId();
+        set((state) => {
+          const index = state.entries.findIndex((entry) =>
+            entry.projectId === projectId
+            && entry.type === 'workshop_edit'
+            && entry.undoable
+            && !entry.data?.undone);
+          if (index < 0) return state;
+          const entries = state.entries.slice();
+          const entry = entries[index];
+          entries[index] = {
+            ...entry,
+            undoable: false,
+            data: { ...(entry.data ?? {}), undone: true },
+          };
+          return { entries };
+        });
       },
     }),
     {

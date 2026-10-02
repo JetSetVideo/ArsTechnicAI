@@ -9,6 +9,7 @@ import {
   PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, defaultParams, buildPrompt, portsCompatible,
 } from '@/lib/pipeline/catalog';
 import { createLayer, compositeVariant, layerDirectives, transformImage, type ImageTransformOptions } from '@/lib/pipeline/layers';
+import { useLogStore } from '@/stores/logStore';
 
 // ── Auto-layout constants (stage lanes → horizontal; slots → vertical) ──────
 export const LANE_WIDTH = 340;
@@ -58,6 +59,8 @@ interface PipelineState {
   pendingEdge: PendingEdge | null;
   isRunning: boolean;
   runningNodeIds: string[];
+  /** Node whose picture should sit behind the graph after the last cook. */
+  lastCookedNodeId: string | null;
 
   // per-project persistence (Workshop state is scoped to whichever project is open)
   currentProjectId: string | null;
@@ -149,6 +152,14 @@ interface PipelineState {
   runNode: (id: string, apiKey: string) => Promise<void>;
   runAll: (apiKey: string) => Promise<void>;
   stopRun: () => void;
+  /** Drops errors left by retired Gemini ids so the node can be run again. */
+  clearRetiredModelErrors: () => void;
+
+  /** How many workshop edits can be returned. Not persisted. */
+  undoDepth: number;
+  /** Sentence for the edit Undo will return, or null when the stack is empty. */
+  undoLabel: string | null;
+  undo: () => void;
 
   // graph helpers
   seedStarterFlow: () => void;
@@ -156,6 +167,15 @@ interface PipelineState {
 }
 
 /** Active output payload of a node (text or image) for downstream consumption. */
+const RETIRED_MODEL_ERROR = /banana2 generation failed|no longer available|models\/gemini-2\.0-flash|model is not available/i;
+
+function withoutRetiredModelError(node: PipelineNode): PipelineNode {
+  if (!node.error || !RETIRED_MODEL_ERROR.test(node.error)) return node;
+  const next = { ...node, error: undefined };
+  if (next.status === 'error') next.status = 'idle';
+  return next;
+}
+
 function activeVariant(node: PipelineNode): NodeVariant | undefined {
   return node.variants.find((v) => v.id === node.activeVariantId) ?? node.variants[0];
 }
@@ -189,6 +209,7 @@ function buildPersistPayload(s: PipelineState) {
     collapsedStages: s.collapsedStages,
     scenes: s.scenes,
     paramTemplates: s.paramTemplates,
+    lastCookedNodeId: s.lastCookedNodeId,
   };
 }
 
@@ -219,6 +240,153 @@ function schedulePipelinePersist() {
   }, PERSIST_DEBOUNCE_MS);
 }
 
+const UNDO_LIMIT = 40;
+const UNDO_GROUP_MS = 160;
+
+interface UndoEntry {
+  nodes: PipelineNode[];
+  edges: PipelineEdge[];
+  scenes: SceneRef[];
+  collapsedStages: PipelineStageId[];
+  selectedId: string | null;
+  lastCookedNodeId: string | null;
+}
+
+const undoStack: UndoEntry[] = [];
+const undoLabels: string[] = [];
+let undoGroup: { baseline: UndoEntry; timer: ReturnType<typeof setTimeout> } | null = null;
+let restoringUndo = false;
+
+function describeEdit(before: UndoEntry, after: PipelineState): string {
+  const beforeIds = new Set(before.nodes.map((node) => node.id));
+  const afterIds = new Set(after.nodes.map((node) => node.id));
+  const added = after.nodes.filter((node) => !beforeIds.has(node.id));
+  const removed = before.nodes.filter((node) => !afterIds.has(node.id));
+  if (before.nodes.length > 0 && after.nodes.length === 0) return 'Cleared the workshop';
+  if (added.length === 1 && removed.length === 0) return `Added ${added[0].title}`;
+  if (removed.length === 1 && added.length === 0) return `Removed ${removed[0].title}`;
+  if (added.length > 1 && removed.length === 0) return `Added ${added.length} nodes`;
+  if (removed.length > 1 && added.length === 0) return `Removed ${removed.length} nodes`;
+
+  const beforeEdgeIds = new Set(before.edges.map((edge) => edge.id));
+  const afterEdgeIds = new Set(after.edges.map((edge) => edge.id));
+  const linked = after.edges.filter((edge) => !beforeEdgeIds.has(edge.id));
+  const unlinked = before.edges.filter((edge) => !afterEdgeIds.has(edge.id));
+  if (linked.length === 1 && unlinked.length === 0) {
+    const edge = linked[0];
+    const from = after.nodes.find((node) => node.id === edge.from)?.title ?? 'a node';
+    const to = after.nodes.find((node) => node.id === edge.to)?.title ?? 'a node';
+    return `Linked ${from} to ${to}`;
+  }
+  if (unlinked.length >= 1 && linked.length === 0) return unlinked.length === 1 ? 'Removed a link' : `Removed ${unlinked.length} links`;
+
+  for (const node of after.nodes) {
+    const prev = before.nodes.find((item) => item.id === node.id);
+    if (!prev) continue;
+    if (prev.title !== node.title) return `Renamed ${prev.title}`;
+    if (prev.x !== node.x || prev.y !== node.y || prev.slot !== node.slot) return `Moved ${node.title}`;
+    if (prev.params !== node.params) return `Edited ${node.title}`;
+    if (prev.variants !== node.variants || prev.activeVariantId !== node.activeVariantId) return `Updated ${node.title}`;
+  }
+  if (before.scenes !== after.scenes) return 'Updated the film strip';
+  if (before.collapsedStages !== after.collapsedStages) return 'Folded a stage';
+  return 'Edited the pipeline';
+}
+
+function headLabel(): string | null {
+  if (undoGroup) return describeEdit(undoGroup.baseline, usePipelineStore.getState());
+  return undoLabels[undoLabels.length - 1] ?? null;
+}
+
+function undoEntryOf(state: PipelineState): UndoEntry {
+  return {
+    nodes: state.nodes,
+    edges: state.edges,
+    scenes: state.scenes,
+    collapsedStages: state.collapsedStages,
+    selectedId: state.selectedId,
+    lastCookedNodeId: state.lastCookedNodeId,
+  };
+}
+
+function nodeEdited(before: PipelineNode, after: PipelineNode): boolean {
+  return before.type !== after.type
+    || before.stage !== after.stage
+    || before.title !== after.title
+    || before.slot !== after.slot
+    || before.x !== after.x
+    || before.y !== after.y
+    || before.params !== after.params
+    || before.variants !== after.variants
+    || before.activeVariantId !== after.activeVariantId
+    || before.collapsed !== after.collapsed
+    || before.deckOpen !== after.deckOpen;
+}
+
+function graphEdited(prev: PipelineState, state: PipelineState): boolean {
+  if (prev.edges !== state.edges || prev.scenes !== state.scenes || prev.collapsedStages !== state.collapsedStages) return true;
+  if (prev.nodes === state.nodes) return false;
+  if (prev.nodes.length !== state.nodes.length) return true;
+  for (let i = 0; i < state.nodes.length; i += 1) {
+    if (prev.nodes[i] !== state.nodes[i] && nodeEdited(prev.nodes[i], state.nodes[i])) return true;
+  }
+  return false;
+}
+
+function publishUndo() {
+  const depth = undoStack.length + (undoGroup ? 1 : 0);
+  const label = headLabel();
+  const state = usePipelineStore.getState();
+  if (state.undoDepth !== depth || state.undoLabel !== label) {
+    usePipelineStore.setState({ undoDepth: depth, undoLabel: label });
+  }
+}
+
+function commitUndoGroup() {
+  if (!undoGroup) return;
+  const label = describeEdit(undoGroup.baseline, usePipelineStore.getState());
+  undoStack.push(undoGroup.baseline);
+  undoLabels.push(label);
+  if (undoStack.length > UNDO_LIMIT) {
+    undoStack.shift();
+    undoLabels.shift();
+  }
+  undoGroup = null;
+  useLogStore.getState().log('workshop_edit', label, undefined, true);
+  publishUndo();
+}
+
+function rememberUndo(prev: PipelineState) {
+  if (!undoGroup) undoGroup = { baseline: undoEntryOf(prev), timer: setTimeout(commitUndoGroup, UNDO_GROUP_MS) };
+  else {
+    clearTimeout(undoGroup.timer);
+    undoGroup.timer = setTimeout(commitUndoGroup, UNDO_GROUP_MS);
+  }
+  publishUndo();
+}
+
+function applyUndo(entry: UndoEntry) {
+  restoringUndo = true;
+  usePipelineStore.setState({
+    ...entry,
+    pendingEdge: null,
+  });
+  restoringUndo = false;
+  publishUndo();
+}
+
+function noteReturned() {
+  useLogStore.getState().markLatestReturned();
+}
+
+function resetUndo() {
+  if (undoGroup) clearTimeout(undoGroup.timer);
+  undoGroup = null;
+  undoStack.length = 0;
+  undoLabels.length = 0;
+  publishUndo();
+}
+
 export const usePipelineStore = create<PipelineState>()(
     (set, get) => ({
       nodes: [],
@@ -228,6 +396,9 @@ export const usePipelineStore = create<PipelineState>()(
       pendingEdge: null,
       isRunning: false,
       runningNodeIds: [],
+      lastCookedNodeId: null,
+      undoDepth: 0,
+      undoLabel: null,
       collapsedStages: [],
       currentProjectId: null,
       currentProjectName: '',
@@ -239,7 +410,7 @@ export const usePipelineStore = create<PipelineState>()(
         // nodes/scenes into the new one while the async load is in flight.
         set({
           nodes: [], edges: [], viewport: EMPTY_VIEWPORT, collapsedStages: [],
-          scenes: [], paramTemplates: [], selectedId: null,
+          scenes: [], paramTemplates: [], selectedId: null, lastCookedNodeId: null,
           currentProjectId: projectId, currentProjectName: projectName ?? '',
           isLoadingProject: true,
         });
@@ -249,10 +420,11 @@ export const usePipelineStore = create<PipelineState>()(
             if (raw) {
               const data = JSON.parse(raw);
               set({
-                nodes: data.nodes ?? [], edges: data.edges ?? [],
+                nodes: (data.nodes ?? []).map(withoutRetiredModelError), edges: data.edges ?? [],
                 viewport: data.viewport ?? EMPTY_VIEWPORT,
                 collapsedStages: data.collapsedStages ?? [],
                 scenes: data.scenes ?? [], paramTemplates: data.paramTemplates ?? [],
+                lastCookedNodeId: data.lastCookedNodeId ?? null,
                 isLoadingProject: false,
               });
               return;
@@ -264,10 +436,11 @@ export const usePipelineStore = create<PipelineState>()(
             const p = data?.pipeline;
             if (p && get().currentProjectId === projectId) {
               set({
-                nodes: p.nodes ?? [], edges: p.edges ?? [],
+                nodes: (p.nodes ?? []).map(withoutRetiredModelError), edges: p.edges ?? [],
                 viewport: p.viewport ?? EMPTY_VIEWPORT,
                 collapsedStages: p.collapsedStages ?? [],
                 scenes: p.scenes ?? [], paramTemplates: p.paramTemplates ?? [],
+                lastCookedNodeId: p.lastCookedNodeId ?? null,
               });
             }
           }
@@ -378,6 +551,7 @@ export const usePipelineStore = create<PipelineState>()(
             nodes,
             edges: s.edges.filter((e) => e.from !== id && e.to !== id),
             selectedId: s.selectedId === id ? null : s.selectedId,
+            lastCookedNodeId: s.lastCookedNodeId === id ? null : s.lastCookedNodeId,
           };
         });
       },
@@ -686,6 +860,7 @@ export const usePipelineStore = create<PipelineState>()(
             meta: { ...variant.meta, model: result.model, retouch: opLabel },
           });
           mark({ status: 'done' });
+          if (result.dataUrl) set({ lastCookedNodeId: nodeId });
         } catch (err) {
           mark({ status: 'error', error: err instanceof Error ? err.message : String(err) });
         } finally {
@@ -968,6 +1143,7 @@ export const usePipelineStore = create<PipelineState>()(
               paramsSnapshot: { ...node.params, __prompt: prompt },
               meta: { model: result.model },
             });
+            if (result.dataUrl) set({ lastCookedNodeId: id });
           }
           mark({ status: 'done' });
         } catch (err) {
@@ -1015,6 +1191,26 @@ export const usePipelineStore = create<PipelineState>()(
       },
 
       stopRun: () => set({ isRunning: false }),
+
+      clearRetiredModelErrors: () => {
+        const nodes = get().nodes.map(withoutRetiredModelError);
+        if (nodes.some((node, index) => node !== get().nodes[index])) set({ nodes });
+      },
+
+      undo: () => {
+        if (undoGroup) {
+          const baseline = undoGroup.baseline;
+          clearTimeout(undoGroup.timer);
+          undoGroup = null;
+          applyUndo(baseline);
+          return;
+        }
+        const entry = undoStack.pop();
+        if (!entry) return;
+        undoLabels.pop();
+        noteReturned();
+        applyUndo(entry);
+      },
 
       seedStarterFlow: () => {
         if (get().nodes.length > 0) return;
@@ -1083,7 +1279,7 @@ export const usePipelineStore = create<PipelineState>()(
       },
 
       clearAll: () =>
-        set({ nodes: [], edges: [], selectedId: null, pendingEdge: null, isRunning: false, runningNodeIds: [], collapsedStages: [] }),
+        set({ nodes: [], edges: [], selectedId: null, pendingEdge: null, isRunning: false, runningNodeIds: [], collapsedStages: [], lastCookedNodeId: null }),
     })
 );
 
@@ -1099,8 +1295,19 @@ usePipelineStore.subscribe((state, prev) => {
     state.viewport !== prev.viewport ||
     state.collapsedStages !== prev.collapsedStages ||
     state.scenes !== prev.scenes ||
-    state.paramTemplates !== prev.paramTemplates
+    state.paramTemplates !== prev.paramTemplates ||
+    state.lastCookedNodeId !== prev.lastCookedNodeId
   ) {
     schedulePipelinePersist();
   }
+});
+
+usePipelineStore.subscribe((state, prev) => {
+  if (restoringUndo) return;
+  if (state.currentProjectId !== prev.currentProjectId || state.isLoadingProject) {
+    resetUndo();
+    return;
+  }
+  if (prev.isLoadingProject) return;
+  if (graphEdited(prev, state)) rememberUndo(prev);
 });

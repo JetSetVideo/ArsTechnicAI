@@ -1,20 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, ChevronDown, Play, Square, Loader2, ZoomIn, ZoomOut, Maximize,
-  Trash2, Wand2, ChevronRight, Scan,
+  Trash2, Wand2, ChevronRight, Scan, Undo2,
 } from 'lucide-react';
 import { usePipelineStore, nodePosition, LANE_WIDTH, LANE_GAP, LANE_HEADER, NODE_H, NODE_GAP, laneX } from '@/stores/pipelineStore';
 import { PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, nodesForStage } from '@/lib/pipeline/catalog';
 import { ingestImage, payloadStats, formatBytes } from '@/lib/pipeline/ingest';
 import type { PipelineStageId } from '@/types/pipeline';
-import { useSettingsStore } from '@/stores';
+import { useSettingsStore, useLogStore } from '@/stores';
 import { useUserStore } from '@/stores/userStore';
 import { PipelineNodeCard, nodeIcon } from './PipelineNodeCard';
 import { NodeInspector } from './NodeInspector';
 import { LayerEditorModal } from './LayerEditorModal';
 import { SceneStrip } from './SceneStrip';
+import { WorkshopOverview } from './WorkshopOverview';
 import { WorkflowMenu } from './WorkflowMenu';
 import { inputPortPos, outputPortPos, edgePath, PORT_COLORS } from './geometry';
+import { formatShortcut, matchShortcut } from '@/lib/shortcuts';
 import styles from './WorkshopFlow.module.css';
 
 export const WorkshopFlow: React.FC = () => {
@@ -24,11 +26,14 @@ export const WorkshopFlow: React.FC = () => {
   // canvas anyway. `collapsedStages` is included because `groups()` reads it
   // internally and this component calls `groups()` directly in render.
   const nodes = usePipelineStore((s) => s.nodes);
+  const scenes = usePipelineStore((s) => s.scenes);
   const edges = usePipelineStore((s) => s.edges);
   const viewport = usePipelineStore((s) => s.viewport);
   const selectedId = usePipelineStore((s) => s.selectedId);
   const pendingEdge = usePipelineStore((s) => s.pendingEdge);
   const isRunning = usePipelineStore((s) => s.isRunning);
+  const undoDepth = usePipelineStore((s) => s.undoDepth);
+  const undoLabel = usePipelineStore((s) => s.undoLabel);
   usePipelineStore((s) => s.collapsedStages);
   const {
     setViewport, select, cancelEdge, removeEdge, addNode, runAll, stopRun,
@@ -46,6 +51,42 @@ export const WorkshopFlow: React.FC = () => {
   useEffect(() => {
     void usePipelineStore.getState().loadForProject(currentProject.id, currentProject.name);
   }, [currentProject.id, currentProject.name]);
+
+  useEffect(() => {
+    usePipelineStore.getState().clearRetiredModelErrors();
+  }, []);
+
+  useEffect(() => {
+    const history = {
+      steps: () => useLogStore.getState().getEntriesForCurrentProject()
+        .filter((entry) => entry.type === 'workshop_edit')
+        .map((entry) => ({
+          id: entry.id,
+          sentence: entry.description,
+          at: entry.timestamp,
+          returned: entry.data?.undone === true,
+        })),
+      undo: () => usePipelineStore.getState().undo(),
+      depth: () => usePipelineStore.getState().undoDepth,
+    };
+    (window as unknown as Record<string, unknown>).__arsHistory = history;
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__arsHistory;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      const shortcut = useSettingsStore.getState().settings.shortcuts?.undo ?? 'mod+z';
+      if (!matchShortcut(event, shortcut)) return;
+      event.preventDefault();
+      usePipelineStore.getState().undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -312,6 +353,18 @@ export const WorkshopFlow: React.FC = () => {
 
         <div className={styles.divider} />
 
+        <button
+          className={styles.tbtn}
+          disabled={undoDepth === 0}
+          onClick={() => usePipelineStore.getState().undo()}
+          title={undoLabel
+            ? `Undo: ${undoLabel} (${formatShortcut(settings.shortcuts?.undo ?? 'mod+z')})`
+            : `Undo (${formatShortcut(settings.shortcuts?.undo ?? 'mod+z')})`}
+          aria-label="Undo"
+        >
+          <Undo2 size={14} />
+        </button>
+
         <button className={styles.tbtn} onClick={() => setViewport({ ...viewport, zoom: Math.min(2.5, viewport.zoom * 1.2) })}>
           <ZoomIn size={14} />
         </button>
@@ -356,7 +409,7 @@ export const WorkshopFlow: React.FC = () => {
           className={styles.tbtn}
           style={{ color: '#f87171' }}
           onClick={() => {
-            if (window.confirm(`Delete all ${nodes.length} nodes, their versions and layers? This cannot be undone.`)) clearAll();
+            if (window.confirm(`Delete all ${nodes.length} nodes, their versions and layers? Undo can bring them back.`)) clearAll();
           }}
           title="Clear the workshop"
         >
@@ -375,6 +428,13 @@ export const WorkshopFlow: React.FC = () => {
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
         onDrop={(e) => void handleDrop(e)}
       >
+        <WorkshopOverview
+          nodes={nodes}
+          scenes={scenes}
+          viewport={viewport}
+          setViewport={setViewport}
+          canvasRef={canvasRef}
+        />
         <div
           className={styles.grid}
           style={{ backgroundPosition: `${viewport.x}px ${viewport.y}px`, backgroundSize: `${28 * viewport.zoom}px ${28 * viewport.zoom}px` }}

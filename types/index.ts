@@ -286,7 +286,8 @@ export type ActionType =
   | 'settings_change'
   | 'search'
   | 'folder_create'
-  | 'folder_open';
+  | 'folder_open'
+  | 'workshop_edit';
 
 export interface ActionLogEntry {
   id: UUID;
@@ -366,11 +367,26 @@ export interface AppearanceSettings {
 
   /** Per-stage Workshop lane color overrides, keyed by PipelineStageId. */
   stageLaneColors?: Record<string, string>;
+
+  /** Last cooked picture drawn behind the workshop nodes. */
+  resultBackdrop: boolean;
+
+  /** Workshop overview map. Width and height are pixels; opacity is 0–1. */
+  mapVisible: boolean;
+  mapWidth: number;
+  mapHeight: number;
+  mapOpacity: number;
+}
+
+export interface ShortcutSettings {
+  /** Chord such as `mod+z`. `mod` is ⌘ on macOS and Ctrl elsewhere. */
+  undo: string;
 }
 
 export interface AppSettings {
   theme: 'dark' | 'light' | 'system';
   appearance: AppearanceSettings;
+  shortcuts: ShortcutSettings;
   aiProvider: AIProviderSettings;
   outputDirectory: string;
   autoSavePrompts: boolean;

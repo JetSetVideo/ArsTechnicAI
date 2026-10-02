@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AppSettings, AIProviderSettings, AppearanceSettings } from '@/types';
+import type { AppSettings, AIProviderSettings, AppearanceSettings, ShortcutSettings } from '@/types';
 import { STORAGE_KEYS } from '@/constants/workspace';
 
 export const RECOMMENDED_GENERATION_MODELS = [
@@ -55,9 +55,18 @@ const defaultAppearance: AppearanceSettings = {
   reduceMotion: false,
   accentColor: '#00d4aa',
   stageLaneColors: {},
+  resultBackdrop: true,
+  mapVisible: true,
+  mapWidth: 148,
+  mapHeight: 78,
+  mapOpacity: 0.42,
 };
 
 // Default AI provider settings - extracted for reuse in migration
+const defaultShortcuts: ShortcutSettings = {
+  undo: 'mod+z',
+};
+
 const defaultAIProvider: AIProviderSettings = {
   activeProvider: 'GOOGLE_IMAGEN',
   activeModel: 'imagen-3.0-generate-002',
@@ -71,6 +80,7 @@ const defaultAIProvider: AIProviderSettings = {
 const defaultSettings: AppSettings = {
   theme: 'dark',
   appearance: defaultAppearance,
+  shortcuts: defaultShortcuts,
   aiProvider: defaultAIProvider,
   outputDirectory: './generated',
   autoSavePrompts: true,
@@ -226,6 +236,10 @@ export const useSettingsStore = create<SettingsState>()(
             appearance: {
               ...defaultAppearance,
               ...(persisted.settings.appearance ?? {}),
+            },
+            shortcuts: {
+              ...defaultShortcuts,
+              ...(persisted.settings.shortcuts ?? {}),
             },
             aiProvider: mergedAiProvider,
           },

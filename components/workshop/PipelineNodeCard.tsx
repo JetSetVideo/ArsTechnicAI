@@ -36,6 +36,14 @@ export function nodeIcon(name: string, size = 13): React.ReactNode {
   return <Icon size={size} />;
 }
 
+function friendlyNodeError(error?: string): string {
+  if (!error) return 'Generation failed';
+  if (/banana2 generation failed|no longer available|model is not available/i.test(error)) {
+    return 'Image model unavailable. Generate again — Nano Banana 2 is the model that runs.';
+  }
+  return error;
+}
+
 interface Props {
   node: PipelineNode;
   zoom: number;
@@ -161,7 +169,7 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
           ) : active?.text ? (
             <div className={styles.previewText}>{active.text}</div>
           ) : node.status === 'error' ? (
-            <div className={styles.errorText}>{node.error}</div>
+            <div className={styles.errorText}>{friendlyNodeError(node.error)}</div>
           ) : (
             <div className={styles.previewEmpty}>
               <ImageOff size={16} />

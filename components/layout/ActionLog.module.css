@@ -4,7 +4,7 @@
 
 .toggleButton {
   position: fixed;
-  bottom: var(--space-4, 1rem);
+  bottom: 96px;
   left: var(--space-4, 1rem);
   display: flex;
   align-items: center;
@@ -46,10 +46,10 @@
 
 .actionLog {
   position: fixed;
-  bottom: var(--space-4, 1rem);
+  bottom: 96px;
   left: var(--space-4, 1rem);
   width: 280px;
-  max-height: 340px;
+  max-height: 280px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg, 10px);
@@ -185,6 +185,30 @@
 }
 .digestEntry:hover {
   opacity: 1;
+}
+
+.returned {
+  opacity: 0.55;
+}
+.returned .entryDescription {
+  text-decoration: line-through;
+}
+
+.returnBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.returnBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .entryHeader {

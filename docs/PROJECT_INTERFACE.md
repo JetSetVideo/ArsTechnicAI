@@ -14,6 +14,40 @@ The workshop lives at `/project/[id]`. The home notes stay in `docs/HOME_INTERFA
 
 Untitled Project opened Rename, Save, Save as, and Export JSON. Typing `gen` listed three file names out of 26 in 0.00 ms. The search icon moved to the right, turned white, and rotated 90 degrees while the field was focused. Clicking Files turned that scope off, and clicking it again turned it back on. Closing the explorer left a 36×851 rail; Open Explorer brought the panel back. The film strip measured 1148px wide. Fit whole pipeline switched the same button to Precise view. A 390px capture was not repeated in this pass.
 
+## Round 2026-09-30 — output behind the graph, map above the nodes
+
+Gall's law: one working slice before the next. This slice is the two things you can see without a second editor.
+
+- The canvas background is the workflow's last picture: the last film-strip frame, otherwise the rightmost node that has an image. This project has neither yet, so the background says to run the pipeline. A generated picture replaces that sentence.
+- The map sits in the bottom-right, above the film strip. Default size is 148×78 at 42% opacity. Settings → Appearance → Pipeline map changes visibility, width, height, and opacity. It draws one mark per node. The white rectangle is the current window.
+
+Checked: the map is on screen above the Script lane, the window rectangle is inside it, and the empty output line is visible because no node has a picture yet.
+
+## Round 2026-09-30 — backdrop switch, cook, Nano Banana 2
+
+- Settings → Appearance → Workshop result turns the picture behind the nodes on or off. It is on by default.
+- Running a node that returns a picture sets that picture as the background. The film strip still wins only when nothing has been cooked in this project.
+- Image generation calls `gemini-3.1-flash-image` (Nano Banana 2), then Pro, Lite, and the original Nano Banana. Text nodes call `gemini-3.8-flash`, then 3.7, 3.6, and 3.5. `gemini-2.0-flash` is retired and is no longer called. If the known ids are missing, the key’s model list is searched. An invalid key or a quota error still stops immediately. Old “model is no longer available” messages are cleared from nodes that have not been run again.
+
+## What exists, and what the other tools still have
+
+This workshop already has a left-to-right stage graph, typed links, pan and zoom, fit/precise view, per-node generate, variant decks, layers, an inspector, a film strip, and local save.
+
+Not built yet, in the order the next slices should land:
+
+1. TouchDesigner cook: run one node and have the background update from that node's picture without a reload.
+2. Notch output: a fixed viewer that stays on the final delivery node while you edit upstream.
+3. Figma multiplayer: two cursors on one project. There is no shared session yet.
+4. Comments, components, and version history that more than one person can see.
+5. A timeline that scrubs the film strip and the background together.
+6. Realtime parameters (sliders that change the picture while you drag). The inspector edits values; it does not cook them live.
+
+## Round 2026-09-30 — one history
+
+Undo and the corner log were two lists. The button restored the graph and forgot to say what it restored. The log was mostly repeated searches, labelled SRC, and its own undo only deleted the line.
+
+They are one record now. A workshop edit becomes a sentence (`Added Generate Moodboard`, `Moved Key Visual`, `Linked Script to Prompt Lab`). That sentence is the Undo tooltip and the first row of History. Returning an edit keeps the line, struck through, so the order of what happened is still there. Searches and settings sit under Other activity. `window.__arsHistory` on the workshop page exposes `steps()`, `undo()`, and `depth()` for an agent reading the same record.
+
 ## Where
 
 `components/layout/TopBar.tsx`, `components/ui/SearchBar.tsx`, `components/layout/ExplorerPanel.tsx`, `components/layout/AppShell.tsx`, `components/workshop/WorkshopFlow.tsx`, `components/layout/SettingsModal.tsx`.

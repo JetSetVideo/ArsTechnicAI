@@ -1,9 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import {
+  BANANA_IMAGE_MODELS,
+  BANANA_TEXT_MODELS,
+  isUnavailableModelError,
+  rankDiscoveredImageModels,
+  rankDiscoveredTextModels,
+} from '@/lib/pipeline/bananaModels';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Workshop pipeline generation — Google "banana2" (Gemini image) + Gemini text.
+// Workshop pipeline generation — Nano Banana 2 (Gemini image) + Gemini text.
 // Uses the user's own Google API key. Other model providers plug in later.
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const config = {
   api: { bodyParser: { sizeLimit: '25mb' } },
@@ -11,13 +16,8 @@ export const config = {
 
 const GL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// banana2 = Nano Banana 2 (Gemini image). Try newest first, fall back.
-const IMAGE_MODELS = [
-  'gemini-3-pro-image-preview',
-  'gemini-2.5-flash-image',
-  'gemini-2.0-flash-preview-image-generation',
-];
-const TEXT_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const IMAGE_MODELS: readonly string[] = BANANA_IMAGE_MODELS;
+const TEXT_MODELS: readonly string[] = BANANA_TEXT_MODELS;
 
 interface GeminiPart {
   text?: string;
@@ -43,6 +43,29 @@ async function callGemini(
   });
   const json = await resp.json().catch(() => ({}));
   return { ok: resp.ok, status: resp.status, json };
+}
+
+async function discoverModelIds(apiKey: string): Promise<string[]> {
+  const found: string[] = [];
+  let pageToken = '';
+  for (let page = 0; page < 3; page += 1) {
+    const url = new URL(GL_BASE);
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('pageSize', '100');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const resp = await fetch(url);
+    if (!resp.ok) break;
+    const json = await resp.json().catch(() => ({}));
+    for (const model of json.models ?? []) {
+      const methods: string[] = model.supportedGenerationMethods ?? [];
+      if (!methods.includes('generateContent')) continue;
+      const id = String(model.name ?? '').replace(/^models\//, '');
+      if (id) found.push(id);
+    }
+    pageToken = typeof json.nextPageToken === 'string' ? json.nextPageToken : '';
+    if (!pageToken) break;
+  }
+  return found;
 }
 
 function extractParts(json: any): { text?: string; dataUrl?: string } {
@@ -110,37 +133,75 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
   };
 
-  let lastError = 'No model available';
+  const tried: string[] = [];
+  let lastError = 'No image model is available for this key';
+
+  const attempt = async (candidate: string): Promise<{ done: true; payload: unknown } | { done: false; fatal?: { status: number; error: string } }> => {
+    tried.push(candidate);
+    let result = await callGemini(candidate, apiKey, body);
+
+    if (!result.ok && result.status === 400) {
+      const cfg = { ...((body.generationConfig ?? {}) as Record<string, unknown>) };
+      delete cfg.imageConfig;
+      delete cfg.temperature;
+      result = await callGemini(candidate, apiKey, { ...body, generationConfig: cfg });
+    }
+
+    if (result.ok) {
+      const { text, dataUrl } = extractParts(result.json);
+      if (isImage && !dataUrl) {
+        lastError = text
+          ? `${candidate} returned no image: ${text.slice(0, 180)}`
+          : `${candidate} returned no image`;
+        return { done: false };
+      }
+      return { done: true, payload: { text, dataUrl, model: candidate } };
+    }
+
+    const message = result.json?.error?.message || `HTTP ${result.status}`;
+    lastError = message;
+    const lower = message.toLowerCase();
+    if (result.status === 401 || lower.includes('api key') || lower.includes('permission denied')) {
+      return { done: false, fatal: { status: result.status === 401 ? 401 : 403, error: message } };
+    }
+    if (result.status === 429 || lower.includes('quota') || lower.includes('rate limit')) {
+      return { done: false, fatal: { status: 429, error: message } };
+    }
+    if (isUnavailableModelError(result.status, message) || result.status === 400 || result.status === 403) {
+      return { done: false };
+    }
+    return { done: false, fatal: { status: result.status, error: message } };
+  };
+
   for (const candidate of [...new Set(candidates)]) {
     try {
-      let result = await callGemini(candidate, apiKey, body);
-
-      // Some models reject imageConfig — retry once without it
-      if (!result.ok && result.status === 400 && isImage && aspectRatio) {
-        const { imageConfig: _drop, ...cfg } = (body.generationConfig ?? {}) as Record<string, unknown>;
-        result = await callGemini(candidate, apiKey, { ...body, generationConfig: cfg });
-      }
-
-      if (result.ok) {
-        const { text, dataUrl } = extractParts(result.json);
-        if (isImage && !dataUrl) {
-          lastError = text
-            ? `Model returned no image: ${text.slice(0, 300)}`
-            : 'Model returned no image';
-          continue;
-        }
-        return res.status(200).json({ text, dataUrl, model: candidate });
-      }
-
-      lastError = result.json?.error?.message || `HTTP ${result.status}`;
-      // Model not found / no access → try next candidate; other errors are fatal
-      if (result.status !== 404 && result.status !== 403 && result.status !== 400) {
-        return res.status(result.status).json({ error: lastError, model: candidate });
-      }
+      const outcome = await attempt(candidate);
+      if (outcome.done) return res.status(200).json(outcome.payload);
+      if (outcome.fatal) return res.status(outcome.fatal.status).json({ error: outcome.fatal.error, model: candidate });
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }
   }
 
-  return res.status(502).json({ error: `banana2 generation failed: ${lastError}` });
+  try {
+    const listed = await discoverModelIds(apiKey);
+    const discovered = isImage
+      ? rankDiscoveredImageModels(listed, tried)
+      : rankDiscoveredTextModels(listed, tried);
+    for (const candidate of discovered.slice(0, 4)) {
+      const outcome = await attempt(candidate);
+      if (outcome.done) return res.status(200).json(outcome.payload);
+      if (outcome.fatal) return res.status(outcome.fatal.status).json({ error: outcome.fatal.error, model: candidate });
+    }
+  } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err);
+  }
+
+  const names = tried.filter((name, index) => tried.indexOf(name) === index).slice(0, 4).join(', ');
+  const kindLabel = isImage ? 'Nano Banana 2' : 'Gemini 3.8 Flash';
+  return res.status(502).json({
+    error: names
+      ? `Model unavailable (${names}). Use a Google AI Studio key that can call ${kindLabel}.`
+      : lastError,
+  });
 }

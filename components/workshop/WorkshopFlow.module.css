@@ -131,12 +131,61 @@
   background-image: radial-gradient(circle, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
   background-size: 28px 28px;
   pointer-events: none;
+  z-index: 1;
+}
+.outputBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: #070712;
+}
+.outputBackdrop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.42;
+  filter: saturate(0.85);
+}
+.outputEmpty {
+  position: absolute;
+  left: 16px;
+  bottom: 132px;
+  max-width: 280px;
+  color: #8a8aa2;
+  font-size: 0.68rem;
+}
+.minimap {
+  position: absolute;
+  right: 16px;
+  bottom: 108px;
+  z-index: 46;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 8, 16, 0.55);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  cursor: crosshair;
+}
+.minimapNode {
+  position: absolute;
+  border-radius: 2px;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.minimapWindow {
+  position: absolute;
+  border: 1.5px solid #fff;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
 }
 
 .scene {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 2;
   transform-origin: 0 0;
   perspective: 2000px;
 }

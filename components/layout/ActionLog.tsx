@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { History, ChevronDown, ChevronUp, Trash2, X, CheckCircle, XCircle, Clock, Sparkles, FolderPlus, Image, Move, Settings, Search } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, Trash2, X, CheckCircle, XCircle, Clock, Sparkles, FolderPlus, Image, Move, Settings, Search, Undo2 } from 'lucide-react';
+import { usePipelineStore } from '@/stores/pipelineStore';
 import { Button } from '../ui/Button';
 import { useLogStore } from '@/stores';
 import styles from './ActionLog.module.css';
@@ -46,7 +47,9 @@ const getActionConfig = (type: ActionLogEntry['type']): { icon: React.ReactNode;
     case 'settings_change':
       return { icon: <Settings size={12} />, color: 'var(--accent-secondary)', label: 'SET' };
     case 'search':
-      return { icon: <Search size={12} />, color: 'var(--text-secondary)', label: 'SRC' };
+      return { icon: <Search size={12} />, color: 'var(--text-secondary)', label: 'Search' };
+    case 'workshop_edit':
+      return { icon: <Undo2 size={12} />, color: 'var(--accent-primary)', label: 'Edit' };
     case 'prompt_save':
       return { icon: <Sparkles size={12} />, color: 'var(--accent-primary)', label: 'PRM' };
     default:
@@ -90,8 +93,9 @@ interface ActionEntryProps {
   entry: ActionLogEntry;
 }
 
-const ActionEntry: React.FC<ActionEntryProps> = ({ entry }) => {
+const ActionEntry: React.FC<ActionEntryProps & { canReturn?: boolean }> = ({ entry, canReturn }) => {
   const config = getActionConfig(entry.type);
+  const returned = entry.data?.undone === true;
 
   if (entry.isDigest) {
     const samples = (entry.data?.samples as { description: string }[] | undefined) ?? [];
@@ -109,16 +113,26 @@ const ActionEntry: React.FC<ActionEntryProps> = ({ entry }) => {
     );
   }
 
-  const params = formatParams(entry.data);
+  const params = entry.type === 'search' ? [] : formatParams(entry.data);
 
   return (
-    <div className={styles.entry}>
+    <div className={`${styles.entry} ${returned ? styles.returned : ''}`}>
       <div className={styles.entryHeader}>
         <span className={styles.entryBadge} style={{ background: config.color }}>
           {config.icon}
-          <span>{config.label}</span>
+          <span>{returned ? 'Returned' : config.label}</span>
         </span>
         <span className={styles.entryTime}>{formatTimestamp(entry.timestamp)}</span>
+        {canReturn && (
+          <button
+            type="button"
+            className={styles.returnBtn}
+            title="Return this edit"
+            onClick={() => usePipelineStore.getState().undo()}
+          >
+            <Undo2 size={12} />
+          </button>
+        )}
       </div>
       <div className={styles.entryDescription}>{entry.description}</div>
       {params.length > 0 && (
@@ -138,25 +152,26 @@ export const ActionLog: React.FC = () => {
   // entries land, then derive the current project's slice from them.
   useLogStore((s) => s.entries);
   const [isOpen, setIsOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [showOther, setShowOther] = useState(false);
+  usePipelineStore((s) => s.undoDepth);
 
   const projectEntries = getEntriesForCurrentProject();
-  const recentEntries = isExpanded ? projectEntries : projectEntries.slice(0, 8);
-
-  // Count by type for the badge
-  const generationCount = projectEntries.filter(e => e.type.startsWith('generation')).length;
+  const edits = projectEntries.filter((entry) => entry.type === 'workshop_edit');
+  const other = projectEntries.filter((entry) => entry.type !== 'workshop_edit');
+  const returnable = edits.filter((entry) => entry.data?.undone !== true);
+  const headId = returnable[0]?.id;
 
   if (!isOpen) {
     return (
       <button
         className={styles.toggleButton}
         onClick={() => setIsOpen(true)}
-        title="Show action log"
+        title="History"
         type="button"
       >
         <History size={16} />
-        {projectEntries.length > 0 && (
-          <span className={styles.badge}>{projectEntries.length}</span>
+        {returnable.length > 0 && (
+          <span className={styles.badge}>{returnable.length}</span>
         )}
       </button>
     );
@@ -167,14 +182,8 @@ export const ActionLog: React.FC = () => {
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <History size={14} />
-          <span>Activity</span>
-          <span className={styles.count}>{projectEntries.length}</span>
-          {generationCount > 0 && (
-            <span className={styles.genCount}>
-              <Sparkles size={10} />
-              {generationCount}
-            </span>
-          )}
+          <span>History</span>
+          <span className={styles.count}>{returnable.length}</span>
         </div>
         <div className={styles.headerRight}>
           <Button
@@ -197,38 +206,33 @@ export const ActionLog: React.FC = () => {
       </div>
 
       <div className={styles.entries}>
-        {recentEntries.length === 0 ? (
+        {edits.length === 0 && other.length === 0 ? (
           <div className={styles.empty}>
             <History size={24} />
-            <p>No activity yet</p>
-            <span>Actions will appear here</span>
+            <p>Nothing to return</p>
+            <span>Workshop edits land here, in the same order as Undo.</span>
           </div>
         ) : (
-          recentEntries.map((entry) => (
-            <ActionEntry key={entry.id} entry={entry} />
-          ))
+          <>
+            {edits.map((entry) => (
+              <ActionEntry key={entry.id} entry={entry} canReturn={entry.id === headId} />
+            ))}
+            {other.length > 0 && (
+              <button
+                className={styles.expandButton}
+                onClick={() => setShowOther((open) => !open)}
+                type="button"
+              >
+                {showOther ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                Other activity ({other.length})
+              </button>
+            )}
+            {showOther && other.slice(0, 12).map((entry) => (
+              <ActionEntry key={entry.id} entry={entry} />
+            ))}
+          </>
         )}
       </div>
-
-      {projectEntries.length > 8 && (
-        <button
-          className={styles.expandButton}
-          onClick={() => setIsExpanded(!isExpanded)}
-          type="button"
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp size={14} />
-              Show less
-            </>
-          ) : (
-            <>
-              <ChevronDown size={14} />
-              Show all ({projectEntries.length})
-            </>
-          )}
-        </button>
-      )}
     </div>
   );
 };
