@@ -138,19 +138,55 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: #070712;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 18px 16px 148px;
+  box-sizing: border-box;
 }
-.outputBackdrop img {
+.viewerBank {
+  display: grid;
+  align-content: start;
+  justify-content: center;
+}
+.viewerTile {
+  position: relative;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(7, 7, 18, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-sizing: border-box;
+}
+.viewerTile img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  opacity: 0.42;
-  filter: saturate(0.85);
+  object-fit: contain;
+  display: block;
+}
+.viewerTile.cooked {
+  border-color: rgba(0, 212, 170, 0.85);
+}
+.viewerTile.selected {
+  border-color: rgba(255, 255, 255, 0.72);
+}
+.viewerLabel {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: 3px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .outputEmpty {
   position: absolute;
   left: 16px;
-  bottom: 132px;
+  top: 16px;
   max-width: 280px;
   color: #8a8aa2;
   font-size: 0.68rem;

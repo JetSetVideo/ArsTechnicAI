@@ -368,8 +368,16 @@ export interface AppearanceSettings {
   /** Per-stage Workshop lane color overrides, keyed by PipelineStageId. */
   stageLaneColors?: Record<string, string>;
 
-  /** Last cooked picture drawn behind the workshop nodes. */
+  /** Node-viewer bank drawn behind the workshop graph. */
   resultBackdrop: boolean;
+  /** main: branch ends, plus the selected and last-run nodes. all: every pictured node. */
+  viewerSource: 'main' | 'all';
+  /** How many viewers the bank may show. */
+  viewerMax: number;
+  /** Longest tile width in pixels before extra viewers shrink it. */
+  viewerSize: number;
+  /** Picture strength inside each viewer, 0–1. */
+  viewerOpacity: number;
 
   /** Workshop overview map. Width and height are pixels; opacity is 0–1. */
   mapVisible: boolean;

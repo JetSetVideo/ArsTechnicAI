@@ -23,6 +23,14 @@ Gall's law: one working slice before the next. This slice is the two things you 
 
 Checked: the map is on screen above the Script lane, the window rectangle is inside it, and the empty output line is visible because no node has a picture yet.
 
+## Round 2026-10-02 — node viewers instead of one backdrop
+
+Derivative’s TOP page, the Derivative forum (Gallo, Achim), and r/TouchDesigner (pixelpixelx, Vpicone, and the Bileam perform-window threads) describe the same habit: several display flags tile into the network, each picture is fitted, and a full-canvas cover is the thing people turn off. [Interface](c8308729-ef2c-4355-83c0-9ba2741a3ab4), [UX](52f5472d-a59f-4ebd-84d3-4f4d305bb54e), [UI](c6331ed5-6dc3-4e77-b93e-6fd9aa47205f), [graph](39491b7f-9d2a-4e9d-8694-76864789feb7), and [research](5e5e5487-db32-4cbc-89d1-ff3f15d17760) agreed the graph stays primary and the pictures stay letterboxed.
+
+The canvas no longer stretches one cooked frame across the window. It shows a bank of fitted 16:9 viewers, centered in the band above the film strip. A main node is a pictured branch end. The selected node and the last run keep a seat even when they sit upstream. One viewer is at most 240px wide (default 168). Each further viewer multiplies that width by 0.82, then the grid fits into 72% of the canvas. Past the cap, the rightmost mains stay.
+
+Settings → Appearance → Node viewers: show or hide, Main nodes or Every pictured node, max viewers (1–8, default 4), size (96–240), opacity (default 70%). The pipeline map is unchanged.
+
 ## Round 2026-09-30 — backdrop switch, cook, Nano Banana 2
 
 - Settings → Appearance → Workshop result turns the picture behind the nodes on or off. It is on by default.
@@ -35,7 +43,7 @@ This workshop already has a left-to-right stage graph, typed links, pan and zoom
 
 Not built yet, in the order the next slices should land:
 
-1. TouchDesigner cook: run one node and have the background update from that node's picture without a reload.
+1. TouchDesigner cook while a slider moves. Running a node already puts that node's picture in the viewer bank. Dragging a parameter does not cook it live.
 2. Notch output: a fixed viewer that stays on the final delivery node while you edit upstream.
 3. Figma multiplayer: two cursors on one project. There is no shared session yet.
 4. Comments, components, and version history that more than one person can see.

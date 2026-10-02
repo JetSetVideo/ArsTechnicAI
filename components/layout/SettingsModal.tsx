@@ -548,16 +548,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                   </div>
 
                   <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
-                    <span style={{ ...labelStyle, fontWeight: 700 }}>Workshop result</span>
-                    <p className={styles.description} style={{ marginTop: 4 }}>The picture from the node you just ran, drawn behind the graph.</p>
+                    <span style={{ ...labelStyle, fontWeight: 700 }}>Node viewers</span>
+                    <p className={styles.description} style={{ marginTop: 4 }}>
+                      Fitted views of the main nodes, behind the graph. Each extra picture takes a smaller tile.
+                    </p>
                   </div>
 
                   <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input type="checkbox" id="result-backdrop" checked={appearance.resultBackdrop ?? true}
                       onChange={e => updateAppearance({ resultBackdrop: e.target.checked })} />
                     <label htmlFor="result-backdrop" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                      Show workflow result behind the nodes
+                      Show node viewers behind the graph
                     </label>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Which nodes</span>
+                    <select
+                      id="viewer-source"
+                      style={inputStyle}
+                      value={appearance.viewerSource ?? 'main'}
+                      onChange={e => updateAppearance({ viewerSource: e.target.value === 'all' ? 'all' : 'main' })}
+                    >
+                      <option value="main">Main nodes</option>
+                      <option value="all">Every pictured node</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Max viewers: {appearance.viewerMax ?? 4}</span>
+                    <input id="viewer-max" type="range" min={1} max={8} step={1} value={appearance.viewerMax ?? 4}
+                      onChange={e => updateAppearance({ viewerMax: Number(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Viewer size: {appearance.viewerSize ?? 168}px</span>
+                    <input id="viewer-size" type="range" min={96} max={240} step={8} value={appearance.viewerSize ?? 168}
+                      onChange={e => updateAppearance({ viewerSize: Number(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Viewer opacity: {Math.round((appearance.viewerOpacity ?? 0.7) * 100)}%</span>
+                    <input id="viewer-opacity" type="range" min={25} max={100} step={5}
+                      value={Math.round((appearance.viewerOpacity ?? 0.7) * 100)}
+                      onChange={e => updateAppearance({ viewerOpacity: Number(e.target.value) / 100 })}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
                   </div>
 
                   <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
