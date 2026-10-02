@@ -248,3 +248,105 @@ Append-only. Newest round at the bottom. Format and rules: `PROGRAM.md`.
 - **How**  `npx next build`, then `npx next dev -p 3010`, then one `curl` per route.
 - **Result**  `✓ Compiled successfully`; `/` 200, `/home` 200, `/aide` 200; 1.5 GiB disk free,
   which is enough for one build at a time and not much more.
+
+### R2.1 surveyor — every ArsTechnicAI copy on the Ubuntu server, and what is not on GitHub
+- **What**  Inventory on MaxPC (2026-10-02): (1) `~/Desktop/ArsTechnicAI` — this repository, `main` =
+  `origin/main` = `a21fa94`, clean, one branch, no stash, no worktree, the only ArsTechnicAI repo on the
+  GitHub account; (2) the Deno studio — already inside it at `lib/studio/` (`0a7a4e3` imported it as
+  `imported/deno-studio`, `a86d06d` moved it: 559 pure renames + 4 near-identical, 564 files both sides,
+  only `imported/README.md` deleted); (3) `~/Desktop/ArsTechnicAI-Server` — a separate Next 14 App Router
+  app (login, signup, Google OAuth landing, profile, persisted session store), **not a git repository**,
+  never on GitHub; (4) `/etc/arstechnicai/pki` — certificates, not source, left alone.
+- **Why**  the user asked for every copy's features in the GitHub version. Only (3) was outside it.
+- **When**  round 2 intake.
+- **Where**  paths above; `git ls-remote --heads origin`, `gh repo list JetSetVideo`.
+- **Who**  `porter` for (3); the donor backlog below is unchanged by this round.
+- **How**  `git fetch --all --prune && git status -sb`; `git show a86d06d -M --name-status`;
+  `find / -xdev -type d -name bridge` filtered for `core/` + `deno.json` siblings.
+- **Result**  one un-merged codebase: ArsTechnicAI-Server (21 files, ~1 000 lines).
+
+### R2.2 surveyor — the destination's auth store was replaced by a stub, and five consumers broke silently
+- **What**  `stores/authStore.ts` held only `{ userId, role }` with `setAuth(userId, role)`, while
+  `AuthContext`, `AuthModal`, `SettingsModal`, `AuthButton`, `GenerationContext` and `ProjectContext`
+  read `user` / `token`, call `setAuth(user, token, expiresIn)` and import a type `AuthUser` that did not
+  exist. Same pattern twice more: `SettingsModal` called `savePseudonym()` (deleted in `a63d587`, callers
+  kept), and `AuthModal`'s Google button tested `typeof json === 'string'` against an API that answers
+  `{ url }`. No `/auth/callback` page existed although the Google callback API redirects there.
+- **Why**  `ae6a444` added a 104-line persisted JWT store; `dda6eb0` later re-created the file as a 17-line
+  NextAuth stub. ArsTechnicAI-Server carries the same store shape, which is why it worked and this did not.
+  Invisible because `next.config.js` sets `ignoreBuildErrors` and plain `tsc` stops at TS2688 (bcryptjs).
+- **When**  round 2; blocks every signed-in feature (projects, generation, profile).
+- **Where**  `git log --follow -- stores/authStore.ts`; `git log -S savePseudonym`.
+- **Who**  `porter`.
+- **How**  `./node_modules/.bin/tsc --noEmit -p . --types node` → 524 errors, 10 of them in the files above.
+  Headless run of the sign-in flow on unmodified `main`: callback 404, register leaves no session,
+  reload shows signed out, pseudonym edit throws.
+- **Result**  cause established from history and from a failing run, before any edit.
+
+### R2.3 porter — ArsTechnicAI-Server merged as a translation into pages-router idiom
+- **What**  carried across: the persisted, expiry-checked session store (restored from `ae6a444`, plus the
+  Server's `roles[]`), its typed API client (`lib/auth/client.ts`, now also tolerant of non-JSON error
+  bodies and honouring `NEXT_PUBLIC_API_URL` so the Mac-frontend → Ubuntu-API split still works), and the
+  Google OAuth landing page (`pages/auth/callback.tsx`, verifies the token via `/api/auth/me` before storing
+  it, `replace()`s it out of the URL, routes failures to `/auth/error` with readable messages).
+  Repaired in place: Google redirect in `AuthModal` (now shows "Google OAuth is not configured" instead of
+  nothing), `savePseudonym` restored, role badge read from `roles[]` by rank, unused NextAuth `hooks/useAuth`
+  repointed at the JWT store. **Not** carried: the Server's `/login`, `/signup`, `/home` pages — this app
+  already signs in through `AuthModal`, and its `/home` is the dashboard; a second sign-in UI would be a
+  parallel system. `~/Desktop/ArsTechnicAI-Server` is left on disk untouched (not deleted — `surgeon`, with a
+  yes, if wanted).
+- **Why**  R2.2.
+- **When**  round 2.
+- **Where**  `stores/authStore.ts`, `lib/auth/client.ts`, `pages/auth/callback.tsx`, `pages/auth/error.tsx`,
+  `components/auth/AuthModal.tsx`, `components/layout/SettingsModal.tsx`, `contexts/AuthContext.tsx`,
+  `hooks/useAuth.ts`, `services/auth/ARCHITECTURE.md`, `.env.example`.
+- **Who**  `breaker`, `evidence`.
+- **How**  edits with asserted match counts; no file removed.
+- **Result**  see R2.4–R2.6.
+
+### R2.4 evidence — before and after, in order
+- **What**  shot five surfaces before (changes stashed) and after; added `auth-callback-error` and
+  `auth-error-oauth-code` to `tools/shot_targets.json`. `tools/shot.ts` could not start Chromium on Ubuntu
+  24.04 ("No usable sandbox!" — AppArmor blocks unprivileged user namespaces); it now passes `--no-sandbox`
+  on Linux only.
+- **Why**  rule: shoot before as well as after.
+- **When**  round 2.
+- **Where**  `shots/2026-10-02T19-28-11-505Z_before-auth-merge` → `shots/2026-10-02T19-28-43-834Z_after-auth-merge` (+ `shots/2026-10-02T19-29-35-171Z_after-auth-merge-probe` with a tightened token probe). Dev server on 3012 (3010 was the
+  Mac's; 3002 is held by Cursor here).
+- **Who**  `conductor`.
+- **How**  `CHROME_PATH=… deno run -A tools/shot.ts --base=http://127.0.0.1:3012 --tag=…`, then `--compare`.
+- **Result**  `auth-callback-error status 404 → 200 · path "/auth/callback" → "/auth/error" · text "404 This
+  page could not be found." → "… Google sign-in was cancelled. …"`; `auth-error-oauth-code text "An
+  authentication error occurred. Back to sign in" → "Your session could not be verified. …"`; `= home-mobile
+  unchanged · = aide unchanged`; `home` lost the green "Connected" strip — `ConnectionBanner` leaves after
+  `EPHEMERAL_DELAY_MS = 2500` and the after-shot loaded 0.8 s slower; it imports nothing touched here.
+  `No regressions between these runs.` Token probe on the error path: `hasToken: False`.
+
+### R2.5 breaker — the battery against sign-in
+- **What**  headless Chromium against `next start` (production build) on 3012, a throwaway local account.
+- **Why**  before anything is called done.
+- **When**  round 2.
+- **Where**  `/home` → Settings → Connect; `/auth/callback`; `/api/user/profile`.
+- **Who**  `conductor`; one open finding below goes to the backlog (A2).
+- **How**  register → reload → edit pseudonym (checked server-side through `/api/auth/me`) → log out →
+  Google → log in → wrong password; then callback with a real token and `auth_expires_in=abc`, Back, the same
+  callback twice, two tabs.
+- **Result**  11/11 flow checks PASS, 0 page errors (same script on unmodified `main`: 5 FAIL then abort).
+  `success: landed=/home tokenInUrl=false stored=true expiryDays≈7.00` · `back: tokenInUrl=false` ·
+  `twice: stored=true expiryHours≈1.00 sameUser=true`. **Open, severity "looks wrong":** logging out in one
+  tab leaves another tab signed in until it reloads — the persisted store has no cross-tab `storage`
+  listener. No work is lost (JWT is stateless; the token stays valid until expiry either way).
+
+### R2.6 conductor — gates, quoted
+- **What**  type, test, build and run gates on the final tree.
+- **Why**  "done means it ran".
+- **When**  round 2 close.
+- **Where**  repository root; dev server stopped before the build.
+- **Who**  next round: `conductor` picks from the donor backlog (G1 loop, U1–U6, M1–M3, L1–L4 untouched).
+- **How**  `tsc --noEmit -p . --types node`; `npm test`; `npx next build`; `next start -p 3012` + e2e.
+- **Result**  type: 524 → 508, **0 new** (8 apparent "new" lines were the same errors with Prisma's type
+  literal printed in another property order — identical file:line:code sets). test: `Tests 2 failed | 288
+  passed (290)` — the 2 are `settingsStore` default-`apiKey` assertions, failing identically on unmodified
+  `main`. build: `✓ Compiled successfully`, `○ /auth/callback 1.37 kB`. run: R2.5. B2 closed by declaring
+  `vitest@4.0.18` + `"test": "vitest run"` (`deno install --allow-scripts`; `node_modules` still 166
+  entries / 26 symlinks; Prisma client regenerated from the unchanged schema, type gate identical after).
