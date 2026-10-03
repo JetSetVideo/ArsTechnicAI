@@ -47,7 +47,8 @@ export interface PipelineSnapshotMeta {
   sceneCount: number;
 }
 
-function pipelineStorageKey(projectId: string): string {
+/** Exported for the sync engine, which must drop a stale cached copy after a pull. */
+export function pipelineStorageKey(projectId: string): string {
   return `ars:pipeline-workshop:${projectId}`;
 }
 
@@ -174,6 +175,16 @@ function withoutRetiredModelError(node: PipelineNode): PipelineNode {
   const next = { ...node, error: undefined };
   if (next.status === 'error') next.status = 'idle';
   return next;
+}
+
+/**
+ * Every node entering the store (localStorage, disk, or another device via sync)
+ * passes here. Nodes written by another version of the app may lack fields the
+ * UI iterates — a node without `variants` crashed the whole dashboard.
+ */
+function normalizeLoadedNode(node: PipelineNode): PipelineNode {
+  const safe = Array.isArray(node.variants) ? node : { ...node, variants: [] };
+  return withoutRetiredModelError(safe);
 }
 
 function activeVariant(node: PipelineNode): NodeVariant | undefined {
@@ -420,7 +431,7 @@ export const usePipelineStore = create<PipelineState>()(
             if (raw) {
               const data = JSON.parse(raw);
               set({
-                nodes: (data.nodes ?? []).map(withoutRetiredModelError), edges: data.edges ?? [],
+                nodes: (data.nodes ?? []).map(normalizeLoadedNode), edges: data.edges ?? [],
                 viewport: data.viewport ?? EMPTY_VIEWPORT,
                 collapsedStages: data.collapsedStages ?? [],
                 scenes: data.scenes ?? [], paramTemplates: data.paramTemplates ?? [],
@@ -436,7 +447,7 @@ export const usePipelineStore = create<PipelineState>()(
             const p = data?.pipeline;
             if (p && get().currentProjectId === projectId) {
               set({
-                nodes: (p.nodes ?? []).map(withoutRetiredModelError), edges: p.edges ?? [],
+                nodes: (p.nodes ?? []).map(normalizeLoadedNode), edges: p.edges ?? [],
                 viewport: p.viewport ?? EMPTY_VIEWPORT,
                 collapsedStages: p.collapsedStages ?? [],
                 scenes: p.scenes ?? [], paramTemplates: p.paramTemplates ?? [],
@@ -1193,7 +1204,7 @@ export const usePipelineStore = create<PipelineState>()(
       stopRun: () => set({ isRunning: false }),
 
       clearRetiredModelErrors: () => {
-        const nodes = get().nodes.map(withoutRetiredModelError);
+        const nodes = get().nodes.map(normalizeLoadedNode);
         if (nodes.some((node, index) => node !== get().nodes[index])) set({ nodes });
       },
 

@@ -170,3 +170,24 @@ describe('projectsStore', () => {
     });
   });
 });
+
+describe('ProjectsStore deduplication', () => {
+  const proj = (id: string, name: string, modifiedAt = 1) => ({ id, name, createdAt: 1, modifiedAt, assetCount: 0, tags: [] as string[] });
+
+  beforeEach(() => {
+    useProjectsStore.setState({ projects: [], currentProjectId: null, recentProjectIds: [] });
+  });
+
+  it('merges the same project listed twice (same id)', () => {
+    useProjectsStore.setState({ projects: [proj('a', 'Film', 1), proj('a', 'Film', 2)] });
+    expect(useProjectsStore.getState().deduplicateProjects()).toBe(1);
+    expect(useProjectsStore.getState().projects).toHaveLength(1);
+    expect(useProjectsStore.getState().projects[0].modifiedAt).toBe(2);
+  });
+
+  it('keeps different projects that share a name (e.g. each synced device’s "Untitled Project")', () => {
+    useProjectsStore.setState({ projects: [proj('mac-1', 'Untitled Project'), proj('ubuntu-1', 'Untitled Project')] });
+    expect(useProjectsStore.getState().deduplicateProjects()).toBe(0);
+    expect(useProjectsStore.getState().projects.map((p) => p.id)).toEqual(['mac-1', 'ubuntu-1']);
+  });
+});

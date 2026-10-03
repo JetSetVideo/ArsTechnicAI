@@ -5,7 +5,12 @@ import { useEffect } from "react";
 import "../styles/globals.css";
 import { ToastContainer } from "@/components/ui";
 import { useSyncOnReconnect } from "@/hooks/useSyncOnReconnect";
+import { useDeviceSync } from "@/hooks/useDeviceSync";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { installAuthFetch } from "@/lib/auth/fetchAuth";
+
+// Before any component mounts: own-API calls carry the session token (lib/auth/fetchAuth).
+installAuthFetch();
 
 const TelemetryProvider = dynamic(
   () => import("@/contexts/TelemetryProvider").then((m) => m.TelemetryProvider),
@@ -14,6 +19,7 @@ const TelemetryProvider = dynamic(
 
 function SyncManager() {
   useSyncOnReconnect();
+  useDeviceSync();
   return null;
 }
 

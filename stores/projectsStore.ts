@@ -141,7 +141,10 @@ export const useProjectsStore = create<ProjectsStore>()(
         let removedCount = 0;
 
         for (const project of projects) {
-          const key = project.name.trim().toLowerCase();
+          // Same project listed twice → merge. Keyed by id, not name: two different
+          // projects may share a name (every synced device has an "Untitled
+          // Project"), and merging by name silently hid one of them.
+          const key = project.id;
           const existing = byName.get(key);
           if (!existing) {
             byName.set(key, project);

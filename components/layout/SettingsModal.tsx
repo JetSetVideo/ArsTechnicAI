@@ -16,6 +16,7 @@ import {
 import { useDashboardStore } from '@/stores/dashboardStore';
 import type { SocialPlatformId } from '@/types/dashboard';
 import { Button } from '../ui/Button';
+import { SyncPanel } from '../settings/SyncPanel';
 import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
 import { STAGES, STAGE_ORDER } from '@/lib/pipeline/catalog';
@@ -835,6 +836,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                 <div className={styles.section}>
                   <h3>Data Management</h3>
                   <p className={styles.description}>Export, import, and verify data integrity.</p>
+
+                  <SyncPanel />
 
                   <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                     <Button variant="outline" onClick={() => log('settings_change', 'Export data')} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

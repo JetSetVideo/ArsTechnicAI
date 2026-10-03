@@ -28,7 +28,8 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
 // Standalone helpers (usable outside React)
 // ============================================
 
-function canvasStateKey(projectId: string): string {
+/** Exported for the sync engine, which must drop a stale cached copy after a pull. */
+export function canvasStateKey(projectId: string): string {
   return `${STORAGE_KEYS.canvasStates}:${projectId}`;
 }
 
