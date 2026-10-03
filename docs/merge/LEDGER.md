@@ -467,3 +467,74 @@ Append-only. Newest round at the bottom. Format and rules: `PROGRAM.md`.
 - **How**  `git check-ignore -v storage/blobs/ab/x lib/storage/blobStore.ts`.
 - **Result**  now `.gitignore:44:/storage/  storage/blobs/ab/abcdef`; `lib/storage/` still
   tracked; `git ls-files storage` empty — nothing was ever committed there.
+
+### R4.1 porter — B6: the settings tests were stale, and three passed vacuously
+- **What**  `settingsStore` moved to `activeProvider` / `activeModel` / `apiKeys{}` in `0d8b9d3`
+  (2026-05-22); the tests still read `aiProvider.provider` / `.apiKey` / `.model`. Two failed;
+  two more passed only because a shallow merge stores whatever field you write.
+- **Why**  a permanently red suite hides new failures.
+- **When**  round 4.
+- **Where**  `tests/stores/settingsStore.test.ts`.
+- **Who**  —
+- **How**  read the store defaults and the migration code before touching the tests.
+- **Result**  4 tests rewritten against the real shape (incl. "reset clears stored keys");
+  `npm test` fully green for the first time in this programme.
+
+### R4.2 porter — files move server-to-server
+- **What**  the engine read every file whole into the browser to hash and upload it. Now each
+  machine's server hashes (`HEAD /api/sync/local-file` → `X-Ars-Sha256`, cached by size+mtime)
+  and streams (`POST /api/sync/transfer/push|pull`), forwarding the session token only to the
+  configured home server (`lib/sync/homeServerUrl.ts` — never request input).
+  `lib/storage/generatedFiles.ts` holds the verified, never-overwriting write.
+- **Why**  the user creates video; a multi-GB file would exhaust the page.
+- **When**  round 4.
+- **Where**  files named; two-machine simulation on 3012/3014.
+- **Who**  `evidence`.
+- **How**  700 MB file synced Ubuntu → server → Mac; page heap measured.
+- **Result**  byte-identical on the Mac; heap 44–55 MB during the transfer; one 701 MB blob;
+  conflict copy re-links both files without storing new blobs; 0 temp leftovers.
+
+### R4.3 porter — runtime /generated/ files in production
+- **What**  `next start` serves only build-time `public/` files: proven 200 for a build-time
+  file, 404 for one added after. Fallback rewrite `/generated/:name` →
+  `/api/files/generated/[name]` (only when no static file matched).
+- **Result**  after the fix: both post-build files 200, correct type, byte-identical;
+  traversal names 404. Exposure unchanged (S3).
+
+### R4.4 evidence — incident: a test upload took down the public site
+- **What**  I added an nginx location for `/api/sync/assets/` with a 2.1 GB limit and
+  `proxy_request_buffering off`, then sent an unauthenticated 600 MB stream through it to
+  check nginx would not buffer it (it did not: temp stayed at 0 bytes). Port 3002 was not
+  this app but a Cursor port forward; it reset the connection at 13:17:25 and stopped
+  listening — every request from 13:17:26 on, including the user's own (192.168.1.254,
+  `/_next/webpack-hmr`), got "Connection refused".
+- **Why**  the change assumed the app (which authenticates before reading a body) was the
+  upstream. It was not, and the test went to the real upstream instead of a sandbox.
+- **When**  round 4.
+- **Where**  `/var/log/nginx/error.log`, `/etc/nginx/sites-available/arstechnicai`.
+- **Who**  the user re-forwards 3002 in Cursor (their choice); nobody else touches 3002.
+- **How**  nginx error-log timeline; `ss -ltnp | grep :3002`.
+- **Result**  nginx reverted within minutes to the R3.6 config (500 MB cap, buffered).
+  Rule kept: never send load tests through the public proxy; test against our own ports.
+
+### R4.5 porter — real data-integrity check (S2)
+- **What**  Settings → Data showed five hard-coded "✓ Verified" rows. Now
+  `/api/workspace/integrity` + `components/settings/IntegrityPanel.tsx`: unreadable project
+  files, referenced `/generated/` files missing from disk, unreferenced files (listed, kept).
+- **Result**  with one of each planted in the Mac sandbox, each was reported exactly; a
+  proxied caller without a session got 401. Its test caught a scanner bug
+  (`/generated/sub/x.png` counted `sub` as a file), fixed.
+
+### R4.6 surveyor — the Mac cannot reach :3002 on the LAN
+- **What**  `docs/OFFLINE_SYNC.md` told the Mac to use `http://192.168.1.50:3002`, but UFW has
+  no rule for 3002. Corrected: a LAN-only rule the user adds, or the domain through nginx
+  (HTTP, 500 MB per file).
+- **Who**  the user (firewall change).
+
+### R4.7 conductor — gates
+- **Result**  `npm test`: 17 files, 371 passed, 0 failed. tsc 507 (unchanged, none in new
+  files). `next build`: `✓ Compiled successfully`, new routes `/api/sync/transfer/{push,pull}`,
+  `/api/files/generated/[name]`, `/api/workspace/integrity`. Slip: the pre-build guard that
+  looks for a dev server serving this checkout only *printed* a hit (a short-lived process,
+  gone seconds later; a Cursor agent and terminal are active in this repository) instead of
+  aborting — nothing was serving from `.next`, so no harm, but the guard must exit non-zero.

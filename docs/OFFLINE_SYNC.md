@@ -56,9 +56,16 @@ Nothing is ever deleted by sync. Removing a project on one machine does not remo
 ## Set up the Mac
 
 1. Clone the repository and install with Deno (`deno task install` — never `npm install`).
-2. In the Mac's `.env.local`: `NEXT_PUBLIC_API_URL=http://192.168.1.50:3002` (the Ubuntu
-   desktop on the home network), or the public URL once it has HTTPS. The Mac needs no
-   database: without one the app runs in degraded mode and saves to its own disk.
+2. In the Mac's `.env.local`, point `NEXT_PUBLIC_API_URL` at the home server — one of:
+   - **Home network (recommended):** `http://192.168.1.50:3002`. UFW does not allow 3002
+     today; open it to the LAN only, like Netdata:
+     `sudo ufw allow from 192.168.1.0/24 to any port 3002 proto tcp`.
+     No size limit beyond `ARS_MAX_ASSET_BYTES`.
+   - **Anywhere:** `http://arstechnicai.freeboxos.fr` through nginx — plain HTTP until a
+     certificate is issued, and files over 500 MB are refused by nginx
+     (`client_max_body_size`). Sync those on the home network.
+   The Mac needs no database: without one the app runs in degraded mode and saves to its
+   own disk.
 3. `deno task dev`, open `http://localhost:3002`, sign in (Settings → Account): the login goes to
    the home server, and its token is kept for 7 days — enough to keep working offline.
 
@@ -80,16 +87,23 @@ Nothing is ever deleted by sync. Removing a project on one machine does not remo
 
 - Bundles carry canvas items, which can embed base64 images: one project push is capped
   at 100 MB.
-- Files referenced by a project are read whole into the browser to hash and upload.
-  Fine for images, heavy for multi-GB video.
+- Files move server-to-server (`/api/sync/transfer/push|pull`): each machine's own server
+  hashes and streams them, so a multi-GB video never passes through the browser (a 700 MB
+  test file synced byte-identical with the page heap at ~50 MB). Largest file:
+  `ARS_MAX_ASSET_BYTES` (2 GiB by default); through nginx, 500 MB (`client_max_body_size`).
+  A larger nginx limit needs `proxy_request_buffering off` *and* this app on port 3002 —
+  with buffering off, an unauthenticated 600 MB test stream crashed the Cursor port
+  forward that was listening there instead (merge ledger R4.4).
 - An editor that rewrites a project when it opens (normalising old data) counts as an
   edit: if the other machine also changed it, you get a conflict copy (never a loss).
 - Each fresh device creates an empty "Untitled Project"; after syncing you will see one
   per device. They are different projects and are kept.
-- Next.js serves `public/` files that existed at build time only. Sync reads and writes
-  `public/generated/` through `/api/sync/local-file`, so it works either way, but files
-  generated or pulled *after* a production build are not shown by the UI's
-  `/generated/…` links until the next build (pre-existing; `next dev` serves them).
+- Next.js serves `public/` files that existed at build time only; files generated or
+  pulled later are served by a fallback route (`/api/files/generated/[name]`), so the
+  UI's `/generated/…` links work in production too. Like the static files, they are
+  reachable by anyone who knows the URL (backlog S3).
+- **Settings → Data → Data integrity** checks this machine for real: unreadable project
+  files, referenced files that are missing, and files no project uses (listed, never deleted).
 - The public site (`arstechnicai.freeboxos.fr`) is plain HTTP until a certificate is
   issued (`sudo certbot --nginx -d arstechnicai.freeboxos.fr`). Until then prefer the
   home-network address.

@@ -13,7 +13,7 @@ not a plan, not an intention.
 |---|-----|---------------|--------------|--------------------|-------|----------|
 | B1 | `@types/bcryptjs@3` is a deprecated stub (`main: ""`, no `.d.ts`) while `bcryptjs@2.4.3` ships no types, so `tsc --noEmit` fails repo-wide | no type gate = no safe merges | — | `package.json` | done | R0.3, R1.1 |
 | B2 | `vitest.config.ts` and `tests/` exist, but no test runner is installed or declared | the test gate cannot run at all | donor `deno task verify` (285 tests) | `package.json`, `tests/` | done | R2.6 — `npm test`: 288 passed, 2 pre-existing failures (B6) |
-| B6 | `tests/stores/settingsStore.test.ts`: 2 assertions on the default `aiProvider.apiKey` fail on unmodified `main` | a red test gate hides new failures | — | `stores/settingsStore.ts` or the test | open | R2.6 |
+| B6 | `tests/stores/settingsStore.test.ts`: 2 assertions on the default `aiProvider.apiKey` fail on unmodified `main` | a red test gate hides new failures | — | `stores/settingsStore.ts` or the test | done | R4.1 — tests were stale; 371/371 |
 | B3 | `lib/storage/local.ts` was imported by six files and had never been committed, so `next build` failed outright | nothing ships from a repository that cannot build | — | `lib/storage/local.ts` | done | R1.2 — `✓ Compiled successfully`, 40 routes |
 | B4 | 498 type errors across 158 files, revealed once B1 stopped masking them; `next.config.js` sets `typescript.ignoreBuildErrors: true` | they block nothing at build time and everything at review time | — | repo-wide | open | R1.1 |
 | B5 | The data volume is 100% full (1.7 GiB free after cleanup); `next build` needs ~400 MB | the build gate may fail for space, not for code | — | the machine | open | R1.4 |
@@ -71,6 +71,8 @@ not a plan, not an intention.
 | # | Row | Why | Donor source | Destination target | State | Evidence |
 |---|-----|-----|--------------|--------------------|-------|----------|
 | S1 | ~20 Prisma models used by `createApiHandler` routes do not exist — they now answer 500 instead of 401 | half the API is a façade | — | `prisma/schema.prisma` vs `pages/api/**` | open | R3.1 |
-| S2 | Settings → Data "Data Integrity ✓ Verified" rows are static text, not checks | a green tick that checks nothing | — | `components/layout/SettingsModal.tsx` | open | R3.5 |
+| S2 | Settings → Data "Data Integrity ✓ Verified" rows are static text, not checks | a green tick that checks nothing | — | `components/layout/SettingsModal.tsx` | done | R4.5 |
 | S3 | `public/generated/` is served to anyone with the URL | generated media are private work | — | serve via an authenticated route | open | R3.1 |
-
+| S4 | Settings → Data "Delete All Data" only logs; nothing is deleted | a destructive-looking button that does nothing | — | `components/layout/SettingsModal.tsx` | open | R4.5 |
+| A7 | The Mac cannot reach :3002 on the LAN (no UFW rule) | sync over the home network | — | `sudo ufw allow from 192.168.1.0/24 to any port 3002 proto tcp` | open — the user's firewall | R4.6 |
+| A8 | Files over 500 MB cannot sync through nginx; raising it needs `proxy_request_buffering off` with this app (not a forward) on 3002 | large video over the internet | — | nginx | open — after A6 | R4.4 |
