@@ -17,6 +17,7 @@ import { useDashboardStore } from '@/stores/dashboardStore';
 import type { SocialPlatformId } from '@/types/dashboard';
 import { Button } from '../ui/Button';
 import { SyncPanel } from '../settings/SyncPanel';
+import { IntegrityPanel } from '../settings/IntegrityPanel';
 import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } from '@/stores';
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
 import { STAGES, STAGE_ORDER } from '@/lib/pipeline/catalog';
@@ -848,17 +849,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                     </Button>
                   </div>
 
-                  <div style={{ marginBottom: 14 }}>
-                    <span style={labelStyle}>Data Integrity</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {['Projects', 'Assets', 'Characters', 'Templates', 'Settings'].map(d => (
-                        <div key={d} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', background: 'var(--bg-tertiary)', borderRadius: 4 }}>
-                          <span style={{ fontSize: '0.6875rem' }}>{d}</span>
-                          <span style={{ fontSize: '0.625rem', color: 'var(--success)' }}>✓ Verified</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Was five hard-coded "✓ Verified" rows; now a real check of this machine's data. */}
+                  <IntegrityPanel />
 
                   <Button variant="danger" onClick={() => { if (confirm('Delete all data?')) log('settings_change', 'Data wiped'); }}
                     style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

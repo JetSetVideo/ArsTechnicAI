@@ -182,3 +182,74 @@ describe('OneDrive mirror', () => {
     });
   });
 });
+
+describe('generated files (server-side transfers)', () => {
+  let dir: string;
+  let prev: string | undefined;
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ars-gen-'));
+    prev = process.env.ARS_GENERATED_DIR;
+    process.env.ARS_GENERATED_DIR = dir;
+  });
+  afterEach(async () => {
+    if (prev === undefined) delete process.env.ARS_GENERATED_DIR; else process.env.ARS_GENERATED_DIR = prev;
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it('writes verified bytes, reports unchanged for the same content, never overwrites different content', async () => {
+    const { writeGenerated } = await import('../../lib/storage/generatedFiles');
+    const a = randomBytes(5000), b = randomBytes(5000);
+    expect((await writeGenerated(Readable.from([a]), 'clip.mp4', nodeSha(a))).status).toBe('written');
+    expect((await writeGenerated(Readable.from([a]), 'clip.mp4', nodeSha(a))).status).toBe('unchanged');
+    await expect(writeGenerated(Readable.from([b]), 'clip.mp4', nodeSha(b))).rejects.toMatchObject({ code: 'NAME_TAKEN', status: 409 });
+    expect(await fs.readFile(path.join(dir, 'clip.mp4'))).toEqual(a);
+  });
+
+  it('rejects a hash mismatch and leaves neither the file nor a temp file', async () => {
+    const { writeGenerated } = await import('../../lib/storage/generatedFiles');
+    const a = randomBytes(1000);
+    await expect(writeGenerated(Readable.from([a]), 'x.png', nodeSha(Buffer.from('other')))).rejects.toMatchObject({ code: 'HASH_MISMATCH' });
+    expect(await fs.readdir(dir)).toEqual([]);
+  });
+
+  it('hashes by streaming and refreshes the cache when the file changes', async () => {
+    const { generatedSha256 } = await import('../../lib/storage/generatedFiles');
+    const p = path.join(dir, 'v.bin');
+    await fs.writeFile(p, 'one');
+    expect((await generatedSha256('v.bin'))?.sha256).toBe(nodeSha('one'));
+    await fs.writeFile(p, 'two!');
+    await fs.utimes(p, new Date(), new Date(Date.now() + 5000));
+    expect((await generatedSha256('v.bin'))?.sha256).toBe(nodeSha('two!'));
+    expect(await generatedSha256('missing.bin')).toBeNull();
+  });
+
+  it('only accepts plain file names', async () => {
+    const { isGeneratedName } = await import('../../lib/storage/generatedFiles');
+    for (const ok of ['gen_a-b_2026-07-01T12-45-12.png', 'clip.mp4']) expect(isGeneratedName(ok)).toBe(true);
+    for (const bad of ['../.env', 'a/b.png', '..png', '.env', '', 'x'.repeat(202)]) expect(isGeneratedName(bad)).toBe(false);
+  });
+});
+
+describe('home server for server-to-server transfers', () => {
+  it('is the configured URL, else this server — never request input', async () => {
+    const { homeServerUrl } = await import('../../lib/sync/homeServerUrl');
+    const prev = process.env.NEXT_PUBLIC_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = 'http://192.168.1.50:3002/';
+    expect(homeServerUrl({ socket: { localPort: 3014 } } as never)).toBe('http://192.168.1.50:3002');
+    delete process.env.NEXT_PUBLIC_API_URL;
+    expect(homeServerUrl({ socket: { localPort: 3014 } } as never)).toBe('http://127.0.0.1:3014');
+    if (prev !== undefined) process.env.NEXT_PUBLIC_API_URL = prev;
+  });
+});
+
+describe('integrity: generated-file references', () => {
+  it('finds /generated/ references anywhere in project JSON, plain names only', async () => {
+    const { generatedRefs } = await import('../../pages/api/workspace/integrity');
+    const refs = generatedRefs({
+      items: [{ src: '/generated/a.png' }, { dataUrl: 'data:image/png;base64,xx' }],
+      projectAssets: [['id', { thumbnail: '/generated/b.mp4?v=2', path: '/projects/x/generated/c.png' }]],
+      nested: { deep: ['/generated/../.env', '/generated/sub/d.png', '/generated/e.wav'] },
+    });
+    expect([...refs].sort()).toEqual(['a.png', 'b.mp4', 'e.wav']);
+  });
+});

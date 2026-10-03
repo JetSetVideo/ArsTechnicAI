@@ -33,6 +33,8 @@ interface SyncState {
   lastSyncAt: number | null;
   lastError: string | null;
   lastReport: SyncReport | null;
+  /** The last 10 runs, newest first. */
+  history: SyncReport[];
   conflicts: SyncConflict[];
   setStatus: (status: SyncStatus, error?: string | null) => void;
   finish: (report: SyncReport) => void;
@@ -46,6 +48,7 @@ export const useSyncStore = create<SyncState>()(
       lastSyncAt: null,
       lastError: null,
       lastReport: null,
+      history: [],
       conflicts: [],
       setStatus: (status, error = null) => set({ status, lastError: error }),
       finish: (report) =>
@@ -54,13 +57,14 @@ export const useSyncStore = create<SyncState>()(
           lastError: report.errors[0] ?? null,
           lastSyncAt: report.finishedAt,
           lastReport: report,
+          history: [report, ...s.history].slice(0, 10),
           conflicts: [...report.conflicts, ...s.conflicts].slice(0, 50),
         })),
       dismissConflict: (copyId) => set((s) => ({ conflicts: s.conflicts.filter((c) => c.copyId !== copyId) })),
     }),
     {
       name: 'ars-sync',
-      partialize: (s) => ({ status: s.status === 'syncing' ? 'idle' : s.status, lastError: s.lastError, lastSyncAt: s.lastSyncAt, conflicts: s.conflicts, lastReport: s.lastReport }),
+      partialize: (s) => ({ status: s.status === 'syncing' ? 'idle' : s.status, lastError: s.lastError, lastSyncAt: s.lastSyncAt, conflicts: s.conflicts, lastReport: s.lastReport, history: s.history }),
     }
   )
 );

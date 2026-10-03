@@ -21,7 +21,10 @@
  *   currently open in an editor     → deferred (an open editor's autosave would
  *       overwrite a pulled copy and silently undo the other device's edits)
  *
- * Files under /generated/ referenced by a project's file tree follow by hash.
+ * Files under /generated/ referenced by a project's file tree follow by hash. Their
+ * bytes never pass through the browser: this machine's server hashes them
+ * (/api/sync/local-file HEAD) and streams them to/from the home server
+ * (/api/sync/transfer/push|pull), so multi-GB video syncs like a thumbnail.
  */
 import { useAuthStore } from '@/stores/authStore';
 import { useProjectsStore } from '@/stores/projectsStore';
@@ -124,13 +127,6 @@ function mimeOf(file: string): string {
   return MIME_BY_EXT[file.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/octet-stream';
 }
 
-function b64url(json: unknown): string {
-  const bytes = new TextEncoder().encode(JSON.stringify(json));
-  let bin = '';
-  bytes.forEach((b) => { bin += String.fromCharCode(b); });
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
 // ── Local side ───────────────────────────────────────────────────────────────
 
 async function loadLocalBundle(projectId: string): Promise<SyncBundle> {
@@ -200,16 +196,31 @@ function openProjectIds(): Set<string> {
   return ids;
 }
 
-async function localFileBytes(file: string): Promise<Uint8Array | null> {
-  const res = await fetch(`/api/sync/local-file?name=${encodeURIComponent(file)}`);
+/** SHA-256 of a local generated file, computed by this machine's server (no bytes to the browser). */
+async function localFileHash(file: string): Promise<string | null> {
+  const res = await fetch(`/api/sync/local-file?name=${encodeURIComponent(file)}`, { method: 'HEAD' });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Local file read failed: ${file} (${res.status})`);
-  return new Uint8Array(await res.arrayBuffer());
+  if (!res.ok) throw new Error(`Local file check failed: ${file} (${res.status})`);
+  return res.headers.get('X-Ars-Sha256');
 }
 
-async function localFileExists(file: string): Promise<boolean> {
-  const res = await fetch(`/api/sync/local-file?name=${encodeURIComponent(file)}`, { method: 'HEAD' });
-  return res.ok;
+/**
+ * Ask this machine's server to stream a file to / from the home server
+ * (/api/sync/transfer/*). The session token travels in Authorization and is
+ * forwarded to the home server only.
+ */
+async function transfer(direction: 'push' | 'pull', body: Record<string, unknown>, okStatuses: number[] = []): Promise<{ status: number; sha256: string }> {
+  const auth = useAuthStore.getState().getAuthHeader();
+  const res = await fetch(`/api/sync/transfer/${direction}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  const out = (await res.json().catch(() => ({}))) as { sha256?: string; code?: string; error?: string };
+  if (res.status === 502 && out.code === 'HOME_UNREACHABLE') throw new OfflineError('Home server unreachable');
+  if (res.status === 401) throw new SignedOutError('Sign in to the home server to sync');
+  if (!res.ok && !okStatuses.includes(res.status)) throw new Error(`${direction === 'push' ? 'Upload' : 'Download'} of ${String(body.file)} failed (${res.status}${out.error ? `: ${out.error}` : ''})`);
+  return { status: res.status, sha256: out.sha256 ?? '' };
 }
 
 // ── One run ──────────────────────────────────────────────────────────────────
@@ -432,53 +443,40 @@ async function uploadAssets(id: string, bundle: SyncBundle, serverProject: Manif
   const onServer = new Map(serverProject.assets.map((a) => [a.assetId, a.sha256]));
   for (const ref of assetRefsOf(bundle)) {
     if (entry?.assets[ref.assetId] && onServer.get(ref.assetId) === entry.assets[ref.assetId]) continue;
-    const bytes = await localFileBytes(fileOf(ref));
-    if (!bytes) continue; // referenced but not on this machine
-    const sha = await digestHex(bytes);
-    if (onServer.get(ref.assetId) === sha) {
-      if (entry) entry.assets[ref.assetId] = sha;
+    const local = await localFileHash(fileOf(ref));
+    if (!local) continue; // referenced but not on this machine
+    if (onServer.get(ref.assetId) === local) {
+      if (entry) entry.assets[ref.assetId] = local;
       continue;
     }
-    const headers: Record<string, string> = {
-      'Content-Type': mimeOf(fileOf(ref)),
-      'X-Ars-Sha256': sha,
-      'X-Ars-Name': encodeURIComponent(fileOf(ref)),
-    };
-    if (ref.metadata) {
-      const meta = b64url(ref.metadata);
-      if (meta.length < 10_000) headers['X-Ars-Metadata'] = meta;
-    }
-    let res: Response;
-    if (ctx.shaOnServer.has(sha)) {
-      res = await remote(`/api/sync/assets/${encodeURIComponent(id)}/${encodeURIComponent(ref.assetId)}`, { method: 'PUT', headers: { ...headers, 'X-Ars-Reuse': '1' }, body: new Uint8Array(0) });
-      if (res.status === 412) res = await remote(`/api/sync/assets/${encodeURIComponent(id)}/${encodeURIComponent(ref.assetId)}`, { method: 'PUT', headers, body: bytes as BodyInit });
-    } else {
-      res = await remote(`/api/sync/assets/${encodeURIComponent(id)}/${encodeURIComponent(ref.assetId)}`, { method: 'PUT', headers, body: bytes as BodyInit });
-    }
-    if (!res.ok) throw new Error(`Upload of ${fileOf(ref)} failed (${res.status})`);
-    ctx.shaOnServer.add(sha);
-    if (ctx.idx.projects[id]) ctx.idx.projects[id].assets[ref.assetId] = sha;
+    // Server-to-server: this machine's server streams the file to the home server.
+    const out = await transfer('push', {
+      file: fileOf(ref), projectId: id, assetId: ref.assetId, name: fileOf(ref),
+      mimeType: mimeOf(fileOf(ref)), metadata: ref.metadata,
+    });
+    ctx.shaOnServer.add(out.sha256);
+    if (ctx.idx.projects[id]) ctx.idx.projects[id].assets[ref.assetId] = out.sha256;
     ctx.report.assetsUp++;
   }
 }
 
-async function downloadAssets(id: string, bundle: SyncBundle, ctx: Ctx, serverProject?: ManifestProject) {
+async function downloadAssets(id: string, bundle: SyncBundle, ctx: Ctx, _serverProject?: ManifestProject) {
   const entry = ctx.idx.projects[id];
-  const shas = new Map((serverProject?.assets ?? []).map((a) => [a.assetId, a.sha256]));
   for (const ref of assetRefsOf(bundle)) {
     if (entry?.assets[ref.assetId]) continue;
     const file = fileOf(ref);
-    if (await localFileExists(file)) continue;
-    const res = await remote(`/api/sync/assets/${encodeURIComponent(id)}/${encodeURIComponent(ref.assetId)}`);
-    if (res.status === 404) continue; // the other device has not uploaded it (yet)
-    if (!res.ok) throw new Error(`Download of ${file} failed (${res.status})`);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const sha = await digestHex(bytes);
-    const declared = res.headers.get('X-Ars-Sha256') ?? shas.get(ref.assetId);
-    if (declared && declared !== sha) throw new Error(`Download of ${file} was corrupted in transit`);
-    const put = await fetch(`/api/sync/local-file?name=${encodeURIComponent(file)}`, { method: 'PUT', headers: { 'X-Ars-Sha256': sha }, body: bytes as BodyInit });
-    if (!put.ok && put.status !== 409) throw new Error(`Saving ${file} locally failed (${put.status})`);
-    if (entry) entry.assets[ref.assetId] = sha;
+    const local = await localFileHash(file);
+    if (local) {
+      if (entry) entry.assets[ref.assetId] = local;
+      continue;
+    }
+    const out = await transfer('pull', { file, projectId: id, assetId: ref.assetId }, [404, 409]);
+    if (out.status === 404) continue; // the other device has not uploaded it (yet)
+    if (out.status === 409) {
+      ctx.report.errors.push(`${file}: a different file with this name already exists here — kept yours`);
+      continue;
+    }
+    if (entry) entry.assets[ref.assetId] = out.sha256;
     ctx.report.assetsDown++;
   }
 }

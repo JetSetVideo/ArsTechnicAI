@@ -9,6 +9,13 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // public/ files created after the build (generated or pulled by sync) are not
+  // served by Next in production; fall back to a route that reads them from disk.
+  async rewrites() {
+    return {
+      fallback: [{ source: '/generated/:name', destination: '/api/files/generated/:name' }],
+    };
+  },
   // Security headers on every response (middleware/securityMiddleware.ts was never
   // wired into any route). The CSP is deliberately narrow — framing, plugins, base
   // and form targets — because the UI relies on inline styles and calls AI
