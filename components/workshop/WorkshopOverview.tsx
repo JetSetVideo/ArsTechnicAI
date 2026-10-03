@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSettingsStore } from '@/stores';
 import { STAGES, STAGE_ORDER } from '@/lib/pipeline/catalog';
-import { usePipelineStore, nodePosition, NODE_W, NODE_H, LANE_WIDTH } from '@/stores/pipelineStore';
-import type { PipelineEdge, PipelineNode, PipelineViewport, SceneRef } from '@/types/pipeline';
+import { usePipelineStore, nodePosition, NODE_W, NODE_H, NODE_GAP, LANE_WIDTH, LANE_HEADER, LANE_PAD_X } from '@/stores/pipelineStore';
+import type { PipelineEdge, PipelineNode, PipelineStageId, PipelineViewport, SceneRef } from '@/types/pipeline';
+import { COLLAPSED_HEADER, collapsedStack, visibleLaneFrames } from './laneFrames';
 import styles from './WorkshopFlow.module.css';
 
 interface WorkshopOverviewProps {
@@ -29,6 +30,37 @@ interface ViewerTile {
   image: string;
   cooked: boolean;
   selected: boolean;
+}
+
+const LANE_BORDER = 1;
+
+/** Nodes inside a group: the right gap matches the left, and the gap under the header matches that same inset. The bottom edge of the stack stays put. */
+function insetGroupedMarks(
+  marks: { id: string; left: number; top: number; width: number; height: number; color: string }[],
+  innerW: number,
+  headerPx: number,
+) {
+  const placed = marks.map((mark) => ({
+    ...mark,
+    width: Math.max(2, Math.min(mark.width, innerW - mark.left * 2)),
+  }));
+  if (placed.length === 0) return placed;
+  const gutter = placed[0].left;
+  const delta = Math.max(0, headerPx + gutter - placed[0].top);
+  const room = placed.map((mark) => Math.max(0, mark.height - 1));
+  const totalRoom = room.reduce((sum, value) => sum + value, 0);
+  const used = Math.min(delta, totalRoom);
+  if (used <= 0) return placed;
+  const origin = placed.map((mark) => ({ top: mark.top, height: mark.height }));
+  let y = origin[0].top + used;
+  placed.forEach((mark, index) => {
+    if (index > 0) y += origin[index].top - (origin[index - 1].top + origin[index - 1].height);
+    const cut = (room[index] / totalRoom) * used;
+    mark.top = y;
+    mark.height = origin[index].height - cut;
+    y += mark.height;
+  });
+  return placed;
 }
 
 function byStage(a: Pictured, b: Pictured): number {
@@ -151,6 +183,12 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
   const cookedId = usePipelineStore((s) => s.lastCookedNodeId);
   const selectedId = usePipelineStore((s) => s.selectedId);
   const edges = usePipelineStore((s) => s.edges);
+  const collapsedStages = usePipelineStore((s) => s.collapsedStages);
+  const openStages = usePipelineStore((s) => s.openStages);
+  const draggingId = usePipelineStore((s) => s.draggingId);
+  const dragOverStage = usePipelineStore((s) => s.dragOverStage);
+  const dragInsertIndex = usePipelineStore((s) => s.dragInsertIndex);
+  const stageLaneColors = useSettingsStore((s) => s.settings.appearance.stageLaneColors);
   const viewers = useMemo(
     () => collectViewers(nodes, edges, cookedId, selectedId, viewerSource, viewerMax),
     [nodes, edges, cookedId, selectedId, viewerSource, viewerMax],
@@ -174,19 +212,74 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
   }, [canvasRef]);
 
   const layout = useMemo(() => {
-    if (nodes.length === 0) return null;
+    const colorOf = (stage: PipelineStageId) => stageLaneColors?.[stage] || STAGES[stage].color;
+    const frames = visibleLaneFrames(nodes, {
+      collapsed: collapsedStages,
+      pinned: openStages,
+      excludeId: draggingId,
+      growStage: dragOverStage,
+    });
+    const lanes = frames.map((frame) => {
+      const collapsed = collapsedStages.includes(frame.stage);
+      const members = nodes
+        .filter((node) => node.stage === frame.stage && node.inLane !== false && node.id !== draggingId)
+        .sort((a, b) => a.slot - b.slot);
+      const stack = collapsed ? collapsedStack(members.length) : [];
+      const marks = members.map((node, index) => {
+        if (collapsed) {
+          const card = stack[index];
+          const prevLip = index === 0 ? 0 : stack[index - 1].lip;
+          return {
+            id: node.id,
+            x: frame.x + LANE_PAD_X + card.shiftX,
+            y: frame.y + COLLAPSED_HEADER + prevLip,
+            w: NODE_W,
+            h: Math.max(1, card.lip - prevLip),
+            color: colorOf(node.stage),
+          };
+        }
+        const pos = nodePosition(node);
+        const pushed = dragOverStage === frame.stage && dragInsertIndex != null && node.slot >= dragInsertIndex;
+        return {
+          id: node.id,
+          x: pos.x,
+          y: pos.y + (pushed ? NODE_H + NODE_GAP : 0),
+          w: NODE_W,
+          h: NODE_H,
+          color: colorOf(node.stage),
+        };
+      });
+      return {
+        stage: frame.stage,
+        x: frame.x,
+        y: frame.y,
+        w: frame.w,
+        h: frame.h,
+        header: collapsed ? COLLAPSED_HEADER : LANE_HEADER,
+        color: colorOf(frame.stage),
+        marks,
+      };
+    });
+    const grouped = new Set(lanes.flatMap((lane) => lane.marks.map((mark) => mark.id)));
+    const free = nodes
+      .filter((node) => !grouped.has(node.id))
+      .map((node) => {
+        const pos = nodePosition(node);
+        return { id: node.id, x: pos.x, y: pos.y, w: NODE_W, h: NODE_H, color: colorOf(node.stage) };
+      });
+    if (lanes.length === 0 && free.length === 0) return null;
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    const marks = nodes.map((node) => {
-      const pos = nodePosition(node);
-      minX = Math.min(minX, pos.x);
-      minY = Math.min(minY, pos.y);
-      maxX = Math.max(maxX, pos.x + NODE_W);
-      maxY = Math.max(maxY, pos.y + NODE_H);
-      return { id: node.id, x: pos.x, y: pos.y, color: STAGES[node.stage].color, lane: pos.x };
-    });
+    const cover = (x: number, y: number, w: number, h: number) => {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    };
+    for (const lane of lanes) cover(lane.x, lane.y, lane.w, lane.h);
+    for (const mark of free) cover(mark.x, mark.y, mark.w, mark.h);
     const pad = 80;
     minX -= pad;
     minY -= pad;
@@ -205,8 +298,11 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
       w: (size.width / viewport.zoom) * scale,
       h: (size.height / viewport.zoom) * scale,
     };
-    return { marks, minX, minY, scale, ox, oy, mapW, mapH, view };
-  }, [nodes, viewport, size, mapWidth, mapHeight]);
+    return { lanes, free, minX, minY, scale, ox, oy, mapW, mapH, view };
+  }, [
+    nodes, viewport, size, mapWidth, mapHeight,
+    collapsedStages, openStages, draggingId, dragOverStage, dragInsertIndex, stageLaneColors,
+  ]);
 
   const panTo = (event: React.PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
@@ -257,15 +353,57 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
           onPointerDown={panTo}
           title="Pipeline map — the rectangle is this window"
         >
-          {layout.marks.map((mark) => (
+          {layout.lanes.map((lane) => (
+            <span
+              key={lane.stage}
+              className={styles.minimapLane}
+              style={{
+                left: (lane.x - layout.minX) * layout.scale + layout.ox,
+                top: (lane.y - layout.minY) * layout.scale + layout.oy,
+                width: Math.max(4, lane.w * layout.scale),
+                height: Math.max(3, lane.h * layout.scale),
+                ['--stage-color' as string]: lane.color,
+              }}
+            >
+              {insetGroupedMarks(
+                lane.marks.map((mark) => ({
+                  id: mark.id,
+                  left: (mark.x - lane.x) * layout.scale,
+                  top: (mark.y - lane.y) * layout.scale,
+                  width: Math.max(2, mark.w * layout.scale),
+                  height: Math.max(1, mark.h * layout.scale),
+                  color: mark.color,
+                })),
+                Math.max(4, lane.w * layout.scale) - LANE_BORDER * 2,
+                (lane.header / lane.h) * (Math.max(3, lane.h * layout.scale) - LANE_BORDER * 2),
+              ).map((mark) => (
+                <span
+                  key={mark.id}
+                  className={styles.minimapNode}
+                  style={{
+                    left: mark.left,
+                    top: mark.top,
+                    width: mark.width,
+                    height: mark.height,
+                    background: mark.color,
+                  }}
+                />
+              ))}
+              <span
+                className={styles.minimapLaneHeader}
+                style={{ height: `${(lane.header / lane.h) * 100}%` }}
+              />
+            </span>
+          ))}
+          {layout.free.map((mark) => (
             <span
               key={mark.id}
               className={styles.minimapNode}
               style={{
                 left: (mark.x - layout.minX) * layout.scale + layout.ox,
                 top: (mark.y - layout.minY) * layout.scale + layout.oy,
-                width: Math.max(4, NODE_W * layout.scale),
-                height: Math.max(3, NODE_H * layout.scale),
+                width: Math.max(4, mark.w * layout.scale),
+                height: Math.max(3, mark.h * layout.scale),
                 background: mark.color,
               }}
             />

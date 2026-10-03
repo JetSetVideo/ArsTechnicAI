@@ -368,6 +368,11 @@ export interface AppearanceSettings {
   /** Per-stage Workshop lane color overrides, keyed by PipelineStageId. */
   stageLaneColors?: Record<string, string>;
 
+  /** After a selection rectangle, offer every group on a wheel. */
+  groupWheel: boolean;
+  /** Wheel diameter in pixels. */
+  groupWheelSize: number;
+
   /** Node-viewer bank drawn behind the workshop graph. */
   resultBackdrop: boolean;
   /** main: branch ends, plus the selected and last-run nodes. all: every pictured node. */

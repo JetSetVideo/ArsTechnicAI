@@ -3,7 +3,10 @@ import {
   Plus, ChevronDown, Play, Square, Loader2, ZoomIn, ZoomOut, Maximize,
   Trash2, Wand2, ChevronRight, Scan, Undo2,
 } from 'lucide-react';
-import { usePipelineStore, nodePosition, LANE_WIDTH, LANE_HEADER, NODE_H, NODE_GAP, NODE_W, laneX } from '@/stores/pipelineStore';
+import { usePipelineStore, nodePosition, LANE_WIDTH, LANE_HEADER, LANE_PAD_X, NODE_H, NODE_GAP, NODE_W, laneX } from '@/stores/pipelineStore';
+import { rectsOverlap } from '@/lib/pipeline/lanes';
+import { COLLAPSED_HEADER, collapsedStack, laneFrameHeight } from './laneFrames';
+import { cyclePointForStage, wiringFor } from './groupCycles';
 import { settleNode } from './settleNode';
 import { PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, nodesForStage } from '@/lib/pipeline/catalog';
 import { ingestImage, payloadStats, formatBytes } from '@/lib/pipeline/ingest';
@@ -41,9 +44,13 @@ export const WorkshopFlow: React.FC = () => {
   const undoDepth = usePipelineStore((s) => s.undoDepth);
   const undoLabel = usePipelineStore((s) => s.undoLabel);
   usePipelineStore((s) => s.collapsedStages);
+  const openStages = usePipelineStore((s) => s.openStages);
+  const draggingId = usePipelineStore((s) => s.draggingId);
+  const dragInsertIndex = usePipelineStore((s) => s.dragInsertIndex);
   const {
     setViewport, select, cancelEdge, removeEdge, addNode, runAll, stopRun,
     clearAll, seedStarterFlow, groups, toggleGroupCollapsed, addVariant,
+    openStage, closeStage,
   } = usePipelineStore.getState();
   const { settings } = useSettingsStore();
   const { currentProject } = useUserStore();
@@ -63,6 +70,7 @@ export const WorkshopFlow: React.FC = () => {
   useEffect(() => {
     if (isLoadingProject || loadedProjectId !== currentProject.id) return;
     usePipelineStore.getState().releaseSparseMoodboard();
+    usePipelineStore.getState().compactLanes();
   }, [isLoadingProject, loadedProjectId, currentProject.id]);
 
   useEffect(() => {
@@ -132,10 +140,38 @@ export const WorkshopFlow: React.FC = () => {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
+  const spaceRef = useRef(false);
+  const marqueeRef = useRef<{ x0: number; y0: number; x1: number; y1: number; clientX: number; clientY: number; additive: boolean } | null>(null);
+  const pickedRef = useRef<string[]>([]);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [addQuery, setAddQuery] = useState('');
   const [viewFitted, setViewFitted] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  pickedRef.current = picked;
+  const [wheel, setWheel] = useState<{ clientX: number; clientY: number; ids: string[] } | null>(null);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if (event.code !== 'Space') return;
+      spaceRef.current = true;
+      event.preventDefault();
+    };
+    const up = (event: KeyboardEvent) => {
+      if (event.code === 'Space') spaceRef.current = false;
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, []);
 
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
   const laneGroups = groups();
@@ -152,7 +188,14 @@ export const WorkshopFlow: React.FC = () => {
       if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) setShowAddMenu(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { cancelEdge(); setShowAddMenu(false); }
+      if (e.key === 'Escape') {
+        cancelEdge();
+        setShowAddMenu(false);
+        setWheel(null);
+        setPicked([]);
+        setMarquee(null);
+        marqueeRef.current = null;
+      }
     };
     document.addEventListener('mousedown', onClick);
     window.addEventListener('keydown', onKey);
@@ -187,22 +230,96 @@ export const WorkshopFlow: React.FC = () => {
   }, [viewport, setViewport]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('[data-node]')) return;
-    if (e.button === 0 || e.button === 1) {
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-node], [data-wheel]')) return;
+    const capture = () => {
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+    };
+    if (e.button === 1 || (e.button === 0 && spaceRef.current)) {
       setIsPanning(true);
-      select(null);
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      capture();
+      return;
     }
-  }, [select]);
+    if (e.button !== 0 || pendingEdge) return;
+    const scene = toScene(e.clientX, e.clientY);
+    marqueeRef.current = {
+      x0: scene.x, y0: scene.y, x1: scene.x, y1: scene.y,
+      clientX: e.clientX, clientY: e.clientY, additive: e.shiftKey,
+    };
+    setSelecting(true);
+    setWheel(null);
+    if (!e.shiftKey) setPicked([]);
+    select(null);
+    capture();
+  }, [pendingEdge, select, toScene]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (isPanning) {
       setViewport({ ...viewport, x: viewport.x + e.movementX, y: viewport.y + e.movementY });
     }
+    const drag = marqueeRef.current;
+    if (drag) {
+      const scene = toScene(e.clientX, e.clientY);
+      drag.x1 = scene.x;
+      drag.y1 = scene.y;
+      drag.clientX = e.clientX;
+      drag.clientY = e.clientY;
+      setMarquee({
+        x: Math.min(drag.x0, drag.x1),
+        y: Math.min(drag.y0, drag.y1),
+        w: Math.abs(drag.x1 - drag.x0),
+        h: Math.abs(drag.y1 - drag.y0),
+      });
+    }
     if (pendingEdge) setMouse(toScene(e.clientX, e.clientY));
   }, [isPanning, viewport, setViewport, pendingEdge, toScene]);
 
-  const handlePointerUp = useCallback(() => setIsPanning(false), []);
+  const handlePointerUp = useCallback(() => {
+    setIsPanning(false);
+    const drag = marqueeRef.current;
+    marqueeRef.current = null;
+    setSelecting(false);
+    setMarquee(null);
+    if (!drag) return;
+    const rect = {
+      x: Math.min(drag.x0, drag.x1),
+      y: Math.min(drag.y0, drag.y1),
+      w: Math.abs(drag.x1 - drag.x0),
+      h: Math.abs(drag.y1 - drag.y0),
+    };
+    if (rect.w < 6 && rect.h < 6) {
+      if (!drag.additive) setPicked([]);
+      setWheel(null);
+      return;
+    }
+    const store = usePipelineStore.getState();
+    const folded = new Set(store.collapsedStages);
+    const hit = store.nodes.filter((node) => {
+      if (node.inLane !== false && folded.has(node.stage)) {
+        const members = store.nodes
+          .filter((item) => item.stage === node.stage && item.inLane !== false && item.id !== store.draggingId)
+          .sort((a, b) => a.slot - b.slot);
+        const index = members.findIndex((item) => item.id === node.id);
+        if (index < 0) return false;
+        const stack = collapsedStack(members.length);
+        const card = stack[index];
+        const previousLip = index === 0 ? 0 : stack[index - 1].lip;
+        return rectsOverlap(rect, {
+          x: laneX(node.stage) + LANE_PAD_X + card.shiftX,
+          y: COLLAPSED_HEADER + previousLip,
+          w: NODE_W,
+          h: card.lip - previousLip,
+        });
+      }
+      const at = nodePosition(node);
+      return rectsOverlap(rect, { x: at.x, y: at.y, w: NODE_W, h: NODE_H });
+    }).map((node) => node.id);
+    const ids = drag.additive ? Array.from(new Set([...pickedRef.current, ...hit])) : hit;
+    setPicked(ids);
+    const wheelOn = useSettingsStore.getState().settings.appearance.groupWheel !== false;
+    if (ids.length > 0 && wheelOn) setWheel({ clientX: drag.clientX, clientY: drag.clientY, ids });
+    else setWheel(null);
+  }, []);
 
   // Explorer / OS drag-and-drop → a free picture. It joins a lane only when
   // released on one, or onto another picture (that opens the moodboard).
@@ -304,12 +421,11 @@ export const WorkshopFlow: React.FC = () => {
   const laneHeights = useMemo(() => {
     const heights: Partial<Record<PipelineStageId, number>> = {};
     for (const g of laneGroups) {
-      heights[g.stage] = g.collapsed
-        ? 62
-        : LANE_HEADER + g.nodeIds.length * (NODE_H + NODE_GAP) + 20;
+      const inserting = !g.collapsed && dragOverStage === g.stage && dragInsertIndex != null;
+      heights[g.stage] = laneFrameHeight(g.nodeIds.length + (inserting ? 1 : 0), g.collapsed);
     }
     return heights;
-  }, [laneGroups]);
+  }, [laneGroups, dragOverStage, dragInsertIndex]);
 
   const pendingSource = pendingEdge
     ? nodes.find((n) => n.id === pendingEdge.from) ?? null
@@ -317,6 +433,15 @@ export const WorkshopFlow: React.FC = () => {
   const pendingStart = pendingSource && pendingEdge
     ? outputPortPos(pendingSource, pendingEdge.fromPort)
     : null;
+
+  const collapsedWiring = useMemo(() => {
+    const map = new Map<PipelineStageId, ReturnType<typeof wiringFor>>();
+    for (const group of laneGroups) {
+      if (!group.collapsed) continue;
+      map.set(group.stage, wiringFor(group.nodeIds, nodes, edges));
+    }
+    return map;
+  }, [laneGroups, nodes, edges]);
 
   const collapsedNodeIds = useMemo(() => {
     const hidden = new Set<string>();
@@ -334,24 +459,47 @@ export const WorkshopFlow: React.FC = () => {
           </button>
           {showAddMenu && (
             <div className={styles.addMenu}>
+              <input
+                className={styles.addMenuSearch}
+                value={addQuery}
+                placeholder="Find a group or a node"
+                onChange={(event) => setAddQuery(event.target.value)}
+                autoFocus
+              />
               {STAGE_ORDER.map((stageId) => {
                 const stage = STAGES[stageId];
                 const stageColor = settings.appearance?.stageLaneColors?.[stageId] || stage.color;
+                const query = addQuery.trim().toLowerCase();
+                const groupMatch = !query || `${stage.title} ${stage.tagline}`.toLowerCase().includes(query);
+                const defs = nodesForStage(stageId).filter((def) => (
+                  !query || groupMatch || `${def.title} ${def.subtitle}`.toLowerCase().includes(query)
+                ));
+                if (query && !groupMatch && defs.length === 0) return null;
+                const opened = openStages.includes(stageId) || laneGroups.some((group) => group.stage === stageId);
                 return (
                   <div
                     key={stageId}
                     className={styles.addMenuStage}
                     style={{ ['--stage-color' as string]: stageColor }}
                   >
-                    <div className={styles.addMenuStageTitle}>
+                    <button
+                      type="button"
+                      className={styles.addMenuStageTitle}
+                      onClick={() => { openStage(stageId); setShowAddMenu(false); setAddQuery(''); }}
+                      title={`Open the ${stage.title} group on the canvas`}
+                    >
                       <span className={styles.addMenuStageDot} />
-                      {stage.title}
-                    </div>
-                    {nodesForStage(stageId).map((def) => (
+                      <span>
+                        <span className={styles.addMenuGroupName}>{stage.title}</span>
+                        <span className={styles.addMenuItemSub}>{stage.tagline}</span>
+                      </span>
+                      <span className={styles.addMenuOpen}>{opened ? 'On canvas' : 'Add group'}</span>
+                    </button>
+                    {defs.map((def) => (
                       <button
                         key={def.type}
                         className={styles.addMenuItem}
-                        onClick={() => { addNode(def.type); setShowAddMenu(false); }}
+                        onClick={() => { addNode(def.type); setShowAddMenu(false); setAddQuery(''); }}
                       >
                         <span>{def.title}</span>
                         <span className={styles.addMenuItemSub}>{def.subtitle}</span>
@@ -457,7 +605,7 @@ export const WorkshopFlow: React.FC = () => {
       {/* ── Canvas ── */}
       <div
         ref={canvasRef}
-        className={`${styles.canvas} ${isPanning ? styles.panning : ''} ${pendingEdge ? styles.connecting : ''}`}
+        className={`${styles.canvas} ${isPanning ? styles.panning : ''} ${selecting ? styles.selecting : ''} ${pendingEdge ? styles.connecting : ''}`}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -485,6 +633,7 @@ export const WorkshopFlow: React.FC = () => {
           {laneGroups.map((group) => {
             const stage = STAGES[group.stage];
             const stageColor = settings.appearance?.stageLaneColors?.[group.stage] || stage.color;
+            const wiring = group.collapsed ? collapsedWiring.get(group.stage) : undefined;
             return (
               <div
                 key={group.id}
@@ -496,18 +645,49 @@ export const WorkshopFlow: React.FC = () => {
                   height: laneHeights[group.stage],
                   ['--stage-color' as string]: stageColor,
                 }}
+                onPointerDown={(event) => { if (group.collapsed) event.stopPropagation(); }}
+                onClick={() => { if (group.collapsed) toggleGroupCollapsed(group.stage); }}
               >
+                {group.collapsed && group.nodeIds.map((id, index) => {
+                  const member = nodes.find((node) => node.id === id);
+                  if (!member) return null;
+                  return (
+                    <PipelineNodeCard
+                      key={id}
+                      node={member}
+                      zoom={viewport.zoom}
+                      apiKey={apiKey}
+                      foldIndex={index}
+                      foldCount={group.nodeIds.length}
+                    />
+                  );
+                })}
                 <div
                   className={styles.laneHeader}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => toggleGroupCollapsed(group.stage)}
+                  onClick={(event) => { event.stopPropagation(); toggleGroupCollapsed(group.stage); }}
                 >
                   <span className={styles.laneIcon}>{nodeIcon(stage.icon, 16)}</span>
                   <div>
                     <div className={styles.laneTitle}>{stage.title}</div>
-                    <div className={styles.laneTagline}>{stage.tagline}</div>
+                    <div className={styles.laneTagline}>
+                      {wiring
+                        ? `${wiring.external} external · ${wiring.internal} internal`
+                        : stage.tagline}
+                    </div>
                   </div>
                   <span className={styles.laneCount}>{group.nodeIds.length}</span>
+                  {openStages.includes(group.stage) && group.nodeIds.length === 0 && (
+                    <button
+                      type="button"
+                      className={styles.laneDismiss}
+                      title="Remove this empty group"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => { event.stopPropagation(); closeStage(group.stage); }}
+                    >
+                      ×
+                    </button>
+                  )}
                   <ChevronRight size={14} className={styles.laneChevron} style={{ transform: group.collapsed ? undefined : 'rotate(90deg)' }} />
                 </div>
               </div>
@@ -520,9 +700,18 @@ export const WorkshopFlow: React.FC = () => {
               const from = nodes.find((n) => n.id === edge.from);
               const to = nodes.find((n) => n.id === edge.to);
               if (!from || !to) return null;
-              if (collapsedNodeIds.has(from.id) || collapsedNodeIds.has(to.id)) return null;
-              const p1 = outputPortPos(from, edge.fromPort);
-              const p2 = inputPortPos(to, edge.toPort);
+              const fromFolded = from.inLane !== false && collapsedNodeIds.has(from.id);
+              const toFolded = to.inLane !== false && collapsedNodeIds.has(to.id);
+              if (fromFolded && toFolded && from.stage === to.stage) return null;
+              const foldedEnd = (node: typeof from, side: 'in' | 'out') => {
+                const wiring = collapsedWiring.get(node.stage);
+                const list = side === 'out' ? wiring?.outputs : wiring?.inputs;
+                const index = list?.findIndex((cycle) => cycle.edgeIds.includes(edge.id) && cycle.role === 'external') ?? -1;
+                if (!wiring || !list || index < 0) return null;
+                return cyclePointForStage(node.stage, laneHeights[node.stage] ?? COLLAPSED_HEADER, side, index, list.length);
+              };
+              const p1 = fromFolded ? foldedEnd(from, 'out') : outputPortPos(from, edge.fromPort);
+              const p2 = toFolded ? foldedEnd(to, 'in') : inputPortPos(to, edge.toPort);
               if (!p1 || !p2) return null;
               const d = edgePath(p1.x, p1.y, p2.x, p2.y);
               const color = PORT_COLORS[edge.type] ?? '#8a8aa2';
@@ -549,13 +738,123 @@ export const WorkshopFlow: React.FC = () => {
             )}
           </svg>
 
+          {laneGroups.map((group) => {
+            const wiring = collapsedWiring.get(group.stage);
+            if (!wiring) return null;
+            return [...wiring.inputs, ...wiring.outputs].map((cycle) => {
+              const list = cycle.side === 'in' ? wiring.inputs : wiring.outputs;
+              const index = list.indexOf(cycle);
+              const at = cyclePointForStage(
+                group.stage,
+                laneHeights[group.stage] ?? COLLAPSED_HEADER,
+                cycle.side,
+                index,
+                list.length,
+              );
+              return (
+                <span
+                  key={`${group.stage}-${cycle.key}`}
+                  className={`${styles.laneCycle} ${cycle.role === 'empty' ? styles.laneCycleEmpty : styles.laneCycleOn} ${cycle.role === 'internal' ? styles.laneCycleInternal : ''}`}
+                  style={{
+                    left: at.x,
+                    top: at.y,
+                    ['--port-color' as string]: PORT_COLORS[cycle.type] ?? '#8a8aa2',
+                  }}
+                  title={cycle.role === 'empty' ? 'Open port' : cycle.role === 'internal' ? 'Internal link' : 'External link'}
+                />
+              );
+            });
+          })}
+
           {/* Nodes */}
+          {marquee && (
+            <div className={styles.marquee} style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />
+          )}
+
           {nodes
             .filter((n) => !collapsedNodeIds.has(n.id))
-            .map((node) => (
-              <PipelineNodeCard key={node.id} node={node} zoom={viewport.zoom} apiKey={apiKey} />
-            ))}
+            .map((node) => {
+              const push = node.inLane !== false
+                && node.id !== draggingId
+                && dragOverStage === node.stage
+                && dragInsertIndex != null
+                && node.slot >= dragInsertIndex
+                && !collapsedNodeIds.has(node.id);
+              return (
+                <PipelineNodeCard
+                  key={node.id}
+                  node={node}
+                  zoom={viewport.zoom}
+                  apiKey={apiKey}
+                  shiftY={push ? NODE_H + NODE_GAP : 0}
+                  marked={picked.includes(node.id)}
+                />
+              );
+            })}
         </div>
+
+        {wheel && (() => {
+          const size = Math.max(200, Math.min(420, settings.appearance.groupWheelSize ?? 280));
+          const rect = canvasRef.current?.getBoundingClientRect();
+          const left = rect
+            ? Math.min(Math.max(wheel.clientX - rect.left, size / 2 + 8), rect.width - size / 2 - 8)
+            : wheel.clientX;
+          const top = rect
+            ? Math.min(Math.max(wheel.clientY - rect.top, size / 2 + 8), rect.height - size / 2 - 8)
+            : wheel.clientY;
+          const radius = size * 0.36;
+          return (
+            <div
+              data-wheel
+              className={styles.wheel}
+              style={{ left, top, width: size, height: size }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <div className={styles.wheelRing} />
+              {STAGE_ORDER.map((stageId, index) => {
+                const stage = STAGES[stageId];
+                const color = settings.appearance?.stageLaneColors?.[stageId] || stage.color;
+                const angle = (index / STAGE_ORDER.length) * Math.PI * 2 - Math.PI / 2;
+                return (
+                  <button
+                    key={stageId}
+                    type="button"
+                    className={styles.wheelChoice}
+                    style={{
+                      left: size / 2 + Math.cos(angle) * radius,
+                      top: size / 2 + Math.sin(angle) * radius,
+                      ['--stage-color' as string]: color,
+                    }}
+                    onClick={() => {
+                      const store = usePipelineStore.getState();
+                      const ordered = [...wheel.ids].sort((a, b) => {
+                        const left = store.nodes.find((node) => node.id === a);
+                        const right = store.nodes.find((node) => node.id === b);
+                        if (!left || !right) return 0;
+                        const pa = nodePosition(left);
+                        const pb = nodePosition(right);
+                        return pa.y - pb.y || pa.x - pb.x;
+                      });
+                      openStage(stageId);
+                      ordered.forEach((id) => usePipelineStore.getState().joinLane(id, stageId));
+                      setWheel(null);
+                      setPicked([]);
+                    }}
+                  >
+                    {stage.title}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                className={styles.wheelCancel}
+                onClick={() => { setWheel(null); setPicked([]); }}
+              >
+                Cancel
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Empty state */}
         {nodes.length === 0 && (

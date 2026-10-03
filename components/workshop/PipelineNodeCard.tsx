@@ -10,8 +10,9 @@ import {
 } from 'lucide-react';
 import type { PipelineNode } from '@/types/pipeline';
 import { PIPELINE_NODE_DEFS, STAGES } from '@/lib/pipeline/catalog';
-import { usePipelineStore, nodePosition, NODE_W, NODE_H } from '@/stores/pipelineStore';
-import { stageAtPoint } from '@/lib/pipeline/lanes';
+import { usePipelineStore, nodePosition, NODE_W, NODE_H, NODE_GAP, LANE_HEADER, LANE_PAD_X } from '@/stores/pipelineStore';
+import { collapsedStack } from './laneFrames';
+import { insertionIndex, laneMembers, stageAtPoint } from '@/lib/pipeline/lanes';
 import { visibleLaneFrames } from './laneFrames';
 import { settleNode } from './settleNode';
 import { PORT_COLORS, PORT_TOP, PORT_SPACING } from './geometry';
@@ -51,9 +52,16 @@ interface Props {
   node: PipelineNode;
   zoom: number;
   apiKey: string;
+  shiftY?: number;
+  marked?: boolean;
+  /** Place in a closed group: cards overlap so each bottom border still shows. */
+  foldIndex?: number;
+  foldCount?: number;
 }
 
-export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNodeCard({ node, zoom, apiKey }) {
+export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNodeCard({
+  node, zoom, apiKey, shiftY = 0, marked = false, foldIndex, foldCount = 1,
+}) {
   const def = PIPELINE_NODE_DEFS[node.type];
   const stage = STAGES[node.stage];
   // Only `selectedId` needs to be a reactive subscription (it drives the
@@ -62,6 +70,7 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
   // Previously this whole-store-destructured, so editing ANY node's params
   // re-rendered EVERY node card on the canvas, not just the edited one.
   const selectedId = usePipelineStore((s) => s.selectedId);
+  const edges = usePipelineStore((s) => s.edges);
 
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
   const [dragging, setDragging] = React.useState(false);
@@ -85,21 +94,35 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
     const dx = (e.clientX - d.startX) / zoom;
     const dy = (e.clientY - d.startY) / zoom;
     if (!d.moved && Math.hypot(dx, dy) < 4) return;
+    if (!d.moved) usePipelineStore.getState().setDraggingNode(node.id);
     d.moved = true;
     setDragging(true);
     const x = d.origX + dx;
     const y = d.origY + dy;
-    usePipelineStore.getState().setNodePosition(node.id, x, y);
     const store = usePipelineStore.getState();
-    const frames = visibleLaneFrames(store.nodes, store.collapsedStages);
-    store.setDragOverStage(stageAtPoint(x + NODE_W / 2, y + NODE_H / 2, frames));
+    store.setNodePosition(node.id, x, y);
+    const fresh = usePipelineStore.getState();
+    const cx = x + NODE_W / 2;
+    const cy = y + NODE_H / 2;
+    const frames = visibleLaneFrames(fresh.nodes, {
+      collapsed: fresh.collapsedStages,
+      pinned: fresh.openStages,
+      excludeId: node.id,
+      growStage: fresh.dragOverStage,
+    });
+    const stage = stageAtPoint(cx, cy, frames, NODE_H * 0.35);
+    if (!stage || fresh.collapsedStages.includes(stage)) {
+      fresh.setDragTarget(stage, stage ? laneMembers(fresh.nodes.filter((item) => item.id !== node.id), stage).length : null);
+      return;
+    }
+    const count = laneMembers(fresh.nodes.filter((item) => item.id !== node.id), stage).length;
+    fresh.setDragTarget(stage, insertionIndex(cy, count, LANE_HEADER, NODE_H, NODE_GAP));
   }, [node.id, zoom]);
 
   const handlePointerUp = useCallback(() => {
     const drag = dragRef.current;
     dragRef.current = null;
     setDragging(false);
-    usePipelineStore.getState().setDragOverStage(null);
     if (!drag?.moved) return;
     settleNode(node.id);
   }, [node.id]);
@@ -107,9 +130,14 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
   if (!def) return null;
 
   const picture = node.type === 'image-import';
+  const folded = foldIndex != null;
+  const fold = folded ? collapsedStack(foldCount)[foldIndex!] : null;
+  const portConnected = (side: 'in' | 'out', portId: string) => edges.some((edge) => (
+    side === 'in' ? edge.to === node.id && edge.toPort === portId : edge.from === node.id && edge.fromPort === portId
+  ));
 
   // Closed-deck ghost cards — variants literally stack above/behind the node
-  const ghostCount = Math.min(3, Math.max(0, node.variants.length - 1));
+  const ghostCount = folded ? 0 : Math.min(3, Math.max(0, node.variants.length - 1));
 
   return (
     <div
@@ -118,17 +146,20 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
         styles.nodeWrap,
         picture ? styles.nodePicture : '',
         isSelected ? styles.nodeSelected : '',
+        marked ? styles.nodePicked : '',
         isRunning ? styles.nodeRunning : '',
         node.status === 'error' ? styles.nodeError : '',
         dragging ? styles.dragging : '',
+        folded ? styles.nodeFolded : '',
       ].join(' ')}
       style={{
-        left: pos.x,
-        top: pos.y,
+        left: fold ? LANE_PAD_X + fold.shiftX : pos.x,
+        top: fold ? fold.top : pos.y + shiftY,
         width: NODE_W,
         height: NODE_H,
-        zIndex: isSelected || node.deckOpen ? 20 : 10,
+        zIndex: fold ? foldCount - foldIndex! : (isSelected || node.deckOpen ? 20 : 10),
         ['--stage-color' as string]: stage.color,
+        ['--fold-alpha' as string]: fold ? String(fold.alpha) : undefined,
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -232,7 +263,7 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
           <div
             key={`in-${port.id}`}
             data-port
-            className={`${styles.port} ${styles.portIn}`}
+            className={`${styles.port} ${styles.portIn} ${portConnected('in', port.id) ? styles.portOn : ''}`}
             style={{
               top: PORT_TOP + i * PORT_SPACING - 6,
               ['--port-color' as string]: PORT_COLORS[port.type] ?? '#8a8aa2',
@@ -257,7 +288,7 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
           <div
             key={`out-${port.id}`}
             data-port
-            className={`${styles.port} ${styles.portOut}`}
+            className={`${styles.port} ${styles.portOut} ${portConnected('out', port.id) ? styles.portOn : ''}`}
             style={{
               top: PORT_TOP + i * PORT_SPACING - 6,
               ['--port-color' as string]: PORT_COLORS[port.type] ?? '#8a8aa2',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rectsOverlap, showStageLane, stageAtPoint } from '../../lib/pipeline/lanes';
+import { insertionIndex, rectsOverlap, showStageLane, stageAtPoint } from '../../lib/pipeline/lanes';
 
 const picture = (stage: 'concept' | 'visual', inLane?: boolean) => ({
   id: stage + String(inLane),
@@ -27,6 +27,12 @@ describe('stage lanes', () => {
     const frames = [{ stage: 'concept' as const, x: 0, y: 0, w: 340, h: 352 }];
     expect(stageAtPoint(20, 40, frames)).toBe('concept');
     expect(stageAtPoint(400, 40, frames)).toBeNull();
+  });
+
+  it('inserts above the member whose midpoint the pointer has not passed', () => {
+    expect(insertionIndex(100, 3, 76, 200, 56)).toBe(0);
+    expect(insertionIndex(200, 3, 76, 200, 56)).toBe(1);
+    expect(insertionIndex(900, 3, 76, 200, 56)).toBe(3);
   });
 
   it('treats overlapping cards as a drop onto each other', () => {

@@ -34,13 +34,34 @@ export interface LaneFrame {
   h: number;
 }
 
-export function stageAtPoint(x: number, y: number, frames: readonly LaneFrame[]): PipelineStageId | null {
+export function stageAtPoint(
+  x: number,
+  y: number,
+  frames: readonly LaneFrame[],
+  slack = 0,
+): PipelineStageId | null {
   for (const frame of frames) {
-    if (x >= frame.x && x <= frame.x + frame.w && y >= frame.y && y <= frame.y + frame.h) {
+    if (x >= frame.x && x <= frame.x + frame.w && y >= frame.y && y <= frame.y + frame.h + slack) {
       return frame.stage;
     }
   }
   return null;
+}
+
+/** Where a card's center should land in a stack of `memberCount` lane members. */
+export function insertionIndex(
+  sceneY: number,
+  memberCount: number,
+  header: number,
+  nodeH: number,
+  gap: number,
+): number {
+  const stride = nodeH + gap;
+  for (let index = 0; index < memberCount; index += 1) {
+    const mid = header + index * stride + nodeH / 2;
+    if (sceneY < mid) return index;
+  }
+  return memberCount;
 }
 
 export function rectsOverlap(

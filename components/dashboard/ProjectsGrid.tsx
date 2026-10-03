@@ -15,7 +15,7 @@ import {
   Trash2, 
   Copy, 
   FolderOpen,
-  Calendar,
+  Info,
   Layers,
   ArrowUpDown,
   Cloud,
@@ -28,9 +28,7 @@ import {
   Music,
   File,
   ChevronDown,
-  ImageIcon,
   Check,
-  Sparkles,
   GripVertical,
   GitBranch,
 } from 'lucide-react';
@@ -43,7 +41,8 @@ import { slugifyProjectName } from '../../utils/project';
 import { WORKSPACE_ROOT_PATHS } from '../../constants/workspace';
 import { Button } from '../ui';
 import styles from './ProjectsGrid.module.css';
-import type { FileNode } from '../../types';
+import type { Asset, FileNode } from '../../types';
+import { formatBytes } from '../../lib/pipeline/ingest';
 
 type FilterPlatform = 'tiktok' | 'instagram' | 'youtube' | 'twitter';
 type FilterSource = 'ai-generated' | 'imported' | 'remixed' | 'manual';
@@ -61,6 +60,155 @@ interface ProjectsGridProps {
   triggerNew?: number;
 }
 
+const byteCache = new Map<string, number>();
+
+function assetFileUrl(asset: Pick<Asset, 'name' | 'thumbnail'>): string | null {
+  if (asset.thumbnail?.startsWith('/')) return asset.thumbnail.split('?')[0];
+  if (asset.name) return `/generated/${asset.name}`;
+  return null;
+}
+
+function storedBytes(asset: Pick<Asset, 'size' | 'metadata'>): number | null {
+  const amount = asset.size ?? asset.metadata?.fileSize;
+  return amount && amount > 0 ? amount : null;
+}
+
+function bytesOf(asset: Pick<Asset, 'name' | 'thumbnail' | 'size' | 'metadata'>): number {
+  const stored = storedBytes(asset);
+  if (stored) return stored;
+  const url = assetFileUrl(asset);
+  return url ? byteCache.get(url) ?? 0 : 0;
+}
+
+/** Fill in file sizes the library never stored, using the file the card already shows. */
+function useMeasuredBytes(assets: Asset[]) {
+  const key = assets.map((asset) => `${asset.id}:${storedBytes(asset) ?? ''}`).join('|');
+  const [, setVersion] = useState(0);
+  useEffect(() => {
+    let cancel = false;
+    const pending = assets.filter((asset) => {
+      const url = assetFileUrl(asset);
+      return storedBytes(asset) == null && url != null && !byteCache.has(url);
+    });
+    if (pending.length === 0) return;
+    void Promise.all(pending.map(async (asset) => {
+      const url = assetFileUrl(asset);
+      if (!url || byteCache.has(url)) return;
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        const length = Number(response.headers.get('content-length'));
+        if (length > 0) byteCache.set(url, length);
+      } catch { /* size stays unknown */ }
+    })).then(() => { if (!cancel) setVersion((version) => version + 1); });
+    return () => { cancel = true; };
+    // `key` already names the asset set; `assets` is the matching snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return bytesOf;
+}
+
+type FormatTone = 'image' | 'video' | 'audio' | 'text' | 'folder';
+
+const INTERNAL_TAGS = new Set(['blueprint', 'image', 'video', 'audio', 'full-pipeline', '3d', 'social']);
+
+const FORMAT_OPTIONS: { id: string; label: string; tone: FormatTone; type: string; aspect: string }[] = [
+  { id: 'still', label: 'Still', tone: 'image', type: 'generic', aspect: '16:9' },
+  { id: 'reel', label: 'Reel', tone: 'video', type: 'short', aspect: '9:16' },
+  { id: 'movie', label: 'Movie', tone: 'video', type: 'feature', aspect: '2.35:1' },
+  { id: 'video', label: 'Video', tone: 'video', type: 'video', aspect: '16:9' },
+  { id: 'script', label: 'Script', tone: 'text', type: 'script', aspect: '16:9' },
+  { id: 'comic', label: 'Comic', tone: 'image', type: 'comic', aspect: '4:3' },
+  { id: 'storyboard', label: 'Storyboard', tone: 'image', type: 'storyboard', aspect: '16:9' },
+  { id: 'audio', label: 'Audio', tone: 'audio', type: 'audio', aspect: '16:9' },
+];
+
+const ASPECT_OPTIONS = ['16:9', '9:16', '1:1', '2.35:1', '4:3'];
+const PLATFORM_OPTIONS: { id: string; label: string; tone: FormatTone }[] = [
+  { id: 'instagram', label: 'Instagram', tone: 'image' },
+  { id: 'tiktok', label: 'TikTok', tone: 'video' },
+  { id: 'youtube', label: 'YouTube', tone: 'video' },
+  { id: 'twitter', label: 'X', tone: 'text' },
+  { id: 'facebook', label: 'Facebook', tone: 'text' },
+  { id: 'linkedin', label: 'LinkedIn', tone: 'text' },
+];
+const LOCATION_OPTIONS = ['Studio', 'Interior', 'Exterior', 'City', 'Nature', 'Stage', 'Home'];
+const STYLE_OPTIONS = ['Noir', 'Documentary', 'Anime', 'Realistic', 'Painterly', 'Minimal'];
+const GENRE_OPTIONS = ['Sci-Fi', 'Drama', 'Comedy', 'Thriller', 'Horror', 'Romance'];
+const LENGTH_OPTIONS = ['15s', '30s', '60s', '3 min', '10 min', '90 min'];
+
+function splitList(value?: string): string[] {
+  return (value || '').split(',').map((part) => part.trim()).filter(Boolean);
+}
+
+function toggleValue(list: string[], value: string): string[] {
+  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+}
+
+function formatIdOf(type?: string, aspect?: string): string {
+  if (type === 'feature') return 'movie';
+  if (type === 'short' || aspect === '9:16') return 'reel';
+  if (type === 'video') return 'video';
+  if (type === 'script') return 'script';
+  if (type === 'comic') return 'comic';
+  if (type === 'storyboard') return 'storyboard';
+  if (type === 'audio') return 'audio';
+  return 'still';
+}
+
+function hardwareLabel(device: { platform?: string; hardwareConcurrency?: number; deviceMemory?: number | null } | null): string {
+  if (!device) return 'This computer';
+  const cores = device.hardwareConcurrency ? `${device.hardwareConcurrency} cores` : null;
+  const memory = device.deviceMemory ? `${device.deviceMemory} GB` : null;
+  return [device.platform || 'This computer', cores, memory].filter(Boolean).join(' · ');
+}
+
+function formatChips(
+  project: { type?: string; aspectRatio?: string; tags: string[]; style?: string; genre?: string; length?: string; platforms?: string[]; locations?: string[] },
+  assets: Asset[],
+): { id: string; label: string; tone: FormatTone }[] {
+  const type = project.type;
+  const aspect = project.aspectRatio;
+  const tags = project.tags;
+  const onlyImages = assets.length > 0 && assets.every((asset) => asset.type === 'image');
+  const chips: { id: string; label: string; tone: FormatTone }[] = [];
+
+  if (type === 'feature' || (type === 'video' && (aspect === '2.35:1' || aspect === '16:9'))) {
+    chips.push({ id: 'movie', label: 'Movie', tone: 'video' });
+  } else if (type === 'short' || aspect === '9:16' || tags.includes('social')) {
+    chips.push({ id: 'reel', label: 'Reel', tone: 'video' });
+  } else if (type === 'video' || tags.includes('video')) {
+    chips.push({ id: 'video', label: 'Video', tone: 'video' });
+  } else if (type === 'audio' || tags.includes('audio')) {
+    chips.push({ id: 'audio', label: 'Audio', tone: 'audio' });
+  } else if (type === 'script') {
+    chips.push({ id: 'script', label: 'Script', tone: 'text' });
+  } else if (type === 'comic') {
+    chips.push({ id: 'comic', label: 'Comic', tone: 'image' });
+  } else if (type === 'storyboard') {
+    chips.push({ id: 'storyboard', label: 'Storyboard', tone: 'image' });
+  } else if (tags.includes('3d')) {
+    chips.push({ id: '3d', label: '3D', tone: 'folder' });
+  } else if (type === 'generic' || tags.includes('image') || tags.includes('full-pipeline') || onlyImages) {
+    chips.push({ id: 'still', label: 'Still', tone: 'image' });
+  }
+
+  if (aspect) chips.push({ id: 'aspect', label: aspect, tone: chips[0]?.tone ?? 'text' });
+  for (const platform of project.platforms ?? []) {
+    const known = PLATFORM_OPTIONS.find((option) => option.id === platform);
+    chips.push({ id: `platform-${platform}`, label: known?.label ?? platform, tone: known?.tone ?? 'video' });
+  }
+  for (const location of project.locations ?? []) {
+    chips.push({ id: `location-${location}`, label: location, tone: 'folder' });
+  }
+  for (const style of splitList(project.style)) chips.push({ id: `style-${style}`, label: style, tone: 'text' });
+  for (const genre of splitList(project.genre)) chips.push({ id: `genre-${genre}`, label: genre, tone: 'text' });
+  if (project.length) chips.push({ id: 'length', label: project.length, tone: 'text' });
+  for (const tag of tags) {
+    if (!INTERNAL_TAGS.has(tag)) chips.push({ id: `tag-${tag}`, label: tag, tone: 'folder' });
+  }
+  return chips;
+}
+
 const findNodeByPath = (nodes: FileNode[], targetPath: string): FileNode | null => {
   for (const node of nodes) {
     if (node.path === targetPath) return node;
@@ -75,6 +223,11 @@ const findNodeByPath = (nodes: FileNode[], targetPath: string): FileNode | null 
 export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters, triggerNew }: ProjectsGridProps) {
   const { data: session } = useSession();
   const isAuthenticated = !!session?.user;
+  const deviceInfo = useUserStore((s) => s.deviceInfo);
+  const refreshDeviceInfo = useUserStore((s) => s.refreshDeviceInfo);
+  const creatorHandle = (session?.user?.name || session?.user?.email?.split('@')[0] || 'local').replace(/^@/, '');
+
+  useEffect(() => { refreshDeviceInfo(); }, [refreshDeviceInfo]);
 
   const { 
     getSortedProjects, 
@@ -163,62 +316,75 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
     recentProjects.forEach((p) => ensureProject(p.id, p.name, p.modifiedAt, p.createdAt));
   }, [currentProject, recentProjects]);
 
-  // Sync project cards with real project folders/assets from file tree.
+  // Sync project cards with real project folders. Counts follow each project's
+  // own generated folder, so a sibling project cannot inherit another's files.
   useEffect(() => {
-    const projectsRoot = findNodeByPath(rootNodes, '/projects');
-    const projectFolders = (projectsRoot?.children || []).filter((n) => n.type === 'folder');
-    if (projectFolders.length === 0) return;
-
     useProjectsStore.setState((state) => {
+      const projectsRoot = findNodeByPath(rootNodes, WORKSPACE_ROOT_PATHS.projects);
+      const projectFolders = (projectsRoot?.children || []).filter((n) => n.type === 'folder');
+      const nextProjects = state.projects.map((project) => ({ ...project }));
+      let changed = false;
       const now = Date.now();
-      const nextProjects = [...state.projects];
 
       for (const projectFolder of projectFolders) {
         const projectSlug = projectFolder.path.split('/').pop() || '';
         const generatedPrefix = `${projectFolder.path}/generated/`;
-        const projectAssets = Array.from(assets.values()).filter(
+        const folderAssets = Array.from(assets.values()).filter(
           (asset) => asset.path.startsWith(generatedPrefix)
         );
-        const latestImage = projectAssets
+        const latestImage = folderAssets
           .filter((asset) => asset.type === 'image' && asset.thumbnail)
           .sort((a, b) => b.modifiedAt - a.modifiedAt)[0];
 
         const existing = nextProjects.find((p) => slugifyProjectName(p.name) === projectSlug);
         if (existing) {
-          existing.assetCount = projectAssets.length;
-          existing.modifiedAt = projectAssets.length > 0
-            ? Math.max(existing.modifiedAt, ...projectAssets.map((a) => a.modifiedAt))
-            : existing.modifiedAt;
           if (!existing.thumbnail && latestImage?.thumbnail) {
             existing.thumbnail = latestImage.thumbnail;
+            changed = true;
           }
           continue;
         }
 
+        changed = true;
         nextProjects.unshift({
           id: `proj-${projectSlug}`,
           name: projectFolder.name,
           createdAt: now,
-          modifiedAt: projectAssets.length > 0 ? Math.max(...projectAssets.map((a) => a.modifiedAt)) : now,
-          assetCount: projectAssets.length,
+          modifiedAt: folderAssets.length > 0 ? Math.max(...folderAssets.map((a) => a.modifiedAt)) : now,
+          assetCount: folderAssets.length,
           tags: [],
           isFavorite: false,
           thumbnail: latestImage?.thumbnail,
         });
       }
 
+      for (const project of nextProjects) {
+        const prefix = `${WORKSPACE_ROOT_PATHS.projects}/${slugifyProjectName(project.name)}/generated/`;
+        const count = Array.from(assets.values()).filter((asset) => asset.path.startsWith(prefix)).length;
+        if (project.assetCount !== count) {
+          project.assetCount = count;
+          changed = true;
+        }
+      }
+
+      if (!changed) return state;
       return { projects: nextProjects };
     });
   }, [rootNodes, assets]);
 
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [infoOpen, setInfoOpen] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectTags, setNewProjectTags] = useState('');
+  const [draftTags, setDraftTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState('');
+  const [draftStyles, setDraftStyles] = useState<string[]>([]);
+  const [draftGenres, setDraftGenres] = useState<string[]>([]);
+  const [draftPlatforms, setDraftPlatforms] = useState<string[]>([]);
+  const [draftLocations, setDraftLocations] = useState<string[]>([]);
+  const [draftThumbnail, setDraftThumbnail] = useState<string | undefined>(undefined);
   const [newProjectLength, setNewProjectLength] = useState('');
-  const [newProjectStyle, setNewProjectStyle] = useState('');
-  const [newProjectGenre, setNewProjectGenre] = useState('');
   const [newProjectCharacters, setNewProjectCharacters] = useState('');
   const [newProjectType, setNewProjectType] = useState('generic');
   const [newProjectAspectRatio, setNewProjectAspectRatio] = useState('16:9');
@@ -329,7 +495,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
 
     // Apply external platform filter (maps to project.type)
     if (externalFilters?.platform) {
-      filtered = filtered.filter((p) => (p as any).type === externalFilters.platform);
+      filtered = filtered.filter((p) => (p.platforms ?? []).includes(externalFilters.platform!));
     }
 
     // Apply external source filter (project has at least one asset with matching source)
@@ -348,48 +514,66 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
   }, [sortedProjects, deferredSearchQuery, minimumAssets, projectScope, externalFilters?.platform, externalFilters?.source, assets]);
   const allTags = getAllTags();
 
-  const handleNewProject = () => {
-    setEditingProject(null);
+  const resetDraft = () => {
     setNewProjectName('');
-    setNewProjectTags('');
+    setDraftTags([]);
+    setTagDraft('');
+    setDraftStyles([]);
+    setDraftGenres([]);
+    setDraftPlatforms([]);
+    setDraftLocations([]);
+    setDraftThumbnail(undefined);
     setNewProjectLength('');
-    setNewProjectStyle('');
-    setNewProjectGenre('');
     setNewProjectCharacters('');
     setNewProjectType('generic');
     setNewProjectAspectRatio('16:9');
+  };
+
+  const handleNewProject = () => {
+    setEditingProject(null);
+    resetDraft();
     setShowCreateModal(true);
   };
 
-  const handleEditProject = (project: any) => {
+  const handleEditProject = (project: { id: string; name: string; tags: string[]; length?: string; style?: string; genre?: string; characters?: string; type?: string; aspectRatio?: string; platforms?: string[]; locations?: string[]; thumbnail?: string }) => {
     setEditingProject(project.id);
     setNewProjectName(project.name);
-    setNewProjectTags(project.tags.join(', '));
+    setDraftTags(project.tags.filter((tag) => !INTERNAL_TAGS.has(tag)));
+    setTagDraft('');
+    setDraftStyles(splitList(project.style));
+    setDraftGenres(splitList(project.genre));
+    setDraftPlatforms(project.platforms ?? []);
+    setDraftLocations(project.locations ?? []);
+    setDraftThumbnail(project.thumbnail);
     setNewProjectLength(project.length || '');
-    setNewProjectStyle(project.style || '');
-    setNewProjectGenre(project.genre || '');
     setNewProjectCharacters(project.characters || '');
     setNewProjectType(project.type || 'generic');
     setNewProjectAspectRatio(project.aspectRatio || '16:9');
+    setMenuOpen(null);
+    setInfoOpen(null);
     setShowCreateModal(true);
   };
 
   const handleSaveProject = () => {
     const trimmedName = newProjectName.trim();
-    const tags = newProjectTags
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean);
+    const pendingTag = tagDraft.trim();
+    const tags = pendingTag && !draftTags.includes(pendingTag) ? [...draftTags, pendingTag] : draftTags;
+    const existing = editingProject ? useProjectsStore.getState().getProject(editingProject) : undefined;
 
     const projectData = {
       name: trimmedName || getNextDefaultName(),
       tags,
       length: newProjectLength,
-      style: newProjectStyle,
-      genre: newProjectGenre,
+      style: draftStyles.join(', '),
+      genre: draftGenres.join(', '),
       characters: newProjectCharacters,
       type: newProjectType,
       aspectRatio: newProjectAspectRatio,
+      platforms: draftPlatforms,
+      locations: draftLocations,
+      thumbnail: draftThumbnail,
+      createdBy: existing?.createdBy || creatorHandle,
+      createdOn: existing?.createdOn || hardwareLabel(deviceInfo),
     };
 
     if (editingProject) {
@@ -443,8 +627,13 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
     return date.toLocaleDateString();
   };
 
+  const formatStamp = (timestamp: number) => new Date(timestamp).toLocaleString(undefined, {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+
+  const measuredBytes = useMeasuredBytes(Array.from(assets.values()));
+
   const [assetDrawerOpen, setAssetDrawerOpen] = useState<string | null>(null);
-  const [coverPickerOpen, setCoverPickerOpen] = useState<string | null>(null);
   const [dragProjectId, setDragProjectId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   
@@ -621,6 +810,12 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
       </div>}
 
       {/* Projects Grid — the bar owns the single New Project control. */}
+      {!isLoadingProjects && projects.length > 0 && (
+        <div className={styles.folderLabel}>
+          <FolderOpen size={13} />
+          <span>/projects/</span>
+        </div>
+      )}
       <div className={styles.grid}>
 
         {/* Skeleton placeholders during initial load */}
@@ -632,7 +827,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
         {!isLoadingProjects && projects.map((project) => {
           const isAssetsOpen = assetDrawerOpen === project.id;
           const projectAssets = getProjectAssets(project.name);
-          const imageAssets = projectAssets.filter((a) => a.type === 'image' && a.thumbnail);
+          const totalBytes = projectAssets.reduce((sum, asset) => sum + measuredBytes(asset), 0);
+          const chips = formatChips(project, projectAssets);
 
           const isDragSource = dragProjectId === project.id;
           const isDropTarget = dropTargetId === project.id;
@@ -654,6 +850,13 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
               onDragEnd={handleDragEnd}
               onClick={() => onOpenProject(project.id)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenProject(project.id); } }}
+              onMouseLeave={(e) => {
+                if (menuOpen !== project.id) return;
+                const next = e.relatedTarget;
+                if (next instanceof Node && e.currentTarget.contains(next)) return;
+                setMenuOpen(null);
+                setInfoOpen(null);
+              }}
             >
               {/* Full-bleed thumbnail */}
               <div className={styles.thumbnail}>
@@ -667,7 +870,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
               </div>
 
               {/* Top toolbar — left & right groups */}
-              <div className={styles.cardToolbar}>
+              <div className={`${styles.cardToolbar} ${menuOpen === project.id ? styles.cardToolbarOpen : ''}`}>
                 <div className={styles.toolbarLeft}>
                   <button
                     className={`${styles.toolbarBtn} ${styles.toolbarBtnFav}`}
@@ -682,15 +885,6 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                       <StarOff size={14} />
                     )}
                   </button>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditProject(project);
-                    }}
-                  >
-                    <Edit size={14} />
-                  </button>
                 </div>
 
                 <div className={styles.toolbarRight}>
@@ -698,7 +892,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                     className={styles.toolbarBtn}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCoverPickerOpen(null);
+                      setInfoOpen(null);
                       setMenuOpen(menuOpen === project.id ? null : project.id);
                     }}
                   >
@@ -706,50 +900,40 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                   </button>
 
                   {menuOpen === project.id && (
-                    <div className={styles.menu} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.menu} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                      <button
+                        className={styles.menuInfoToggle}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInfoOpen(infoOpen === project.id ? null : project.id);
+                        }}
+                      >
+                        <Info size={14} />
+                        Info
+                        <ChevronDown size={12} className={`${styles.assetButtonChevron} ${infoOpen === project.id ? styles.assetButtonChevronOpen : ''}`} />
+                      </button>
+                      {infoOpen === project.id && (
+                        <div className={styles.menuInfoBody}>
+                          <div><span>Created</span><b>{formatStamp(project.createdAt)}</b></div>
+                          <div><span>Updated</span><b>{formatStamp(project.modifiedAt)}</b></div>
+                          <div><span>Creator</span><b>@{project.createdBy || creatorHandle}</b></div>
+                          <div><span>Hardware</span><b>{project.createdOn || hardwareLabel(deviceInfo)}</b></div>
+                        </div>
+                      )}
+                      <div className={styles.menuDivider} />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditProject(project);
+                        }}
+                      >
+                        <Edit size={14} />
+                        Edit
+                      </button>
                       <button onClick={() => handleDuplicate(project.id)}>
                         <Copy size={14} />
                         Duplicate
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCoverPickerOpen(coverPickerOpen === project.id ? null : project.id);
-                        }}
-                      >
-                        <ImageIcon size={14} />
-                        Set Cover Image
-                      </button>
-
-                      {coverPickerOpen === project.id && (
-                        <>
-                          <div className={styles.menuDivider} />
-                          <div className={styles.coverPickerLabel}>Choose cover</div>
-                          {imageAssets.length === 0 ? (
-                            <button disabled style={{ opacity: 0.4, cursor: 'default' }}>
-                              No images available
-                            </button>
-                          ) : (
-                            imageAssets.map((asset) => (
-                              <button
-                                key={asset.id}
-                                className={`${styles.coverPickerItem} ${asset.thumbnail === project.thumbnail ? styles.coverPickerActive : ''}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateProject(project.id, { thumbnail: asset.thumbnail });
-                                  setCoverPickerOpen(null);
-                                  setMenuOpen(null);
-                                }}
-                              >
-                                <img src={asset.thumbnail} alt="" className={styles.coverPickerThumb} />
-                                <span className={styles.coverPickerName}>{asset.name}</span>
-                                {asset.thumbnail === project.thumbnail && <Check size={12} />}
-                              </button>
-                            ))
-                          )}
-                        </>
-                      )}
-
                       <div className={styles.menuDivider} />
                       <button
                         className={styles.menuDanger}
@@ -766,7 +950,6 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
               {/* Info overlay at the bottom */}
               <div className={`${styles.info} ${isAssetsOpen ? styles.infoExpanded : ''}`}>
                 <h3 className={styles.name}>
-                  <span className={styles.pathPrefix}>/projects/</span>
                   {project.name}
                   <span className={styles.dragHandle} title="Drag to set parent project">
                     <GripVertical size={10} />
@@ -783,62 +966,11 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                   </div>
                 )}
 
-                {/* Media type badge counts */}
-                {(() => {
-                  const typeCounts: Record<string, number> = {};
-                  projectAssets.forEach(a => { typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; });
-                  const sourceCounts: Record<string, number> = {};
-                  projectAssets.forEach(a => { 
-                    const src = a.metadata?.source || 'imported'; 
-                    sourceCounts[src] = (sourceCounts[src] || 0) + 1; 
-                  });
-                  return (
-                    <>
-                      <div className={styles.mediaBadges}>
-                        {typeCounts['image'] ? <span className={styles.mediaBadge} data-type="image" title="Images"><Image size={10} /> {typeCounts['image']}</span> : null}
-                        {typeCounts['video'] ? <span className={styles.mediaBadge} data-type="video" title="Videos"><Film size={10} /> {typeCounts['video']}</span> : null}
-                        {typeCounts['audio'] ? <span className={styles.mediaBadge} data-type="audio" title="Audio"><Music size={10} /> {typeCounts['audio']}</span> : null}
-                        {typeCounts['text'] || typeCounts['prompt'] ? <span className={styles.mediaBadge} data-type="text" title="Text"><FileText size={10} /> {(typeCounts['text']||0) + (typeCounts['prompt']||0)}</span> : null}
-                        {(sourceCounts['generated'] || sourceCounts['imported'] || sourceCounts['remixed']) ? (
-                          <span 
-                            className={styles.mediaBadge} 
-                            data-type="source" 
-                            title={`AI: ${sourceCounts['generated']||0} | Import: ${sourceCounts['imported']||0} | Remix: ${sourceCounts['remixed']||0}`}
-                          >
-                            <Sparkles size={10} /> {sourceCounts['generated']||0}/{sourceCounts['imported']||0}/{sourceCounts['remixed']||0}
-                          </span>
-                        ) : null}
-                      </div>
-                    </>
-                  );
-                })()}
-
-                {(project.genre || project.style || project.length || project.type) && (
-                  <div className={styles.details}>
-                    {project.type && project.type !== 'generic' && (
-                      <span className={styles.detailItem} style={{ color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}>
-                        {project.type}
-                      </span>
-                    )}
-                    {project.aspectRatio && project.aspectRatio !== '16:9' && (
-                      <span className={styles.detailItem}>{project.aspectRatio}</span>
-                    )}
-                    {project.genre && <span className={styles.detailItem}>{project.genre}</span>}
-                    {project.style && <span className={styles.detailItem}>{project.style}</span>}
-                    {project.length && <span className={styles.detailItem}>{project.length}</span>}
-                  </div>
-                )}
-
                 <div className={styles.meta}>
-                  <span className={styles.metaItem}>
-                    <Calendar size={12} />
-                    {formatDate(project.modifiedAt)}
+                  <span className={styles.metaItem} title="Total size of this project's assets">
+                    <HardDrive size={12} />
+                    {projectAssets.length === 0 ? '0 B' : totalBytes > 0 ? formatBytes(totalBytes) : '…'}
                   </span>
-                  {/* Status indicator */}
-                  <span
-                    className={`${styles.statusDot} ${project.assetCount > 0 ? styles.statusActive : styles.statusEmpty}`}
-                    title={project.assetCount > 0 ? 'Has assets' : 'No assets yet'}
-                  />
                   <button
                     className={`${styles.assetButton} ${isAssetsOpen ? styles.assetButtonActive : ''}`}
                     onClick={(e) => {
@@ -847,7 +979,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                     }}
                   >
                     <Layers size={12} />
-                    {project.assetCount} asset{project.assetCount !== 1 ? 's' : ''}
+                    {projectAssets.length} asset{projectAssets.length !== 1 ? 's' : ''}
                     <ChevronDown
                       size={10}
                       className={`${styles.assetButtonChevron} ${isAssetsOpen ? styles.assetButtonChevronOpen : ''}`}
@@ -855,31 +987,45 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                   </button>
                 </div>
 
-                {/* Expanded asset list — inline, full width */}
+                {/* One indicator: the count opens the type breakdown and the files. */}
                 {isAssetsOpen && (
                   <div className={styles.assetListExpanded} onClick={(e) => e.stopPropagation()}>
                     {projectAssets.length === 0 ? (
                       <div className={styles.assetListEmpty}>No assets yet</div>
                     ) : (
-                      projectAssets.map((asset) => (
-                        <div key={asset.id} className={styles.assetListItem}>
-                          {asset.thumbnail ? (
-                            <img src={asset.thumbnail} alt="" className={styles.assetListThumb} />
-                          ) : (
-                            <span className={styles.assetListIcon}>{assetTypeIcon(asset.type)}</span>
-                          )}
-                          <span className={styles.assetListName}>{asset.name}</span>
-                          <span className={styles.assetListType}>{asset.type}</span>
+                      <>
+                        <div className={styles.mediaBadges}>
+                          {(['image', 'video', 'audio', 'text', 'prompt', 'model_3d'] as const).map((type) => {
+                            const count = projectAssets.filter((asset) => asset.type === type || (type === 'text' && asset.type === 'prompt')).length;
+                            if (type === 'prompt') return null;
+                            if (count === 0) return null;
+                            return (
+                              <span key={type} className={styles.mediaBadge} data-type={type === 'model_3d' ? 'folder' : type}>
+                                {assetTypeIcon(type)} {count}
+                              </span>
+                            );
+                          })}
                         </div>
-                      ))
+                        {projectAssets.map((asset) => (
+                          <div key={asset.id} className={styles.assetListItem}>
+                            {asset.thumbnail ? (
+                              <img src={asset.thumbnail} alt="" className={styles.assetListThumb} />
+                            ) : (
+                              <span className={styles.assetListIcon}>{assetTypeIcon(asset.type)}</span>
+                            )}
+                            <span className={styles.assetListName}>{asset.name}</span>
+                            <span className={styles.assetListType} data-type={asset.type}>{asset.type}</span>
+                          </div>
+                        ))}
+                      </>
                     )}
                   </div>
                 )}
 
-                {project.tags.length > 0 && (
+                {chips.length > 0 && (
                   <div className={styles.tags}>
-                    {project.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className={styles.tag}>{tag}</span>
+                    {chips.map((chip) => (
+                      <span key={chip.id} className={styles.tag} data-tone={chip.tone}>{chip.label}</span>
                     ))}
                   </div>
                 )}
@@ -927,96 +1073,197 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                   className={styles.input}
                 />
               </label>
-              <label className={styles.formGroup}>
-                <span>Project Type</span>
-                <select
-                  value={newProjectType}
-                  onChange={(e) => setNewProjectType(e.target.value)}
-                  className={styles.input}
-                >
-                  <option value="generic">Generic Project</option>
-                  <option value="video">Video (Linear)</option>
-                  <option value="short">Short (Vertical)</option>
-                  <option value="feature">Feature Film</option>
-                  <option value="script">Script/Screenplay</option>
-                  <option value="comic">Comic Book</option>
-                  <option value="storyboard">Storyboard</option>
-                  <option value="audio">Audio Drama</option>
-                </select>
-              </label>
-              <label className={styles.formGroup}>
-                <span>Aspect Ratio</span>
-                <select
-                  value={newProjectAspectRatio}
-                  onChange={(e) => setNewProjectAspectRatio(e.target.value)}
-                  className={styles.input}
-                >
-                  <option value="16:9">16:9 (Widescreen)</option>
-                  <option value="9:16">9:16 (Vertical)</option>
-                  <option value="1:1">1:1 (Square)</option>
-                  <option value="2.35:1">2.35:1 (Cinemascope)</option>
-                  <option value="4:3">4:3 (TV)</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </label>
-              <label className={styles.formGroup}>
-                <span>Tags (comma separated)</span>
-                <input
-                  type="text"
-                  placeholder="branding, video, launch"
-                  value={newProjectTags}
-                  onChange={(e) => setNewProjectTags(e.target.value)}
-                  className={styles.input}
-                />
-              </label>
-              <label className={styles.formGroup}>
-                <span>Length</span>
-                <input
-                  type="text"
-                  placeholder="e.g. 120 mins"
-                  value={newProjectLength}
-                  onChange={(e) => setNewProjectLength(e.target.value)}
-                  className={styles.input}
-                />
-              </label>
-              <label className={styles.formGroup}>
+
+              {editingProject && (
+                <div className={styles.formGroup}>
+                  <span>Cover</span>
+                  {(() => {
+                    const record = useProjectsStore.getState().getProject(editingProject);
+                    const covers = record ? getProjectAssets(record.name).filter((asset) => asset.type === 'image' && asset.thumbnail) : [];
+                    if (covers.length === 0) {
+                      return <div className={styles.helperText}>No images in this project yet.</div>;
+                    }
+                    return (
+                      <div className={styles.coverGrid}>
+                        {covers.map((asset) => (
+                          <button
+                            key={asset.id}
+                            type="button"
+                            className={`${styles.coverOption} ${draftThumbnail === asset.thumbnail ? styles.coverOptionOn : ''}`}
+                            onClick={() => setDraftThumbnail(asset.thumbnail)}
+                            title={asset.name}
+                          >
+                            <img src={asset.thumbnail} alt="" />
+                            {draftThumbnail === asset.thumbnail && <Check size={12} />}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              <div className={styles.formGroup}>
+                <span>Format</span>
+                <div className={styles.choiceGrid}>
+                  {FORMAT_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`${styles.choice} ${formatIdOf(newProjectType, newProjectAspectRatio) === option.id ? styles.choiceOn : ''}`}
+                      data-tone={option.tone}
+                      onClick={() => { setNewProjectType(option.type); setNewProjectAspectRatio(option.aspect); }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <span>Frame</span>
+                <div className={styles.choiceGrid}>
+                  {ASPECT_OPTIONS.map((aspect) => (
+                    <button
+                      key={aspect}
+                      type="button"
+                      className={`${styles.choice} ${newProjectAspectRatio === aspect ? styles.choiceOn : ''}`}
+                      data-tone={aspect === '9:16' ? 'video' : 'image'}
+                      onClick={() => setNewProjectAspectRatio(aspect)}
+                    >
+                      {aspect}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <span>Platforms</span>
+                <div className={styles.choiceGrid}>
+                  {PLATFORM_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`${styles.choice} ${draftPlatforms.includes(option.id) ? styles.choiceOn : ''}`}
+                      data-tone={option.tone}
+                      onClick={() => setDraftPlatforms(toggleValue(draftPlatforms, option.id))}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <span>Locations</span>
+                <div className={styles.choiceGrid}>
+                  {LOCATION_OPTIONS.map((location) => (
+                    <button
+                      key={location}
+                      type="button"
+                      className={`${styles.choice} ${draftLocations.includes(location) ? styles.choiceOn : ''}`}
+                      data-tone="folder"
+                      onClick={() => setDraftLocations(toggleValue(draftLocations, location))}
+                    >
+                      {location}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.formGroup}>
                 <span>Style</span>
-                <input
-                  type="text"
-                  placeholder="e.g. Noir, Minimalist"
-                  value={newProjectStyle}
-                  onChange={(e) => setNewProjectStyle(e.target.value)}
-                  className={styles.input}
-                />
-              </label>
-              <label className={styles.formGroup}>
+                <div className={styles.choiceGrid}>
+                  {STYLE_OPTIONS.map((style) => (
+                    <button
+                      key={style}
+                      type="button"
+                      className={`${styles.choice} ${draftStyles.includes(style) ? styles.choiceOn : ''}`}
+                      data-tone="text"
+                      onClick={() => setDraftStyles(toggleValue(draftStyles, style))}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.formGroup}>
                 <span>Genre</span>
-                <input
-                  type="text"
-                  placeholder="e.g. Sci-Fi, Drama"
-                  value={newProjectGenre}
-                  onChange={(e) => setNewProjectGenre(e.target.value)}
-                  className={styles.input}
-                />
-              </label>
+                <div className={styles.choiceGrid}>
+                  {GENRE_OPTIONS.map((genre) => (
+                    <button
+                      key={genre}
+                      type="button"
+                      className={`${styles.choice} ${draftGenres.includes(genre) ? styles.choiceOn : ''}`}
+                      data-tone="text"
+                      onClick={() => setDraftGenres(toggleValue(draftGenres, genre))}
+                    >
+                      {genre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <span>Length</span>
+                <div className={styles.choiceGrid}>
+                  {LENGTH_OPTIONS.map((length) => (
+                    <button
+                      key={length}
+                      type="button"
+                      className={`${styles.choice} ${newProjectLength === length ? styles.choiceOn : ''}`}
+                      data-tone="text"
+                      onClick={() => setNewProjectLength(newProjectLength === length ? '' : length)}
+                    >
+                      {length}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className={styles.formGroup}>
                 <span>Characters</span>
                 <input
                   type="text"
-                  placeholder="e.g. Hero, Villain"
+                  placeholder="Hero, villain, narrator"
                   value={newProjectCharacters}
                   onChange={(e) => setNewProjectCharacters(e.target.value)}
                   className={styles.input}
                 />
               </label>
+              <div className={styles.formGroup}>
+                <span>Other details</span>
+                {draftTags.length > 0 && (
+                  <div className={styles.choiceGrid}>
+                    {draftTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={`${styles.choice} ${styles.choiceOn}`}
+                        data-tone="folder"
+                        onClick={() => setDraftTags(draftTags.filter((item) => item !== tag))}
+                        title="Remove"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  type="text"
+                  placeholder="Add a word, then Enter"
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    const value = tagDraft.trim();
+                    if (!value || draftTags.includes(value) || INTERNAL_TAGS.has(value)) return;
+                    setDraftTags([...draftTags, value]);
+                    setTagDraft('');
+                  }}
+                  className={styles.input}
+                />
+              </div>
               <div className={styles.helperText}>
-                If you leave the name empty, it will be created as {getNextDefaultName()}.
+                These choices show on the card. An empty name becomes {getNextDefaultName()}.
               </div>
             </div>
             <div className={styles.modalActions}>
-              <Button variant="ghost" onClick={() => setShowCreateModal(false)}>
-                Cancel
-              </Button>
               <Button variant="primary" onClick={handleSaveProject}>
                 {editingProject ? 'Save Changes' : 'Create Project'}
               </Button>

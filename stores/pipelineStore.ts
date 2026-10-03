@@ -15,12 +15,12 @@ import { createLayer, compositeVariant, layerDirectives, transformImage, type Im
 import { useLogStore } from '@/stores/logStore';
 
 // ── Auto-layout constants (stage lanes → horizontal; slots → vertical) ──────
-export const LANE_WIDTH = 340;
-export const LANE_GAP = 90;
-export const LANE_HEADER = 76;
+export const LANE_WIDTH = 324;
+export const LANE_GAP = 62;
+export const LANE_HEADER = 68;
 export const NODE_W = 292;
 export const NODE_H = 200;
-export const NODE_GAP = 56;
+export const NODE_GAP = 30;
 export const LANE_PAD_X = (LANE_WIDTH - NODE_W) / 2;
 
 export function laneX(stage: PipelineStageId): number {
@@ -33,6 +33,26 @@ export function nodePosition(node: PipelineNode): { x: number; y: number } {
     x: laneX(node.stage) + LANE_PAD_X,
     y: LANE_HEADER + node.slot * (NODE_H + NODE_GAP),
   };
+}
+
+/** Renumber lane members 0..n-1 so a removed node cannot leave a hole in the stack. */
+function compactInLane(nodes: PipelineNode[], exceptId?: string | null): PipelineNode[] {
+  const slotOf = new Map<string, number>();
+  for (const stage of STAGE_ORDER) {
+    const members = nodes
+      .filter((node) => node.stage === stage && node.inLane !== false && node.id !== exceptId)
+      .sort((a, b) => a.slot - b.slot || a.id.localeCompare(b.id));
+    members.forEach((member, index) => slotOf.set(member.id, index));
+  }
+  let changed = false;
+  const next = nodes.map((node) => {
+    const slot = slotOf.get(node.id);
+    if (slot === undefined) return node;
+    if (slot === node.slot && node.x === undefined && node.y === undefined) return node;
+    changed = true;
+    return { ...node, slot, x: undefined, y: undefined };
+  });
+  return changed ? next : nodes;
 }
 
 interface PendingEdge {
@@ -93,11 +113,18 @@ interface PipelineState {
   placeFree: (id: string, x: number, y: number) => void;
   /** Stage lane currently under a dragged node, for the highlight. Not saved. */
   dragOverStage: PipelineStageId | null;
-  setDragOverStage: (stage: PipelineStageId | null) => void;
-  /** Puts the node in a stage lane and clears a free position. */
-  joinLane: (id: string, stage: PipelineStageId) => void;
+  /** Index the dragged node would take in that lane. Not saved. */
+  dragInsertIndex: number | null;
+  setDragTarget: (stage: PipelineStageId | null, index: number | null) => void;
+  /** Node currently following the pointer. Excluded from the lane stack. Not saved. */
+  draggingId: string | null;
+  setDraggingNode: (id: string | null) => void;
+  /** Puts the node in a stage lane at `index` and clears a free position. */
+  joinLane: (id: string, stage: PipelineStageId, index?: number) => void;
   /** If the moodboard would hold fewer than two pictures, let the last one go. */
   releaseSparseMoodboard: () => void;
+  /** Close holes left by older slot numbers so the border matches the stack. */
+  compactLanes: () => void;
   resetNodePosition: (id: string) => void;
   toggleDeck: (id: string) => void;
   setCollapsed: (id: string, collapsed: boolean) => void;
@@ -160,6 +187,10 @@ interface PipelineState {
   groups: () => PipelineGroup[];
   toggleGroupCollapsed: (stage: PipelineStageId) => void;
   collapsedStages: PipelineStageId[];
+  /** Stages the user opened from the add menu, kept even while empty. */
+  openStages: PipelineStageId[];
+  openStage: (stage: PipelineStageId) => void;
+  closeStage: (stage: PipelineStageId) => void;
 
   // execution
   runNode: (id: string, apiKey: string) => Promise<void>;
@@ -232,6 +263,7 @@ function buildPersistPayload(s: PipelineState) {
     edges: s.edges,
     viewport: s.viewport,
     collapsedStages: s.collapsedStages,
+    openStages: s.openStages,
     scenes: s.scenes,
     paramTemplates: s.paramTemplates,
     lastCookedNodeId: s.lastCookedNodeId,
@@ -422,12 +454,15 @@ export const usePipelineStore = create<PipelineState>()(
       selectedId: null,
       pendingEdge: null,
       dragOverStage: null,
+      dragInsertIndex: null,
+      draggingId: null,
       isRunning: false,
       runningNodeIds: [],
       lastCookedNodeId: null,
       undoDepth: 0,
       undoLabel: null,
       collapsedStages: [],
+      openStages: [],
       currentProjectId: null,
       currentProjectName: '',
       isLoadingProject: false,
@@ -437,7 +472,8 @@ export const usePipelineStore = create<PipelineState>()(
         // Reset first so a project switch never bleeds the previous project's
         // nodes/scenes into the new one while the async load is in flight.
         set({
-          nodes: [], edges: [], viewport: EMPTY_VIEWPORT, collapsedStages: [],
+          nodes: [], edges: [], viewport: EMPTY_VIEWPORT, collapsedStages: [], openStages: [],
+          dragOverStage: null, dragInsertIndex: null, draggingId: null,
           scenes: [], paramTemplates: [], selectedId: null, lastCookedNodeId: null,
           currentProjectId: projectId, currentProjectName: projectName ?? '',
           isLoadingProject: true,
@@ -451,6 +487,7 @@ export const usePipelineStore = create<PipelineState>()(
                 nodes: (data.nodes ?? []).map(normalizeLoadedNode), edges: data.edges ?? [],
                 viewport: data.viewport ?? EMPTY_VIEWPORT,
                 collapsedStages: data.collapsedStages ?? [],
+                openStages: data.openStages ?? [],
                 scenes: data.scenes ?? [], paramTemplates: data.paramTemplates ?? [],
                 lastCookedNodeId: data.lastCookedNodeId ?? null,
                 isLoadingProject: false,
@@ -467,6 +504,7 @@ export const usePipelineStore = create<PipelineState>()(
                 nodes: (p.nodes ?? []).map(normalizeLoadedNode), edges: p.edges ?? [],
                 viewport: p.viewport ?? EMPTY_VIEWPORT,
                 collapsedStages: p.collapsedStages ?? [],
+                openStages: p.openStages ?? [],
                 scenes: p.scenes ?? [], paramTemplates: p.paramTemplates ?? [],
                 lastCookedNodeId: p.lastCookedNodeId ?? null,
               });
@@ -507,6 +545,7 @@ export const usePipelineStore = create<PipelineState>()(
           projectId, projectName, name,
           nodes: s.nodes.map((n) => ({ ...n, status: 'idle' as const })),
           edges: s.edges, viewport: s.viewport, collapsedStages: s.collapsedStages,
+          openStages: s.openStages,
           scenes: s.scenes, paramTemplates: s.paramTemplates,
         };
         await fetch('/api/workspace/pipelines', {
@@ -525,6 +564,7 @@ export const usePipelineStore = create<PipelineState>()(
             nodes: data.nodes ?? [], edges: data.edges ?? [],
             viewport: data.viewport ?? get().viewport,
             collapsedStages: data.collapsedStages ?? [],
+            openStages: data.openStages ?? [],
             scenes: data.scenes ?? [], paramTemplates: data.paramTemplates ?? [],
             selectedId: null,
           });
@@ -598,23 +638,34 @@ export const usePipelineStore = create<PipelineState>()(
         set((s) => {
           const node = s.nodes.find((n) => n.id === id);
           if (!node) return s;
-          const others = s.nodes.filter((n) => n.id !== id);
-          // Re-slot source stage
-          const reslotted = others.map((n) =>
-            n.stage === node.stage && n.slot > node.slot ? { ...n, slot: n.slot - 1 } : n
-          );
-          const targetCount = reslotted.filter((n) => n.stage === stage && n.inLane !== false).length;
-          const clamped = Math.max(0, Math.min(slot, targetCount));
-          // Shift target stage down to make room
-          const shifted = reslotted.map((n) =>
-            n.stage === stage && n.inLane !== false && n.slot >= clamped ? { ...n, slot: n.slot + 1 } : n
-          );
-          return {
-            nodes: [
-              ...shifted,
-              { ...node, stage, slot: clamped, x: undefined, y: undefined, inLane: true },
-            ],
-          };
+          const rest = s.nodes.filter((n) => n.id !== id);
+          const target = rest
+            .filter((n) => n.stage === stage && n.inLane !== false)
+            .sort((a, b) => a.slot - b.slot || a.id.localeCompare(b.id));
+          const index = Math.max(0, Math.min(slot, target.length));
+          const ordered = [
+            ...target.slice(0, index),
+            { ...node, stage, inLane: true as const, x: undefined, y: undefined },
+            ...target.slice(index),
+          ];
+          const slotOf = new Map(ordered.map((n, i) => [n.id, i]));
+          const source = node.stage === stage
+            ? []
+            : rest
+              .filter((n) => n.stage === node.stage && n.inLane !== false)
+              .sort((a, b) => a.slot - b.slot || a.id.localeCompare(b.id));
+          const sourceSlot = new Map(source.map((n, i) => [n.id, i]));
+          const nodes = rest.map((n) => {
+            if (slotOf.has(n.id)) {
+              const nextSlot = slotOf.get(n.id)!;
+              return { ...n, stage, slot: nextSlot, inLane: true as const, x: undefined, y: undefined };
+            }
+            if (sourceSlot.has(n.id)) {
+              return { ...n, slot: sourceSlot.get(n.id)!, x: undefined, y: undefined };
+            }
+            return n;
+          });
+          return { nodes: [...nodes, { ...node, stage, slot: slotOf.get(id)!, inLane: true, x: undefined, y: undefined }] };
         });
       },
 
@@ -623,34 +674,55 @@ export const usePipelineStore = create<PipelineState>()(
 
       placeFree: (id, x, y) =>
         set((s) => ({
-          nodes: s.nodes.map((n) => {
+          nodes: compactInLane(s.nodes.map((n) => {
             if (n.id !== id) return n;
             const home = n.type === 'image-import' ? PIPELINE_NODE_DEFS[n.type]?.stage ?? n.stage : n.stage;
             return { ...n, x, y, inLane: false, stage: home };
-          }),
+          })),
         })),
 
-      setDragOverStage: (stage) => {
-        if (get().dragOverStage === stage) return;
-        set({ dragOverStage: stage });
+      setDragTarget: (stage, index) => {
+        const current = get();
+        if (current.dragOverStage === stage && current.dragInsertIndex === index) return;
+        set({ dragOverStage: stage, dragInsertIndex: index });
       },
 
-      joinLane: (id, stage) => {
+      setDraggingNode: (id) => {
+        const current = get();
+        if (current.draggingId === id) return;
+        if (!id) {
+          set({ draggingId: null });
+          return;
+        }
+        set({ draggingId: id, nodes: compactInLane(current.nodes, id) });
+      },
+
+      joinLane: (id, stage, index) => {
         const members = get().nodes.filter((n) => n.stage === stage && n.id !== id && n.inLane !== false);
-        get().moveNodeToSlot(id, stage, members.length);
+        const at = index == null ? members.length : Math.max(0, Math.min(index, members.length));
+        get().moveNodeToSlot(id, stage, at);
+        if (get().collapsedStages.includes(stage)) {
+          set({ collapsedStages: get().collapsedStages.filter((item) => item !== stage) });
+        }
+      },
+
+      compactLanes: () => {
+        const nodes = compactInLane(get().nodes);
+        if (nodes !== get().nodes) set({ nodes });
       },
 
       releaseSparseMoodboard: () => {
+        if (get().openStages.includes('concept')) return;
         const nodes = get().nodes;
         if (showStageLane(nodes, 'concept')) return;
         const stranded = nodes.filter((n) => n.stage === 'concept' && n.inLane !== false && n.type === 'image-import');
         if (stranded.length === 0) return;
         set({
-          nodes: nodes.map((n) => {
+          nodes: compactInLane(nodes.map((n) => {
             if (!stranded.some((item) => item.id === n.id)) return n;
             const at = nodePosition(n);
-            return { ...n, inLane: false, x: at.x, y: at.y, stage: 'visual' };
-          }),
+            return { ...n, inLane: false, x: at.x, y: at.y, stage: 'visual' as const };
+          })),
         });
       },
 
@@ -1048,19 +1120,28 @@ export const usePipelineStore = create<PipelineState>()(
         })),
 
       groups: () => {
-        const { nodes, collapsedStages } = get();
-        return STAGE_ORDER.filter((stage) => showStageLane(nodes, stage)).map(
-          (stage) => ({
-            id: `group-${stage}`,
-            stage,
-            nodeIds: nodes
-              .filter((n) => n.stage === stage && n.inLane !== false)
-              .sort((a, b) => a.slot - b.slot)
-              .map((n) => n.id),
-            collapsed: collapsedStages.includes(stage),
-          })
-        );
+        const { nodes, collapsedStages, openStages, draggingId } = get();
+        const dragging = nodes.find((node) => node.id === draggingId);
+        const sticky = dragging && dragging.inLane !== false ? dragging.stage : null;
+        const resting = draggingId ? nodes.filter((node) => node.id !== draggingId) : nodes;
+        return STAGE_ORDER.filter((stage) => (
+          openStages.includes(stage) || stage === sticky || showStageLane(resting, stage)
+        )).map((stage) => ({
+          id: `group-${stage}`,
+          stage,
+          nodeIds: resting
+            .filter((n) => n.stage === stage && n.inLane !== false)
+            .sort((a, b) => a.slot - b.slot)
+            .map((n) => n.id),
+          collapsed: collapsedStages.includes(stage),
+        }));
       },
+
+      openStage: (stage) =>
+        set((s) => (s.openStages.includes(stage) ? s : { openStages: [...s.openStages, stage] })),
+
+      closeStage: (stage) =>
+        set((s) => ({ openStages: s.openStages.filter((item) => item !== stage) })),
 
       toggleGroupCollapsed: (stage) =>
         set((s) => ({
@@ -1379,7 +1460,7 @@ export const usePipelineStore = create<PipelineState>()(
       },
 
       clearAll: () =>
-        set({ nodes: [], edges: [], selectedId: null, pendingEdge: null, isRunning: false, runningNodeIds: [], collapsedStages: [], lastCookedNodeId: null }),
+        set({ nodes: [], edges: [], selectedId: null, pendingEdge: null, isRunning: false, runningNodeIds: [], collapsedStages: [], openStages: [], lastCookedNodeId: null }),
     })
 );
 
@@ -1394,6 +1475,7 @@ usePipelineStore.subscribe((state, prev) => {
     state.edges !== prev.edges ||
     state.viewport !== prev.viewport ||
     state.collapsedStages !== prev.collapsedStages ||
+    state.openStages !== prev.openStages ||
     state.scenes !== prev.scenes ||
     state.paramTemplates !== prev.paramTemplates ||
     state.lastCookedNodeId !== prev.lastCookedNodeId

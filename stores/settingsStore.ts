@@ -55,6 +55,8 @@ const defaultAppearance: AppearanceSettings = {
   reduceMotion: false,
   accentColor: '#00d4aa',
   stageLaneColors: {},
+  groupWheel: true,
+  groupWheelSize: 280,
   resultBackdrop: true,
   viewerSource: 'main',
   viewerMax: 4,

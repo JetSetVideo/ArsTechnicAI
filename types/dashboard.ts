@@ -36,6 +36,14 @@ export interface DashboardProject {
   characters?: string;
   type?: string;
   aspectRatio?: string;
+  /** Places this project is set in. */
+  locations?: string[];
+  /** Social platforms the cut is aimed at. */
+  platforms?: string[];
+  /** Display name of whoever created the project, without the @. */
+  createdBy?: string;
+  /** Machine the project was created on. */
+  createdOn?: string;
 }
 
 // ============================================

@@ -668,6 +668,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                   </div>
 
                   <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                    <span style={{ ...labelStyle, fontWeight: 700 }}>Grouping</span>
+                    <p className={styles.description} style={{ marginTop: 4 }}>
+                      Drag a rectangle on the workshop canvas to select nodes. Releasing the mouse opens a wheel of every group. Middle-click or hold Space to pan.
+                    </p>
+                  </div>
+
+                  <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" id="group-wheel" checked={appearance.groupWheel !== false}
+                      onChange={e => updateAppearance({ groupWheel: e.target.checked })} />
+                    <label htmlFor="group-wheel" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                      Show the group wheel after a selection
+                    </label>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={labelStyle}>Wheel size: {appearance.groupWheelSize ?? 280}px</span>
+                    <input id="group-wheel-size" type="range" min={200} max={420} step={10} value={appearance.groupWheelSize ?? 280}
+                      onChange={e => updateAppearance({ groupWheelSize: Number(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
+                  </div>
+
+                  <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
                     <span style={{ ...labelStyle, fontWeight: 700 }}>Workshop Stage Colors</span>
                     <p className={styles.description} style={{ marginTop: 4 }}>Override the default color of each pipeline stage lane.</p>
                   </div>
