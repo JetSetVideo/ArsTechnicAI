@@ -38,7 +38,9 @@ export function settleNode(id: string): void {
     return rectsOverlap(card, { x: at.x, y: at.y, w: NODE_W, h: NODE_H });
   });
   if (hit && hit.inLane !== false) {
-    store.joinLane(id, hit.stage);
+    const count = laneMembers(store.nodes.filter((node) => node.id !== id), hit.stage).length;
+    const at = insertionIndex(self.y + NODE_H / 2, count, LANE_HEADER, NODE_H, NODE_GAP);
+    store.joinLane(id, hit.stage, at);
     store.releaseSparseMoodboard();
     return;
   }
