@@ -61,8 +61,10 @@ describe('SettingsStore', () => {
     it('should have default AI provider settings', () => {
       const state = useSettingsStore.getState();
       
-      expect(state.settings.aiProvider.provider).toBe('nanobanana');
-      expect(state.settings.aiProvider.model).toBe('imagen-3.0-generate-002');
+      // Shape since 0d8b9d3: activeProvider / activeModel / apiKeys per provider.
+      expect(state.settings.aiProvider.activeProvider).toBe('GOOGLE_IMAGEN');
+      expect(state.settings.aiProvider.activeModel).toBe('imagen-3.0-generate-002');
+      expect(state.settings.aiProvider.apiKeys).toEqual({});
       expect(state.settings.aiProvider.defaultWidth).toBe(1024);
       expect(state.settings.aiProvider.defaultHeight).toBe(1024);
     });
@@ -71,13 +73,14 @@ describe('SettingsStore', () => {
       const store = useSettingsStore.getState();
       
       store.updateAIProvider({
-        apiKey: 'test-api-key',
-        model: 'custom-model',
+        apiKeys: { GOOGLE_IMAGEN: 'test-api-key' },
+        activeModel: 'custom-model',
       });
       
       const state = useSettingsStore.getState();
-      expect(state.settings.aiProvider.apiKey).toBe('test-api-key');
-      expect(state.settings.aiProvider.model).toBe('custom-model');
+      expect(state.settings.aiProvider.apiKeys).toEqual({ GOOGLE_IMAGEN: 'test-api-key' });
+      expect(state.settings.aiProvider.activeModel).toBe('custom-model');
+      expect(state.settings.aiProvider.activeProvider).toBe('GOOGLE_IMAGEN');
     });
 
     it('should update default dimensions', () => {
@@ -95,13 +98,13 @@ describe('SettingsStore', () => {
 
     it('should preserve other AI settings when updating', () => {
       const store = useSettingsStore.getState();
-      store.updateAIProvider({ apiKey: 'initial-key' });
+      store.updateAIProvider({ apiKeys: { GOOGLE_IMAGEN: 'initial-key' } });
       
-      store.updateAIProvider({ model: 'new-model' });
+      store.updateAIProvider({ activeModel: 'new-model' });
       
       const state = useSettingsStore.getState();
-      expect(state.settings.aiProvider.apiKey).toBe('initial-key');
-      expect(state.settings.aiProvider.model).toBe('new-model');
+      expect(state.settings.aiProvider.apiKeys).toEqual({ GOOGLE_IMAGEN: 'initial-key' });
+      expect(state.settings.aiProvider.activeModel).toBe('new-model');
     });
 
     it('should return fallback models excluding the current model', () => {
@@ -174,7 +177,7 @@ describe('SettingsStore', () => {
       
       // Modify various settings
       store.updateSettings({ theme: 'light', showGrid: false });
-      store.updateAIProvider({ apiKey: 'some-key', model: 'custom' });
+      store.updateAIProvider({ apiKeys: { GOOGLE_IMAGEN: 'some-key' }, activeModel: 'custom' });
       store.updateAppearance({ fontSize: 'large', compactMode: true });
       
       // Reset
@@ -183,8 +186,8 @@ describe('SettingsStore', () => {
       const state = useSettingsStore.getState();
       expect(state.settings.theme).toBe('dark');
       expect(state.settings.showGrid).toBe(true);
-      expect(state.settings.aiProvider.apiKey).toBe('');
-      expect(state.settings.aiProvider.model).toBe('imagen-3.0-generate-002');
+      expect(state.settings.aiProvider.apiKeys).toEqual({}); // reset must not keep a stored key
+      expect(state.settings.aiProvider.activeModel).toBe('imagen-3.0-generate-002');
       expect(state.settings.appearance.fontSize).toBe('medium');
       expect(state.settings.appearance.compactMode).toBe(false);
     });
