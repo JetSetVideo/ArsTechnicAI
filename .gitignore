@@ -38,7 +38,10 @@ next-env.d.ts
 deno.lock
 
 # Storage
-/storage/   # anchored: an unanchored "storage/" also ignored lib/storage/, which is source
+# Anchored: an unanchored "storage/" also ignored lib/storage/, which is source.
+# (Comments must be on their own line — git reads a trailing "# …" as part of the pattern,
+# which is why this rule matched nothing until merge round 3. Holds synced blobs.)
+/storage/
 
 # Local workspace data (user-specific, rebuilt from disk scan)
 .ars-data/

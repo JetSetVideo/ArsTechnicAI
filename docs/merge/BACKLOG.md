@@ -62,3 +62,15 @@ not a plan, not an intention.
 | A1 | Merge ArsTechnicAI-Server (persisted JWT session, typed auth client, Google OAuth landing) and repair the auth consumers broken by `dda6eb0` / `a63d587` | nothing signed-in worked in the GitHub version | `~/Desktop/ArsTechnicAI-Server` (not a git repo) | `stores/authStore.ts`, `lib/auth/client.ts`, `pages/auth/callback.tsx` | done | R2.3–R2.6 |
 | A2 | Cross-tab sign-out: another tab stays signed in until reload | looks wrong; no work lost | — | `stores/authStore.ts` (`storage` event → `persist.rehydrate()`) | open | R2.5 |
 | A3 | Two sign-in systems: NextAuth pages (`/auth/signin`, `[...nextauth]`) do not populate the JWT session the UI uses | a user who reaches `/auth/signin` "signs in" and is still signed out | — | `lib/auth/options.ts`, `pages/auth/*` | open — decision for the user | R2.2 |
+| A4 | Device sync (Mac offline ↔ Ubuntu home server ↔ OneDrive mirror) | the user's daily workflow | — | `lib/sync`, `services/sync`, `/api/sync/*` | done | R3.4, R3.5 |
+| A5 | HTTPS for `arstechnicai.freeboxos.fr` (plain HTTP today) | tokens cross the internet in clear | — | nginx + certbot | open — the user accepts certbot's terms | R3.6 |
+| A6 | Ubuntu home server not running: port 3002 is a Cursor port forward; `pm2 start ecosystem.config.cjs` once it is freed | the Mac has nothing to sync with | — | PM2, `ecosystem.config.cjs` (cwd fixed) | open — the user's call | R3.6 |
+
+## Security
+
+| # | Row | Why | Donor source | Destination target | State | Evidence |
+|---|-----|-----|--------------|--------------------|-------|----------|
+| S1 | ~20 Prisma models used by `createApiHandler` routes do not exist — they now answer 500 instead of 401 | half the API is a façade | — | `prisma/schema.prisma` vs `pages/api/**` | open | R3.1 |
+| S2 | Settings → Data "Data Integrity ✓ Verified" rows are static text, not checks | a green tick that checks nothing | — | `components/layout/SettingsModal.tsx` | open | R3.5 |
+| S3 | `public/generated/` is served to anyone with the URL | generated media are private work | — | serve via an authenticated route | open | R3.1 |
+

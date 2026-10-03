@@ -350,3 +350,120 @@ Append-only. Newest round at the bottom. Format and rules: `PROGRAM.md`.
   `main`. build: `✓ Compiled successfully`, `○ /auth/callback 1.37 kB`. run: R2.5. B2 closed by declaring
   `vitest@4.0.18` + `"test": "vitest run"` (`deno install --allow-scripts`; `node_modules` still 166
   entries / 26 symlinks; Prisma client regenerated from the unchanged schema, type gate identical after).
+
+### R3.1 surveyor — the backend the Mac would sync with did not exist, and its disk routes were open
+- **What**  (1) 14 routes had no authentication, including `workspace/save|load|pipelines`,
+  which build `canvas-${projectId}.json` from request input; (2) `createApiHandler` only
+  accepted NextAuth sessions while the UI holds a custom JWT; (3) ~20 Prisma models the
+  routes use (`asset`, `canvasState`, `timeline*`, `tag`, `userApiKey`…) exist in neither the
+  schema nor the database; (4) `enqueueSync()` had no callers — nothing ever synced between
+  machines; (5) login/register rate limits were one global bucket (`'LOGIN_TOKEN'`);
+  (6) `JWT_SECRET` was the public placeholder, `.env*` were mode 664; (7) no security
+  headers (`securityMiddleware` never wired); (8) nginx served a public `/storage/` alias.
+- **Why**  the user wants to keep developing on the Mac offline while assets stay in sync
+  across the Ubuntu database, OneDrive and the Mac.
+- **When**  round 3 intake.
+- **Where**  `pages/api/**`, `lib/api/handler.ts`, `utils/rateLimit.ts`, `/etc/nginx`.
+- **Who**  `breaker` to prove, then `porter`.
+- **How**  route-by-route grep for auth wrappers; `prisma.<model>` usage vs `pg_tables`.
+- **Result**  see R3.2.
+
+### R3.2 breaker — proofs before any fix
+- **What**  an unauthenticated `POST /api/workspace/save` with
+  `projectId=x/../../../../../../tmp/ars-poc-fffa0f93` wrote `/tmp/ars-poc-fffa0f93.json`, and
+  `GET /api/workspace/load` read it back; `GET /api/workspace/scan` returned the settings file
+  (where provider keys live — none were stored, so nothing leaked). A valid JWT got 200 from
+  `/api/auth/me` and 401 from every `createApiHandler` route. Next 14 injects
+  `x-forwarded-for`/`-host` itself (`base-server.js` `??=`) and keeps a client-supplied XFF.
+- **Why**  rule 1.
+- **When**  round 3, before R3.3.
+- **Where**  dev server on 3012 (3002 is held by a Cursor port forward here).
+- **Who**  `porter`.
+- **How**  curl / python probes; a temporary header-echo route (removed).
+- **Result**  all reproduced; probe file deleted.
+
+### R3.3 porter — one request-auth layer, safe paths, secrets, limits, headers
+- **What**  `lib/auth/requestAuth.ts` (user via JWT → NextAuth; `local` only for direct
+  loopback — no proxy headers, localhost Host, not cross-site; off in production);
+  `lib/auth/jwt.ts` (HS256 pinned, iss/aud, secret strength); `lib/security/safePath.ts`
+  (`isSafeId`, `resolveInside`) on every path built from input; 14 routes wrapped; login
+  per IP (10/min) and per account (20/15 min), register per IP, 429 not 400;
+  `lib/security/clientIp.ts` (X-Real-IP, else the *last* XFF entry); headers in
+  `next.config.js`; `lib/auth/fetchAuth.ts` attaches the token to own-API calls only;
+  JWT secret rotated (64 chars), `.env*` and settings 600.
+- **Why**  R3.2.
+- **When**  round 3.
+- **Where**  files named; `.env` (git-ignored).
+- **Who**  `breaker`.
+- **How**  asserted edits; `tests/lib/security.test.ts` (46).
+- **Result**  traversal → 400, proxied/rebinding/CSRF → 401, forged `alg:none`/old-style/
+  tampered tokens → 401, valid token through a proxy → 200, IP A blocked at try 10 while
+  IP B is not, one account blocked at try 20 across 20 IPs.
+
+### R3.4 porter — device sync on tables that exist
+- **What**  `services/sync/syncService.ts` + `/api/sync/{manifest,projects/[id],assets/[projectId]/[assetId],local-file}`:
+  projects in `Project`/`ProjectWorkspaceState` (compare-and-swap on version **and**
+  content hash), files in a content-addressed store (`lib/storage/blobStore.ts`, verified
+  while streamed, deduplicated), a readable OneDrive mirror (`lib/storage/oneDriveMirror.ts`,
+  atomic `.~ars-*.tmp` writes the OneDrive client skips, never overwrites another file).
+  Client: `lib/sync/syncEngine.ts` (push/pull/keep-both/defer-open), `hooks/useDeviceSync.ts`,
+  `stores/syncStore.ts`, Settings → Data → `components/settings/SyncPanel.tsx`, notices with
+  **Load latest**. Settings and API keys never sync.
+- **Why**  the user's offline-Mac workflow.
+- **When**  round 3.
+- **Where**  files named; `docs/OFFLINE_SYNC.md`.
+- **Who**  `breaker`, `evidence`.
+- **How**  `tests/lib/sync.test.ts` (26).
+- **Result**  API battery 21/21; 20 concurrent pushes from one base → exactly 1 updated, 19 conflicts.
+
+### R3.5 breaker — two-machine simulation (Ubuntu with DB, Mac without), real UI in headless Chromium
+- **What**  isolated copies on 3012 (home server) and 3014 (Mac: unreachable DB/Redis, its own
+  JWT secret, `NEXT_PUBLIC_API_URL` → 3012). Create on Ubuntu → Mac receives project and
+  byte-identical image; repeated syncs go quiet; Ubuntu down → Mac edits offline (kept);
+  Ubuntu edits the same project → Mac reconnects → both versions on both machines; a normal
+  edit flows without conflict; an open project is deferred and taken with **Load latest**.
+- **Why**  "done means it ran".
+- **When**  round 3.
+- **Where**  scratch copies (no real `.ars-data`, OneDrive or storage touched).
+- **Who**  `porter` for the five defects it found.
+- **How**  step scripts with persistent browser profiles per device.
+- **Result**  found and fixed, each proven first: (1) **data loss** — a project on disk but not
+  in the browser's list was pulled over local edits → disk counts as local + `pull()` refuses
+  to overwrite content that is neither the server's nor the last agreed; (2) spurious
+  conflicts — `workspace/save` reshapes bundles → hash only disk-kept fields; (3) the
+  dashboard deduplicated projects **by name**, hiding a different project (every device's
+  "Untitled Project") → by id; (4) `X-Ars-Reuse` missing from CORS → Mac uploads blocked and
+  reported as "offline" → header added, and a blocked request is no longer called offline;
+  (5) a node without `variants` white-screened the dashboard → nodes normalised on load.
+  Final: Ubuntu "Sim Film" holds all three edits from both machines; conflict copy holds the
+  Mac's offline edit; 1 blob for 2 projects; 0 temp leftovers.
+
+### R3.6 porter — nginx (live)
+- **What**  removed the public `/storage/` alias, `server_tokens off`, nginx sign-in limit
+  (`limit_req zone=ars_auth`, 20/min, burst 10, 429). Backup: `sites-available/arstechnicai.bak-2026-10-03`.
+- **Why**  R3.1 (8); defense in depth.
+- **When**  round 3.
+- **Where**  `/etc/nginx/sites-available/arstechnicai`, `/etc/nginx/conf.d/arstechnicai-ratelimit.conf`.
+- **Who**  the user — HTTPS needs `certbot` (terms + e-mail are theirs to accept).
+- **How**  `nginx -t`, reload, curl with the site's Host header.
+- **Result**  site 200, `/storage/` 404, `/.env` 403, `Server: nginx`, 35 rapid sign-ins → 14×400, 21×429.
+
+### R3.7 conductor — gates, quoted
+- **What**  type, test, build, production run.
+- **Result**  tsc 508 → 507, 0 new in touched files. `npm test`: 2 failed | 364 passed — the 2 are
+  the pre-existing `settingsStore` (B6); `save-meta` tests updated to call as the owner, plus
+  a 401 case. `next build`: `✓ Compiled successfully`, 4 sync routes. `next start`: local
+  call without session 401, with session 200, login 200, headers present.
+
+### R3.8 surveyor — `/storage/` was never ignored: git has no trailing comments
+- **What**  `.gitignore` line 41 read `/storage/   # anchored: …`. Git takes the whole line,
+  spaces and `# …` included, as the pattern, so it matched nothing — the R1.6 fix never took
+  effect. Found when `git check-ignore -v storage/blobs/…` printed nothing before the first
+  commit that creates `storage/blobs` (synced media must never reach the public repo).
+- **Why**  same family as R1.6: the ignore file silently disagreeing with its intent.
+- **When**  round 3 close, before committing.
+- **Where**  `.gitignore`.
+- **Who**  anyone editing `.gitignore`: comments on their own line.
+- **How**  `git check-ignore -v storage/blobs/ab/x lib/storage/blobStore.ts`.
+- **Result**  now `.gitignore:44:/storage/  storage/blobs/ab/abcdef`; `lib/storage/` still
+  tracked; `git ls-files storage` empty — nothing was ever committed there.

@@ -59,6 +59,21 @@ The client/login/signup/OAuth-callback flow was previously a separate Next.js ap
 frontend on another machine, point `NEXT_PUBLIC_API_URL` at this server, set
 `FRONTEND_URL` to that frontend, and list it in `CORS_ALLOWED_ORIGINS`.
 
+### Request authentication (all API routes, since merge round 3)
+
+`lib/auth/requestAuth.ts` is the single answer to "who is calling?":
+
+| Principal | From | Accepted by |
+|-----------|------|-------------|
+| `user` (via `jwt`) | `Authorization: Bearer` from `/api/auth/*` — HS256, issuer `arstechnicai`, audience `arstechnicai-app` (`lib/auth/jwt.ts`) | every authenticated route |
+| `user` (via `nextauth`) | NextAuth session cookie (fallback) | every authenticated route |
+| `local` | direct loopback: no proxy headers, localhost `Host`, not cross-site; off in production unless `ARS_TRUST_LOOPBACK=1` | disk-only routes (`withPrincipal(…, { allowLocal: true })`) |
+
+`createApiHandler` (DB routes) and `withAuth` both delegate to it. Inactive or banned
+accounts are refused within 30 s even with a valid token. The browser attaches the token
+to its own `/api/` calls through `lib/auth/fetchAuth.ts`. Device sync and its threat model:
+`docs/OFFLINE_SYNC.md`.
+
 ### Roles (Current)
 
 | Role | Description | Privileges |
