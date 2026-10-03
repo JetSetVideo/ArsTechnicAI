@@ -6,11 +6,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Blueprint, BlueprintRun } from '@/types/blueprint';
+import { STARTER_BLUEPRINTS, specToBlueprint } from '@/lib/pipeline/blueprintBridge';
 
 interface BlueprintState {
   blueprints: Blueprint[];
   runs: BlueprintRun[];
   selectedBlueprintId: string | null;
+  /** Set after the built-in graphs have been inserted once. Deleting one stays deleted. */
+  startersSeeded: boolean;
 
   // CRUD
   addBlueprint: (bp: Blueprint) => void;
@@ -25,6 +28,8 @@ interface BlueprintState {
   // Import / Export
   exportBlueprint: (id: string) => string | null;
   importBlueprint: (json: string) => Blueprint | null;
+  /** Inserts the built-in workshop graphs the first time the store hydrates. */
+  ensureStarters: () => void;
 }
 
 export const useBlueprintStore = create<BlueprintState>()(
@@ -33,6 +38,7 @@ export const useBlueprintStore = create<BlueprintState>()(
       blueprints: [],
       runs: [],
       selectedBlueprintId: null,
+      startersSeeded: false,
 
       addBlueprint: (bp) =>
         set((s) => ({ blueprints: [...s.blueprints, bp] })),
@@ -66,6 +72,16 @@ export const useBlueprintStore = create<BlueprintState>()(
         return JSON.stringify(bp, null, 2);
       },
 
+      ensureStarters: () => {
+        if (get().startersSeeded) return;
+        const starters = STARTER_BLUEPRINTS.map(specToBlueprint);
+        const have = new Set(get().blueprints.map((bp) => bp.id));
+        set({
+          startersSeeded: true,
+          blueprints: [...starters.filter((bp) => !have.has(bp.id)), ...get().blueprints],
+        });
+      },
+
       importBlueprint: (json) => {
         try {
           const parsed = JSON.parse(json) as Blueprint;
@@ -86,7 +102,11 @@ export const useBlueprintStore = create<BlueprintState>()(
       partialize: (state) => ({
         blueprints: state.blueprints,
         selectedBlueprintId: state.selectedBlueprintId,
+        startersSeeded: state.startersSeeded,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.ensureStarters();
+      },
     }
   )
 );

@@ -1,0 +1,47 @@
+@keyframes cycle {
+  0%, 12%        { --spectrum-l: 0.7384; --spectrum-c: 0.0997; --spectrum-h: 176.10; }
+  16.67%, 28.67% { --spectrum-l: 0.6847; --spectrum-c: 0.1139; --spectrum-h: 238.61; }
+  33.33%, 45.33% { --spectrum-l: 0.6469; --spectrum-c: 0.1335; --spectrum-h: 346.22; }
+  50%, 62%       { --spectrum-l: 0.6812; --spectrum-c: 0.1054; --spectrum-h: 292.95; }
+  66.67%, 78.67% { --spectrum-l: 0.7649; --spectrum-c: 0.1399; --spectrum-h: 432.95; }
+  83.33%, 95.33% { --spectrum-l: 0.6620; --spectrum-c: 0.1361; --spectrum-h: 392.59; }
+  100%           { --spectrum-l: 0.7384; --spectrum-c: 0.0997; --spectrum-h: 536.10; }
+}
+
+.mark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.1em;
+  text-decoration: none;
+  color: #fff;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.ars {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  color: #fff;
+}
+
+.technic {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  color: #fff;
+}
+
+.ai {
+  font-size: 0.5em;
+  font-weight: 700;
+  margin-left: 2px;
+  align-self: flex-start;
+  letter-spacing: 0.06em;
+  animation: cycle 56s infinite;
+  animation-timing-function: cubic-bezier(0.86, 0, 0.14, 1);
+  color: oklch(var(--spectrum-l) var(--spectrum-c) var(--spectrum-h));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai { animation: none; color: #9b8cd4; }
+}

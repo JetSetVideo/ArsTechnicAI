@@ -25,9 +25,6 @@
 }
 
 .brand { display: flex; align-items: baseline; gap: 0.1em; text-decoration: none; color: #fff; }
-.brandArs { font-family: var(--font-serif); font-size: 1.1rem; font-style: italic; font-weight: 500; color: #fff; }
-.brandTechnic { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 600; color: #fff; }
-.brandAI { font-size: 0.55rem; font-weight: 700; margin-left: 2px; align-self: flex-start; letter-spacing: 0.06em; }
 .spectrumShadow,
 .spectrumShadow span {
   animation: spectrum-cycle 56s infinite;

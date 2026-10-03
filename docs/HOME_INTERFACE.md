@@ -27,6 +27,14 @@ The cycle is 56s, slightly faster than the 84s pass. New Project text and its ho
 
 See `docs/PROJECT_INTERFACE.md`. The workshop top bar, explorer rail, film strip, and fit/precise view are specified there.
 
+## Round 2026-10-03 — blueprints on the home page
+
+Blueprints are reusable workshop graphs. They are not a separate page. The left panel's
+Blueprints control lists them (three built-in graphs, plus any saved from a workshop).
+Open in Workshop creates a project and loads that graph on `/project/[id]`. Workflows stays
+the list of projects that already have a pipeline. The wordmark is `components/ui/Wordmark.tsx`.
+The left panel uses the same background and border tokens as the workshop explorer.
+
 ## Where
 
-`components/layout/DashboardLayout.tsx`, `DashboardLayout.module.css`, `components/dashboard/HomeLeftPanel.tsx`, `components/dashboard/ProjectsGrid.tsx`, `components/ui/ConnectionBanner.tsx`.
+`components/layout/DashboardLayout.tsx`, `DashboardLayout.module.css`, `components/dashboard/HomeLeftPanel.tsx`, `components/dashboard/ProjectsGrid.tsx`, `components/ui/ConnectionBanner.tsx`, `components/workshop/BlueprintShelf.tsx`, `components/ui/Wordmark.tsx`.

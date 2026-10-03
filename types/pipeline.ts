@@ -195,6 +195,11 @@ export interface PipelineNode {
   y?: number;
   /** Order inside its stage lane (vertical slot); irrelevant once `x`/`y` are set. */
   slot: number;
+  /**
+   * `false` leaves the node on the open canvas. It does not open or join a
+   * stage lane until it is dragged into one. Omitted means it belongs to `stage`.
+   */
+  inLane?: boolean;
   params: Record<string, unknown>;
   status: NodeStatus;
   error?: string;

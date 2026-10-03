@@ -3,7 +3,8 @@ import {
   Plus, ChevronDown, Play, Square, Loader2, ZoomIn, ZoomOut, Maximize,
   Trash2, Wand2, ChevronRight, Scan, Undo2,
 } from 'lucide-react';
-import { usePipelineStore, nodePosition, LANE_WIDTH, LANE_GAP, LANE_HEADER, NODE_H, NODE_GAP, laneX } from '@/stores/pipelineStore';
+import { usePipelineStore, nodePosition, LANE_WIDTH, LANE_HEADER, NODE_H, NODE_GAP, NODE_W, laneX } from '@/stores/pipelineStore';
+import { settleNode } from './settleNode';
 import { PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, nodesForStage } from '@/lib/pipeline/catalog';
 import { ingestImage, payloadStats, formatBytes } from '@/lib/pipeline/ingest';
 import type { PipelineStageId } from '@/types/pipeline';
@@ -15,6 +16,9 @@ import { LayerEditorModal } from './LayerEditorModal';
 import { SceneStrip } from './SceneStrip';
 import { WorkshopOverview } from './WorkshopOverview';
 import { WorkflowMenu } from './WorkflowMenu';
+import { BlueprintShelf } from './BlueprintShelf';
+import { useBlueprintStore } from '@/stores/blueprintStore';
+import { PENDING_BLUEPRINT_KEY } from '@/lib/pipeline/blueprintBridge';
 import { inputPortPos, outputPortPos, edgePath, PORT_COLORS } from './geometry';
 import { formatShortcut, matchShortcut } from '@/lib/shortcuts';
 import styles from './WorkshopFlow.module.css';
@@ -26,6 +30,8 @@ export const WorkshopFlow: React.FC = () => {
   // canvas anyway. `collapsedStages` is included because `groups()` reads it
   // internally and this component calls `groups()` directly in render.
   const nodes = usePipelineStore((s) => s.nodes);
+  const isLoadingProject = usePipelineStore((s) => s.isLoadingProject);
+  const loadedProjectId = usePipelineStore((s) => s.currentProjectId);
   const scenes = usePipelineStore((s) => s.scenes);
   const edges = usePipelineStore((s) => s.edges);
   const viewport = usePipelineStore((s) => s.viewport);
@@ -37,7 +43,7 @@ export const WorkshopFlow: React.FC = () => {
   usePipelineStore((s) => s.collapsedStages);
   const {
     setViewport, select, cancelEdge, removeEdge, addNode, runAll, stopRun,
-    clearAll, seedStarterFlow, groups, toggleGroupCollapsed, moveNodeToSlot, addVariant,
+    clearAll, seedStarterFlow, groups, toggleGroupCollapsed, addVariant,
   } = usePipelineStore.getState();
   const { settings } = useSettingsStore();
   const { currentProject } = useUserStore();
@@ -51,6 +57,31 @@ export const WorkshopFlow: React.FC = () => {
   useEffect(() => {
     void usePipelineStore.getState().loadForProject(currentProject.id, currentProject.name);
   }, [currentProject.id, currentProject.name]);
+
+  // A lone imported picture is not a moodboard. Release it once the project is open
+  // so an older drop (slotted into Concept) does not keep a hidden lane membership.
+  useEffect(() => {
+    if (isLoadingProject || loadedProjectId !== currentProject.id) return;
+    usePipelineStore.getState().releaseSparseMoodboard();
+  }, [isLoadingProject, loadedProjectId, currentProject.id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (isLoadingProject || loadedProjectId !== currentProject.id) return;
+    const applyPending = () => {
+      const blueprintId = sessionStorage.getItem(PENDING_BLUEPRINT_KEY);
+      if (!blueprintId) return;
+      useBlueprintStore.getState().ensureStarters();
+      const blueprint = useBlueprintStore.getState().blueprints.find((item) => item.id === blueprintId);
+      sessionStorage.removeItem(PENDING_BLUEPRINT_KEY);
+      if (blueprint) usePipelineStore.getState().applyBlueprint(blueprint, 'replace');
+    };
+    if (useBlueprintStore.persist.hasHydrated()) {
+      applyPending();
+      return;
+    }
+    return useBlueprintStore.persist.onFinishHydration(applyPending);
+  }, [isLoadingProject, loadedProjectId, currentProject.id]);
 
   useEffect(() => {
     usePipelineStore.getState().clearRetiredModelErrors();
@@ -108,6 +139,7 @@ export const WorkshopFlow: React.FC = () => {
 
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
   const laneGroups = groups();
+  const dragOverStage = usePipelineStore((s) => s.dragOverStage);
 
   // Debug handle for automated driving/tests
   useEffect(() => {
@@ -172,12 +204,11 @@ export const WorkshopFlow: React.FC = () => {
 
   const handlePointerUp = useCallback(() => setIsPanning(false), []);
 
-  // Explorer / OS drag-and-drop → curated image node in the lane under cursor
+  // Explorer / OS drag-and-drop → a free picture. It joins a lane only when
+  // released on one, or onto another picture (that opens the moodboard).
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     const pos = toScene(e.clientX, e.clientY);
-    const stageIdx = Math.max(0, Math.min(STAGE_ORDER.length - 1, Math.round(pos.x / (LANE_WIDTH + LANE_GAP))));
-    const stage = STAGE_ORDER[stageIdx];
 
     const sources: { src: string; name: string; kind: 'explorer' | 'file' }[] = [];
     const json = e.dataTransfer.getData('application/json');
@@ -207,13 +238,18 @@ export const WorkshopFlow: React.FC = () => {
     // so dropping several images no longer serializes decode-then-encode
     // one full image at a time.
     const created: { nodeId: string; source: (typeof sources)[number] }[] = [];
-    for (const source of sources) {
+    sources.forEach((source, index) => {
       const node = addNode('image-import');
-      if (!node) continue;
+      if (!node) return;
       usePipelineStore.getState().renameNode(node.id, source.name.replace(/\.[a-z0-9]+$/i, ''));
-      moveNodeToSlot(node.id, stage, 999);
+      usePipelineStore.getState().placeFree(
+        node.id,
+        pos.x - NODE_W / 2 + index * (NODE_W + 24),
+        pos.y - NODE_H / 2,
+      );
+      settleNode(node.id);
       created.push({ nodeId: node.id, source });
-    }
+    });
 
     await Promise.all(created.map(async ({ nodeId, source }) => {
       try {
@@ -234,7 +270,7 @@ export const WorkshopFlow: React.FC = () => {
         usePipelineStore.getState().removeNode(nodeId);
       }
     }));
-  }, [toScene, addNode, moveNodeToSlot, addVariant]);
+  }, [toScene, addNode, addVariant]);
 
   // Payload telemetry: how heavy the workshop media currently is
   const stats = useMemo(() => payloadStats(nodes), [nodes]);
@@ -350,6 +386,7 @@ export const WorkshopFlow: React.FC = () => {
         </button>
 
         <WorkflowMenu scope="project" projectId={currentProject.id} projectName={currentProject.name} />
+        <BlueprintShelf variant="workshop" />
 
         <div className={styles.divider} />
 
@@ -451,7 +488,7 @@ export const WorkshopFlow: React.FC = () => {
             return (
               <div
                 key={group.id}
-                className={`${styles.lane} ${group.collapsed ? styles.laneCollapsed : ''}`}
+                className={`${styles.lane} ${group.collapsed ? styles.laneCollapsed : ''} ${dragOverStage === group.stage ? styles.laneHot : ''}`}
                 style={{
                   left: laneX(group.stage),
                   top: 0,

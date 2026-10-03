@@ -7,11 +7,12 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   FolderOpen, FolderPlus, FileText, Image, Film, Music,
   ChevronRight, ChevronDown, Trash2, Copy, Sparkles, Pencil, Download,
-  Users, BookOpen, Palette, RefreshCw, FolderClock,
+  Users, BookOpen, Palette, RefreshCw, FolderClock, GitBranch,
 } from 'lucide-react';
 import { useFileStore } from '../../stores/fileStore';
 import { useProjectsStore } from '../../stores/projectsStore';
 import { WorkflowMenu } from '../workshop/WorkflowMenu';
+import { BlueprintShelf } from '../workshop/BlueprintShelf';
 import styles from './HomeLeftPanel.module.css';
 import type { FileNode, Asset } from '../../types';
 
@@ -233,6 +234,9 @@ export const HomeLeftPanel: React.FC<HomeLeftPanelProps> = ({
           <button title="Templates" onClick={() => { setCollapsed(false); onOpenTemplate?.(); }}>
             <BookOpen size={14} />
           </button>
+          <button title="Blueprints" onClick={() => setCollapsed(false)}>
+            <GitBranch size={14} />
+          </button>
         </div>
       </div>
     );
@@ -290,6 +294,7 @@ export const HomeLeftPanel: React.FC<HomeLeftPanelProps> = ({
               </button>
             )}
           />
+          <BlueprintShelf variant="home" />
           <button className={styles.quickAction} onClick={() => setShelvesOpen((open) => !open)} aria-expanded={shelvesOpen}>
             <FolderOpen size={12} /> {shelvesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Files
           </button>

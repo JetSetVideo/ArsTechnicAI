@@ -28,6 +28,8 @@ not a plan, not an intention.
 | U4 | Right panel shows the **decision tree of connected nodes** and the loops driving them, not only flat parameters | the user's stated model of the inspector | donor Inspector `Wiring`/`Loop` | `components/layout/InspectorPanel.tsx` | open | — |
 | U5 | Bottom panel as the place for long programmes — sequences, loops, progress per iteration | where a 600-frame run is watched | donor console + depth strip | `components/layout/Timeline.tsx` | open | — |
 | U6 | Workflows drag from the left panel onto the canvas (insert beside, not replace) | asked for explicitly; node types and files already drag | donor `insertFlow` | `AppShell` → `Canvas` | open | R0.6 (node/file drag exists) |
+| U7 | Blueprint graphs open inside the workshop, from the home page, with one wordmark | the blueprint store had no page; the donor's workshop *is* the blueprint | `stores/blueprintStore.ts`, donor `/blueprint/` | `BlueprintShelf`, `lib/pipeline/blueprintBridge.ts`, `Wordmark` | in round 5 | R5.2 tests; R5.3 on 3010. Build gate not run |
+| U8 | `canvasStore` is still written by generation and project sync after the canvas UI was retired | a second graph beside the workshop | — | `stores/canvasStore.ts` and its API routes | open — surgeon, after a yes | R5.1 |
 
 ## The graph
 

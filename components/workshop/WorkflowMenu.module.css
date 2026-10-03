@@ -12,16 +12,16 @@
   gap: 0.4rem;
   padding: 0.35rem 0.7rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary, #b6b6c8);
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
 }
-.trigger:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+.trigger:hover { background: var(--bg-elevated); color: var(--text-primary); }
 
 .panel {
   /* position/top/left/width are set inline (portaled to <body>, positioned
@@ -29,7 +29,7 @@
      is never clipped by a scrolling ancestor like the home page's left panel. */
   max-height: 420px;
   overflow-y: auto;
-  background: rgba(16, 16, 30, 0.97);
+  background: var(--bg-elevated);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;

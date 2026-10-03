@@ -51,44 +51,6 @@
   opacity: 0.8;
 }
 
-.logo {
-  display: flex;
-  align-items: baseline;
-  gap: 2px;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-@keyframes spectrum-cycle {
-  0%, 12%        { --spectrum-l: 0.7384; --spectrum-c: 0.0997; --spectrum-h: 176.10; }
-  16.67%, 28.67% { --spectrum-l: 0.6847; --spectrum-c: 0.1139; --spectrum-h: 238.61; }
-  33.33%, 45.33% { --spectrum-l: 0.6469; --spectrum-c: 0.1335; --spectrum-h: 346.22; }
-  50%, 62%       { --spectrum-l: 0.6812; --spectrum-c: 0.1054; --spectrum-h: 292.95; }
-  66.67%, 78.67% { --spectrum-l: 0.7649; --spectrum-c: 0.1399; --spectrum-h: 432.95; }
-  83.33%, 95.33% { --spectrum-l: 0.6620; --spectrum-c: 0.1361; --spectrum-h: 392.59; }
-  100%           { --spectrum-l: 0.7384; --spectrum-c: 0.0997; --spectrum-h: 536.10; }
-}
-
-.logoArs {
-  font-family: var(--font-serif);
-  font-style: italic;
-  color: #fff;
-}
-
-.logoTechnic {
-  font-family: var(--font-mono);
-  color: #fff;
-  font-weight: 400;
-}
-
-.logoAI {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  animation: spectrum-cycle 56s infinite;
-  animation-timing-function: cubic-bezier(0.86, 0, 0.14, 1);
-  color: oklch(var(--spectrum-l) var(--spectrum-c) var(--spectrum-h));
-}
-
 .breadcrumbSeparator {
   color: var(--text-muted);
   opacity: 0.5;

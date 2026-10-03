@@ -340,7 +340,7 @@ export const NodeInspector: React.FC<Props> = ({ node, apiKey }) => {
       {tab === 'params' && (
       <div className={styles.inspectorBody}>
         <div className={styles.nodeSubtitle} style={{ whiteSpace: 'normal' }}>
-          {stage.title} · {def.subtitle}
+          {node.type === 'image-import' ? 'Picture' : `${stage.title} · ${def.subtitle}`}
           {def.execution.startsWith('banana') ? ' · powered by your Google banana2 key' : ''}
         </div>
 
@@ -423,6 +423,7 @@ export const NodeInspector: React.FC<Props> = ({ node, apiKey }) => {
       </div>
       )}
 
+      {node.type !== 'image-import' && (
       <button
         className={`${styles.tbtn} ${styles.runBtn} ${styles.inspectorRun}`}
         disabled={isRunning}
@@ -433,6 +434,7 @@ export const NodeInspector: React.FC<Props> = ({ node, apiKey }) => {
           ? (node.variants.length > 0 ? 'Regenerate (stacks a new alternative)' : 'Generate')
           : 'Apply'}
       </button>
+      )}
     </div>
   );
 };

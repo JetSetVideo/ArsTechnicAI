@@ -336,6 +336,7 @@ const CloudAssetCard: React.FC<{ asset: DbAsset }> = ({ asset }) => {
     const node = ps.addNode('image-import');
     if (node) {
       ps.renameNode(node.id, asset.name);
+      ps.placeFree(node.id, 80, 90);
       ps.addVariant(node.id, {
         label: asset.name,
         image: thumbnailUrl,

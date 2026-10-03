@@ -69,10 +69,6 @@
   margin-bottom: 1.25rem;
 }
 
-.brandArs    { color: var(--accent-primary); }
-.brandTechnic { color: var(--text-primary); }
-.brandAI     { color: var(--accent-secondary, var(--accent-primary)); opacity: 0.7; }
-
 /* ── Tabs ─────────────────────────────────────────────────── */
 .tabs {
   display: flex;

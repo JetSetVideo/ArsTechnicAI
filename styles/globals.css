@@ -5,6 +5,11 @@
 /* Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
+/* Registered once so the wordmark hue can interpolate on every page. */
+@property --spectrum-l { syntax: "<number>"; inherits: true; initial-value: 0.7384; }
+@property --spectrum-c { syntax: "<number>"; inherits: true; initial-value: 0.0997; }
+@property --spectrum-h { syntax: "<number>"; inherits: true; initial-value: 176.1; }
+
 :root {
   /* ═══════════════════════════════════════════════════════════
      COLORS - Dark Theme (Default)

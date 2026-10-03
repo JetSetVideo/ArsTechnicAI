@@ -538,3 +538,61 @@ Append-only. Newest round at the bottom. Format and rules: `PROGRAM.md`.
   looks for a dev server serving this checkout only *printed* a hit (a short-lived process,
   gone seconds later; a Cursor agent and terminal are active in this repository) instead of
   aborting — nothing was serving from `.next`, so no harm, but the guard must exit non-zero.
+
+---
+
+## Round 5 — the blueprint is the workshop
+
+### R5.1 surveyor — there is no blueprint page
+- **What**  `git pull --ff-only` was already at `b1c3d6b`. No `pages/blueprint`. The workshop
+  is `/project/[id]` (`AppShell` → `WorkshopFlow`). `useBlueprintStore` was imported only by
+  `stores/index.ts` and `hooks/useDiskReconciliation.ts`. `useCanvasStore` is still imported
+  by generation, project sync, disk save, and telemetry.
+- **Why**  a second page would split the editor the home page is supposed to open.
+- **When**  round 5, before any edit. Unblocks U7. Leaves U8 for `surgeon`.
+- **Where**  `stores/blueprintStore.ts`, `stores/canvasStore.ts`, `pages/project/[id].tsx`.
+- **Who**  `graph-engineer` and `interface-smith`.
+- **How**  `git pull --ff-only origin main`; search for `useBlueprintStore` and `pages/blueprint`.
+- **Result**  `Already up to date.` Last commit `b1c3d6b`.
+
+### R5.2 graph-engineer — a blueprint compiles into workshop nodes
+- **What**  `lib/pipeline/blueprintBridge.ts` turns a blueprint into pipeline nodes and edges,
+  and writes a workshop graph back. Unknown catalog ids and unfit ports become warnings.
+  Three built-in graphs: Key visual, Spoken scene, Storyboard. `applyBlueprint` replaces or
+  inserts. The store seeds those three once (`startersSeeded`).
+- **Why**  the blueprint store had graphs and no screen.
+- **When**  round 5. U7.
+- **Where**  `lib/pipeline/blueprintBridge.ts`, `stores/pipelineStore.ts`, `stores/blueprintStore.ts`,
+  `tests/lib/blueprintBridge.test.ts`.
+- **Who**  `breaker`, then `interface-smith`.
+- **How**  `npx vitest run tests/lib/blueprintBridge.test.ts`.
+- **Result**  `Test Files 1 passed (1)`, `Tests 4 passed (4)`, duration 208 ms.
+
+### R5.3 interface-smith — home opens the graph; one wordmark
+- **What**  Home → Blueprints → Open in Workshop creates a project and loads the graph after
+  that project's pipeline has loaded. The workshop toolbar can replace, add beside, or save
+  the current pipeline. `components/ui/Wordmark.tsx` is the mark on home, the workshop, the
+  sign-in dialog, and Informations, Communauté, Forum, Magasin, Aide. Workshop toolbar and
+  the home left panel use the shared surface tokens.
+- **Why**  the user asked for the blueprint inside the workshop, reachable from home, and for
+  the surfaces that had drifted to share one design.
+- **When**  round 5.
+- **Where**  `components/workshop/BlueprintShelf.tsx`, `WorkshopFlow.tsx`, `HomeLeftPanel.tsx`,
+  `components/ui/Wordmark.tsx`. Prompt: `docs/merge/ROUND5_PROMPT.md`.
+- **Who**  `evidence`.
+- **How**  dev server on port 3010. Click Blueprints, then Open in Workshop.
+- **Result**  `/home` lists three Open in Workshop actions. Opening the first created project
+  `proj-5686c98b-c7f3-407c-a0f3-56aee97e2f28` titled Key visual. The live store held
+  `moodboard-gen`, `style-dna`, `prompt-craft`, `keyframe-gen` and 4 edges. Technic computed
+  as Instrument Serif on the workshop and on `/informations`; AI computed as
+  `oklch(0.7384 0.0997 176.1)`.
+
+### R5.4 conductor — the row stays open for the build gate
+- **What**  U7 is evidenced on 3010 and by the four tests. It is not moved to done.
+- **Why**  `PROGRAM.md` requires a quoted `next build`, and a dev server is serving this
+  checkout. Building now would overwrite `.next` out from under it.
+- **When**  round 5 close.
+- **Where**  `docs/merge/BACKLOG.md` row U7. U8 stays open for `surgeon`.
+- **Who**  the next round, after this server is stopped: `next build`, then move U7.
+- **How**  the browser session above; no `next build` in this round.
+- **Result**  open. Dev server left on `http://127.0.0.1:3010`.

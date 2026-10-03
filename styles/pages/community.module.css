@@ -35,27 +35,6 @@
   text-decoration: none;
 }
 
-.logoArs {
-  font-family: var(--font-serif);
-  font-style: italic;
-  color: var(--text-primary);
-}
-
-.logoTechnic {
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  font-weight: 400;
-}
-
-.logoAI {
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-family: var(--font-mono);
-  font-weight: 700;
-}
-
 /* ═══════════════════════════════════════════════════════════
    HERO
    ═══════════════════════════════════════════════════════════ */

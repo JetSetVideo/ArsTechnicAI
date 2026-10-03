@@ -109,3 +109,8 @@ A row is done when: it runs on 3010; `breaker` has run the battery and its findi
 recorded as accepted; `evidence` holds a before-and-after comparison with no regression; the type
 and build gates are green with output quoted in the ledger; and the ledger entry answers all six
 questions.
+
+## Round 5
+
+The dispatch for the blueprint-into-workshop pass, the shared wordmark, and the check-up
+order is `docs/merge/ROUND5_PROMPT.md`. Agents still post to `LEDGER.md` in the form above.

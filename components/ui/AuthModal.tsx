@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { signIn } from 'next-auth/react';
 import { X, Mail, Lock, User, Loader2 } from 'lucide-react';
 import styles from './AuthModal.module.css';
+import { Wordmark } from './Wordmark';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -113,9 +114,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, callbackUrl = '/'
         </button>
 
         <div className={styles.brand}>
-          <span className={styles.brandArs}>Ars</span>
-          <span className={styles.brandTechnic}>Technic</span>
-          <span className={styles.brandAI}>AI</span>
+          <Wordmark href={null} />
         </div>
 
         <div className={styles.tabs}>

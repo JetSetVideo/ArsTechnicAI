@@ -1,5 +1,4 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
   Settings,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { SearchBar } from '../ui/SearchBar';
+import { Wordmark } from '../ui/Wordmark';
 import { useLogStore, useProjectStore, useProjectsStore } from '@/stores';
 import { STORAGE_KEYS } from '@/constants/workspace';
 import { useToastStore } from '@/stores/toastStore';
@@ -192,13 +192,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     <header id="topbar-app-header-workspace" className={styles.topBar}>
       {/* Left section - Logo, Breadcrumbs, Save, Search */}
       <div id="topbar-section-left-brand-nav" className={styles.section}>
-        <Link href="/home" className={styles.homeLink} title="Back to Dashboard">
-          <div className={styles.logo}>
-            <span className={styles.logoArs}>Ars</span>
-            <span className={styles.logoTechnic}>Technic</span>
-            <span className={styles.logoAI}>AI</span>
-          </div>
-        </Link>
+        <Wordmark className={styles.homeLink} title="Back to Dashboard" />
         
         <ChevronRight size={14} className={styles.breadcrumbSeparator} />
         

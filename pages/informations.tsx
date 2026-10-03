@@ -7,6 +7,7 @@
 import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { Wordmark } from '@/components/ui/Wordmark';
 import { 
   ArrowRight, 
   Sparkles, 
@@ -54,11 +55,7 @@ export default function InformationsPage() {
       <div className={styles.pageContainer}>
         {/* Header */}
         <header className={styles.header}>
-          <Link href="/home" className={styles.logo}>
-            <span className={styles.logoArs}>Ars</span>
-            <span className={styles.logoTechnic}>Technic</span>
-            <span className={styles.logoAI}>AI</span>
-          </Link>
+          <Wordmark className={styles.logo} />
         </header>
 
         {/* Navigation */}

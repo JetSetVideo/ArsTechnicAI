@@ -5,7 +5,6 @@
  * character creator, templates, and comprehensive module access.
  */
 import React, { useState, useCallback, useRef, useEffect, useMemo, KeyboardEvent } from 'react';
-import Link from 'next/link';
 import {
   Search, UserRound, LayoutGrid, Image as ImageIcon,
   Sparkles, Film, Send, ChevronDown, Zap, BrainCircuit,
@@ -32,6 +31,7 @@ import { useUserStore } from '../../stores/userStore';
 import { useTelemetryStore } from '../../stores/telemetryStore';
 import { useProjectsStore } from '../../stores/projectsStore';
 import { useToastStore } from '../../stores/toastStore';
+import { Wordmark } from '../ui/Wordmark';
 import { ProjectsGrid } from '../dashboard';
 import { AssetsGrid } from '../dashboard/AssetsGrid';
 
@@ -663,11 +663,7 @@ export function DashboardLayout() {
     <div id="dashboard-layout-root-page-region" className={styles.root}>
       {/* Top Bar */}
       <header id="dashboard-layout-header-primary-at-top" className={styles.topBar}>
-        <Link href="/home" className={styles.brand} title="Dashboard Home">
-          <span className={styles.brandArs}>Ars</span>
-          <span className={styles.brandTechnic}>Technic</span>
-          <span className={`${styles.brandAI} ${styles.spectrum}`}>AI</span>
-        </Link>
+        <Wordmark className={styles.brand} title="Dashboard Home" />
         <div className={`${styles.searchBox} ${searchOpen ? styles.searchOpen : ''}`}>
           <button type="button" className={styles.searchToggle} aria-label={searchOpen ? 'Close search' : 'Open search'} aria-expanded={searchOpen} onClick={() => {
             setSearchOpen((open) => !open);

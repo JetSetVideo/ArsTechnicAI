@@ -11,6 +11,9 @@ import {
 import type { PipelineNode } from '@/types/pipeline';
 import { PIPELINE_NODE_DEFS, STAGES } from '@/lib/pipeline/catalog';
 import { usePipelineStore, nodePosition, NODE_W, NODE_H } from '@/stores/pipelineStore';
+import { stageAtPoint } from '@/lib/pipeline/lanes';
+import { visibleLaneFrames } from './laneFrames';
+import { settleNode } from './settleNode';
 import { PORT_COLORS, PORT_TOP, PORT_SPACING } from './geometry';
 import { NodeDeck } from './NodeDeck';
 import { LayerOverlay } from './LayerSystem';
@@ -73,7 +76,7 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
     e.stopPropagation();
     usePipelineStore.getState().select(node.id);
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   }, [node.id, pos.x, pos.y]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -84,21 +87,26 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
     if (!d.moved && Math.hypot(dx, dy) < 4) return;
     d.moved = true;
     setDragging(true);
-    usePipelineStore.getState().setNodePosition(node.id, d.origX + dx, d.origY + dy);
+    const x = d.origX + dx;
+    const y = d.origY + dy;
+    usePipelineStore.getState().setNodePosition(node.id, x, y);
+    const store = usePipelineStore.getState();
+    const frames = visibleLaneFrames(store.nodes, store.collapsedStages);
+    store.setDragOverStage(stageAtPoint(x + NODE_W / 2, y + NODE_H / 2, frames));
   }, [node.id, zoom]);
 
   const handlePointerUp = useCallback(() => {
+    const drag = dragRef.current;
     dragRef.current = null;
     setDragging(false);
-    // Deliberately no snap-back-into-lane here: `handlePointerMove` already
-    // live-updated the node's x/y via setNodePosition, and it now just stays
-    // wherever it was dropped — matching the "put it anywhere" freedom the
-    // old freeform Canvas had, on the same node graph instead of a second,
-    // incompatible editor. The node's `stage` (and its lane-grouping/
-    // execution-order membership) is unaffected by where it's dragged.
-  }, []);
+    usePipelineStore.getState().setDragOverStage(null);
+    if (!drag?.moved) return;
+    settleNode(node.id);
+  }, [node.id]);
 
   if (!def) return null;
+
+  const picture = node.type === 'image-import';
 
   // Closed-deck ghost cards — variants literally stack above/behind the node
   const ghostCount = Math.min(3, Math.max(0, node.variants.length - 1));
@@ -108,6 +116,7 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
       data-node
       className={[
         styles.nodeWrap,
+        picture ? styles.nodePicture : '',
         isSelected ? styles.nodeSelected : '',
         isRunning ? styles.nodeRunning : '',
         node.status === 'error' ? styles.nodeError : '',
@@ -140,24 +149,26 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
 
       <div className={styles.node}>
         <div className={styles.nodeHeader}>
-          <span className={styles.nodeIcon}>{nodeIcon(def.icon)}</span>
+          {!picture && <span className={styles.nodeIcon}>{nodeIcon(def.icon)}</span>}
           <div className={styles.nodeTitleBox}>
             <div className={styles.nodeTitle}>{node.title}</div>
-            <div className={styles.nodeSubtitle}>{def.subtitle}</div>
+            {!picture && <div className={styles.nodeSubtitle}>{def.subtitle}</div>}
           </div>
-          <span className={styles.nodeStatus}>
-            {isRunning ? (
-              <Loader2 size={13} className={styles.spin} />
-            ) : (
-              <span
-                className={`${styles.statusDot} ${
-                  node.status === 'done' ? styles.statusDone
-                  : node.status === 'error' ? styles.statusError
-                  : styles.statusIdle
-                }`}
-              />
-            )}
-          </span>
+          {!picture && (
+            <span className={styles.nodeStatus}>
+              {isRunning ? (
+                <Loader2 size={13} className={styles.spin} />
+              ) : (
+                <span
+                  className={`${styles.statusDot} ${
+                    node.status === 'done' ? styles.statusDone
+                    : node.status === 'error' ? styles.statusError
+                    : styles.statusIdle
+                  }`}
+                />
+              )}
+            </span>
+          )}
         </div>
 
         <div className={styles.nodePreview}>
@@ -182,26 +193,39 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
           )}
         </div>
 
-        <div className={styles.nodeFooter}>
-          <button
-            className={`${styles.nodeBtn} ${styles.nodeBtnPrimary}`}
-            disabled={isRunning}
-            onClick={(e) => { e.stopPropagation(); void usePipelineStore.getState().runNode(node.id, apiKey); }}
-            title={def.execution.startsWith('banana') ? 'Generate with banana2' : 'Apply / snapshot'}
-          >
-            {isRunning ? <Loader2 size={11} className={styles.spin} /> : <Play size={11} />}
-            {def.execution.startsWith('banana') ? 'Generate' : 'Apply'}
-          </button>
+        {!picture && (
+          <div className={styles.nodeFooter}>
+            <button
+              className={`${styles.nodeBtn} ${styles.nodeBtnPrimary}`}
+              disabled={isRunning}
+              onClick={(e) => { e.stopPropagation(); void usePipelineStore.getState().runNode(node.id, apiKey); }}
+              title={def.execution.startsWith('banana') ? 'Generate with banana2' : 'Apply / snapshot'}
+            >
+              {isRunning ? <Loader2 size={11} className={styles.spin} /> : <Play size={11} />}
+              {def.execution.startsWith('banana') ? 'Generate' : 'Apply'}
+            </button>
+            <button
+              data-deck
+              className={styles.variantBadge}
+              onClick={(e) => { e.stopPropagation(); usePipelineStore.getState().toggleDeck(node.id); }}
+              title="Layers · versions · info"
+            >
+              <Layers size={10} />
+              {node.variants.length > 0 ? node.variants.length : '+'}
+            </button>
+          </div>
+        )}
+        {picture && node.variants.length > 1 && (
           <button
             data-deck
-            className={styles.variantBadge}
+            className={styles.pictureDeck}
             onClick={(e) => { e.stopPropagation(); usePipelineStore.getState().toggleDeck(node.id); }}
-            title="Layers · versions · info"
+            title="Versions"
           >
             <Layers size={10} />
-            {node.variants.length > 0 ? node.variants.length : '+'}
+            {node.variants.length}
           </button>
-        </div>
+        )}
 
         {/* Ports */}
         {def.inputs.map((port, i) => (

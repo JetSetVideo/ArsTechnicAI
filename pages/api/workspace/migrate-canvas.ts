@@ -96,6 +96,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       title: item.name ?? `Image ${i + 1}`,
       x: item.x,
       y: item.y,
+      inLane: false,
       slot: i,
       params: { file: image },
       status: 'idle',

@@ -7,6 +7,7 @@
 import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { Wordmark } from '@/components/ui/Wordmark';
 import { Users, MessageCircle, Heart, Star, Trophy, Zap } from 'lucide-react';
 import { NavigationBar } from '@/components/layout/NavigationBar';
 import styles from '@/styles/pages/community.module.css';
@@ -53,11 +54,7 @@ export default function CommunautePage() {
       <div className={styles.pageContainer}>
         {/* Header */}
         <header className={styles.header}>
-          <Link href="/home" className={styles.logo}>
-            <span className={styles.logoArs}>Ars</span>
-            <span className={styles.logoTechnic}>Technic</span>
-            <span className={styles.logoAI}>AI</span>
-          </Link>
+          <Wordmark className={styles.logo} />
         </header>
 
         {/* Navigation */}

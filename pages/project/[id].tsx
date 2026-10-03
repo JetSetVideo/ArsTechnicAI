@@ -73,6 +73,7 @@ const ProjectLoader = dynamic(
                     const node = ps.addNode('image-import');
                     if (node) {
                       ps.renameNode(node.id, 'Quick create');
+                      ps.placeFree(node.id, 80, 90);
                       ps.addVariant(node.id, {
                         label: 'Quick create',
                         image: qc.prefillDataUrl,

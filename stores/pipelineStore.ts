@@ -5,6 +5,9 @@ import type {
   PipelineStageId, NodeVariant, BananaRequest, BananaResponse,
   AssetLayer, LayerKind, SceneRef, ParamTemplate,
 } from '@/types/pipeline';
+import type { Blueprint } from '@/types/blueprint';
+import { compileBlueprint } from '@/lib/pipeline/blueprintBridge';
+import { showStageLane } from '@/lib/pipeline/lanes';
 import {
   PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, defaultParams, buildPrompt, portsCompatible,
 } from '@/lib/pipeline/catalog';
@@ -86,6 +89,15 @@ interface PipelineState {
   setParam: (id: string, key: string, value: unknown) => void;
   moveNodeToSlot: (id: string, stage: PipelineStageId, slot: number) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
+  /** Leaves the node on the open canvas, outside every stage lane. */
+  placeFree: (id: string, x: number, y: number) => void;
+  /** Stage lane currently under a dragged node, for the highlight. Not saved. */
+  dragOverStage: PipelineStageId | null;
+  setDragOverStage: (stage: PipelineStageId | null) => void;
+  /** Puts the node in a stage lane and clears a free position. */
+  joinLane: (id: string, stage: PipelineStageId) => void;
+  /** If the moodboard would hold fewer than two pictures, let the last one go. */
+  releaseSparseMoodboard: () => void;
   resetNodePosition: (id: string) => void;
   toggleDeck: (id: string) => void;
   setCollapsed: (id: string, collapsed: boolean) => void;
@@ -164,6 +176,8 @@ interface PipelineState {
 
   // graph helpers
   seedStarterFlow: () => void;
+  /** Drops a saved blueprint onto this workshop. `insert` keeps the current nodes. */
+  applyBlueprint: (blueprint: Blueprint, mode: 'replace' | 'insert') => string[];
   clearAll: () => void;
 }
 
@@ -278,6 +292,7 @@ function describeEdit(before: UndoEntry, after: PipelineState): string {
   if (removed.length === 1 && added.length === 0) return `Removed ${removed[0].title}`;
   if (added.length > 1 && removed.length === 0) return `Added ${added.length} nodes`;
   if (removed.length > 1 && added.length === 0) return `Removed ${removed.length} nodes`;
+  if (added.length > 0 && removed.length > 0) return `Loaded a blueprint (${added.length} nodes)`;
 
   const beforeEdgeIds = new Set(before.edges.map((edge) => edge.id));
   const afterEdgeIds = new Set(after.edges.map((edge) => edge.id));
@@ -327,6 +342,7 @@ function nodeEdited(before: PipelineNode, after: PipelineNode): boolean {
     || before.slot !== after.slot
     || before.x !== after.x
     || before.y !== after.y
+    || before.inLane !== after.inLane
     || before.params !== after.params
     || before.variants !== after.variants
     || before.activeVariantId !== after.activeVariantId
@@ -405,6 +421,7 @@ export const usePipelineStore = create<PipelineState>()(
       viewport: { x: 60, y: 40, zoom: 0.85 },
       selectedId: null,
       pendingEdge: null,
+      dragOverStage: null,
       isRunning: false,
       runningNodeIds: [],
       lastCookedNodeId: null,
@@ -586,16 +603,16 @@ export const usePipelineStore = create<PipelineState>()(
           const reslotted = others.map((n) =>
             n.stage === node.stage && n.slot > node.slot ? { ...n, slot: n.slot - 1 } : n
           );
-          const targetCount = reslotted.filter((n) => n.stage === stage).length;
+          const targetCount = reslotted.filter((n) => n.stage === stage && n.inLane !== false).length;
           const clamped = Math.max(0, Math.min(slot, targetCount));
           // Shift target stage down to make room
           const shifted = reslotted.map((n) =>
-            n.stage === stage && n.slot >= clamped ? { ...n, slot: n.slot + 1 } : n
+            n.stage === stage && n.inLane !== false && n.slot >= clamped ? { ...n, slot: n.slot + 1 } : n
           );
           return {
             nodes: [
               ...shifted,
-              { ...node, stage, slot: clamped, x: undefined, y: undefined },
+              { ...node, stage, slot: clamped, x: undefined, y: undefined, inLane: true },
             ],
           };
         });
@@ -603,6 +620,39 @@ export const usePipelineStore = create<PipelineState>()(
 
       setNodePosition: (id, x, y) =>
         set((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, x, y } : n)) })),
+
+      placeFree: (id, x, y) =>
+        set((s) => ({
+          nodes: s.nodes.map((n) => {
+            if (n.id !== id) return n;
+            const home = n.type === 'image-import' ? PIPELINE_NODE_DEFS[n.type]?.stage ?? n.stage : n.stage;
+            return { ...n, x, y, inLane: false, stage: home };
+          }),
+        })),
+
+      setDragOverStage: (stage) => {
+        if (get().dragOverStage === stage) return;
+        set({ dragOverStage: stage });
+      },
+
+      joinLane: (id, stage) => {
+        const members = get().nodes.filter((n) => n.stage === stage && n.id !== id && n.inLane !== false);
+        get().moveNodeToSlot(id, stage, members.length);
+      },
+
+      releaseSparseMoodboard: () => {
+        const nodes = get().nodes;
+        if (showStageLane(nodes, 'concept')) return;
+        const stranded = nodes.filter((n) => n.stage === 'concept' && n.inLane !== false && n.type === 'image-import');
+        if (stranded.length === 0) return;
+        set({
+          nodes: nodes.map((n) => {
+            if (!stranded.some((item) => item.id === n.id)) return n;
+            const at = nodePosition(n);
+            return { ...n, inLane: false, x: at.x, y: at.y, stage: 'visual' };
+          }),
+        });
+      },
 
       resetNodePosition: (id) =>
         set((s) => ({
@@ -999,12 +1049,12 @@ export const usePipelineStore = create<PipelineState>()(
 
       groups: () => {
         const { nodes, collapsedStages } = get();
-        return STAGE_ORDER.filter((stage) => nodes.some((n) => n.stage === stage)).map(
+        return STAGE_ORDER.filter((stage) => showStageLane(nodes, stage)).map(
           (stage) => ({
             id: `group-${stage}`,
             stage,
             nodeIds: nodes
-              .filter((n) => n.stage === stage)
+              .filter((n) => n.stage === stage && n.inLane !== false)
               .sort((a, b) => a.slot - b.slot)
               .map((n) => n.id),
             collapsed: collapsedStages.includes(stage),
@@ -1030,6 +1080,11 @@ export const usePipelineStore = create<PipelineState>()(
           set((s) => ({
             nodes: s.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
           }));
+
+        if (node.type === 'image-import') {
+          if (node.status === 'done') mark({ status: 'idle', error: undefined });
+          return;
+        }
 
         if (def.execution === 'import' || def.execution === 'manual' || def.execution === 'compose' || def.execution === 'local') {
           // ── Sequence: assemble the Edit Decision List from the film strip ──
@@ -1287,6 +1342,40 @@ export const usePipelineStore = create<PipelineState>()(
         link(script, 'script', subs, 'script', 'script');
         link(seq, 'timeline', fmt, 'timeline', 'timeline');
         set({ selectedId: null });
+      },
+
+      applyBlueprint: (blueprint, mode) => {
+        const compiled = compileBlueprint(blueprint);
+        if (compiled.nodes.length === 0) return compiled.warnings;
+        if (mode === 'replace') {
+          set({
+            nodes: compiled.nodes,
+            edges: compiled.edges,
+            selectedId: null,
+            pendingEdge: null,
+            lastCookedNodeId: null,
+          });
+          return compiled.warnings;
+        }
+        const existing = get().nodes;
+        const slotBase: Partial<Record<string, number>> = {};
+        for (const node of existing) {
+          slotBase[node.stage] = Math.max(slotBase[node.stage] ?? 0, node.slot + 1);
+        }
+        const shift = existing.length > 0 ? 36 : 0;
+        const placed = compiled.nodes.map((node) => ({
+          ...node,
+          slot: node.slot + (slotBase[node.stage] ?? 0),
+          x: node.x !== undefined ? node.x + shift : undefined,
+          y: node.y !== undefined ? node.y + shift : undefined,
+        }));
+        set({
+          nodes: [...existing, ...placed],
+          edges: [...get().edges, ...compiled.edges],
+          selectedId: placed[0]?.id ?? get().selectedId,
+          pendingEdge: null,
+        });
+        return compiled.warnings;
       },
 
       clearAll: () =>

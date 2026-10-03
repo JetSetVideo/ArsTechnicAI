@@ -56,6 +56,16 @@ Undo and the corner log were two lists. The button restored the graph and forgot
 
 They are one record now. A workshop edit becomes a sentence (`Added Generate Moodboard`, `Moved Key Visual`, `Linked Script to Prompt Lab`). That sentence is the Undo tooltip and the first row of History. Returning an edit keeps the line, struck through, so the order of what happened is still there. Searches and settings sit under Other activity. `window.__arsHistory` on the workshop page exposes `steps()`, `undo()`, and `depth()` for an agent reading the same record.
 
+## Round 2026-10-03 — the blueprint is the workshop
+
+A blueprint compiles into the same nodes and edges the canvas already runs
+(`lib/pipeline/blueprintBridge.ts`). The toolbar Blueprints menu replaces the current
+graph, adds the graph beside it, or saves the current pipeline back into the blueprint
+list, which the home page reads. Opening one from home sets `sessionStorage`
+`ars:pending-blueprint` and applies it after that project's pipeline has loaded.
+The workshop chrome (toolbar, add menu, workflow menu) uses the same surface tokens as home.
+The top bar uses the shared wordmark.
+
 ## Where
 
-`components/layout/TopBar.tsx`, `components/ui/SearchBar.tsx`, `components/layout/ExplorerPanel.tsx`, `components/layout/AppShell.tsx`, `components/workshop/WorkshopFlow.tsx`, `components/layout/SettingsModal.tsx`.
+`components/layout/TopBar.tsx`, `components/ui/SearchBar.tsx`, `components/layout/ExplorerPanel.tsx`, `components/layout/AppShell.tsx`, `components/workshop/WorkshopFlow.tsx`, `components/workshop/BlueprintShelf.tsx`, `components/ui/Wordmark.tsx`, `components/layout/SettingsModal.tsx`.

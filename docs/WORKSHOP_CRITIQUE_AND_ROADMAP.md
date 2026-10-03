@@ -219,5 +219,5 @@ REFINEMENT & FORMATS                          status
 | 7 | Parallel branch execution + job queue UI | Speed on big pipelines |
 | 8 | Minimap + marquee select + shortcuts | Navigation at scale |
 | 9 | Prompt copy button in Info tab (preview ✅ shipped) | Trust and reusability |
-| 10 | .arsflow export/import of pipelines | Sharing / templates |
+| 10 | .arsflow export/import of pipelines | Sharing / templates. In-app blueprints shipped 2026-10-03; a file format is still open |
 ```
