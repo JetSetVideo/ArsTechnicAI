@@ -14,6 +14,7 @@
  * }
  */
 
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -36,7 +37,7 @@ const PLATFORM_PRESETS: Record<string, { width: number; height: number; fps: num
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' } } };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const {
@@ -144,3 +145,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Video creation failed', detail: String(err) });
   }
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

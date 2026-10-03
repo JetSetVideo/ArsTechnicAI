@@ -1,3 +1,4 @@
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 /**
@@ -6,7 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
  * 
  * This will return a simple test image to verify the image pipeline is working.
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -113,3 +114,6 @@ export default async function handler(
     </html>
   `);
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

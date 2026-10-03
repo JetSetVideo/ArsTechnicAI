@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { AuthService } from '../services/auth/authService';
+import { authenticate } from '@/lib/auth/requestAuth';
 
 // Authentication middleware types
 type NextApiHandlerWithAuth = (
@@ -12,28 +12,20 @@ type NextApiHandlerWithAuth = (
 export function withAuth(handler: NextApiHandlerWithAuth) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
     try {
-      // Extract token from Authorization header
-      const authHeader = req.headers.authorization;
-      if (!authHeader) {
+      if (!req.headers.authorization) {
         return res.status(401).json({ message: 'No token provided' });
       }
 
-      const token = authHeader.split(' ')[1];
-      
-      // Verify token
-      const decoded = AuthService.verifyToken(token);
+      // Pinned algorithm/issuer/audience + banned/inactive accounts (lib/auth/requestAuth).
+      const principal = await authenticate(req, res);
+      if (!principal || principal.kind !== 'user' || principal.via !== 'jwt') {
+        return res.status(401).json({ message: 'Invalid or expired token' });
+      }
 
-      // Attach user information to request
-      (req as any).userId = decoded.id;
-      (req as any).userRoles = decoded.roles;
+      (req as any).userId = principal.userId;
+      (req as any).userRoles = principal.roles;
 
-      // Call the original handler with additional user context
-      return await handler(
-        req, 
-        res, 
-        decoded.id, 
-        decoded.roles
-      );
+      return await handler(req, res, principal.userId, principal.roles);
 
     } catch (error) {
       console.error('Authentication error:', error);

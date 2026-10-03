@@ -1,15 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import AuthService from '../../../services/auth/authService';
 import rateLimit from '../../../utils/rateLimit';
+import { clientIp } from '@/lib/security/clientIp';
 
+// Per IP (was the constant 'REGISTER_TOKEN' — one bucket for everyone).
 const limiter = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
+  interval: 60 * 60 * 1000,
+  uniqueTokenPerInterval: 5000,
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    await limiter.check(req, res, 5, 'REGISTER_TOKEN');
+    await limiter.check(req, res, 10, `ip:${clientIp(req)}`);
 
     if (req.method !== 'POST') {
       return res.status(405).json({ message: 'Method not allowed' });
@@ -31,6 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     console.error('Register error:', error);
     if (error instanceof Error) {
+      if (error.message === 'Rate limit exceeded') {
+        res.setHeader('Retry-After', '3600');
+        return res.status(429).json({ message: 'Too many sign-ups from this address. Try again later.' });
+      }
       if (error.message.includes('already exists') || error.message.includes('already registered')) {
         return res.status(409).json({ message: error.message });
       }

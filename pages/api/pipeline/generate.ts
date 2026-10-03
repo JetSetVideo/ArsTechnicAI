@@ -1,3 +1,4 @@
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import {
   BANANA_IMAGE_MODELS,
@@ -83,7 +84,7 @@ function extractParts(json: any): { text?: string; dataUrl?: string } {
   return { text, dataUrl };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -205,3 +206,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : lastError,
   });
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

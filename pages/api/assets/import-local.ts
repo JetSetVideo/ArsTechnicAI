@@ -1,3 +1,4 @@
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -69,7 +70,7 @@ function isSystemPath(filePath: string): boolean {
   return blocked.some((p) => lower.startsWith(p));
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
@@ -153,3 +154,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(200).json({ success: true, data: results });
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

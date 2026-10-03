@@ -1,3 +1,5 @@
+import { isSafeId, resolveInside } from '@/lib/security/safePath';
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -14,21 +16,24 @@ async function readJsonSafe(filePath: string): Promise<unknown | null> {
   }
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { projectId } = req.query;
+  if (projectId !== undefined && !isSafeId(projectId)) {
+    return res.status(400).json({ error: 'Invalid projectId' });
+  }
 
   try {
     const result: Record<string, unknown> = {};
 
     // Load canvas for project
     if (projectId && typeof projectId === 'string') {
-      result.canvas = await readJsonSafe(path.join(DATA_DIR, `canvas-${projectId}.json`));
-      result.fileState = await readJsonSafe(path.join(DATA_DIR, `filestate-${projectId}.json`));
-      result.pipeline = await readJsonSafe(path.join(DATA_DIR, `pipeline-${projectId}-draft.json`));
+      result.canvas = await readJsonSafe(resolveInside(DATA_DIR, `canvas-${projectId}.json`));
+      result.fileState = await readJsonSafe(resolveInside(DATA_DIR, `filestate-${projectId}.json`));
+      result.pipeline = await readJsonSafe(resolveInside(DATA_DIR, `pipeline-${projectId}-draft.json`));
     }
 
     // Load projects list
@@ -42,3 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Load failed', detail: String(error) });
   }
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

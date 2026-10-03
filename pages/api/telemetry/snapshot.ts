@@ -2,6 +2,7 @@
  * Telemetry Snapshot API — Receive startup/session snapshot
  */
 
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 type TelemetrySnapshotDelegate = {
@@ -30,7 +31,7 @@ function safeDate(value: unknown): Date {
   return Number.isFinite(n) && !Number.isNaN(d.getTime()) ? d : new Date();
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{ ok: boolean; id?: string; error?: string }>
 ) {
@@ -107,3 +108,6 @@ export default async function handler(
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

@@ -1,3 +1,5 @@
+import { isSafeId, resolveInside } from '@/lib/security/safePath';
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -13,7 +15,7 @@ export const config = {
   },
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -25,16 +27,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { canvas, fileState, settings, projectId, projectName, pipeline } = body ?? {};
+  if (projectId !== undefined && !isSafeId(projectId)) {
+    return res.status(400).json({ error: 'Invalid projectId' });
+  }
 
   try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.mkdir(DATA_DIR, { recursive: true, mode: 0o700 });
 
     // These three can carry base64 image data (canvas items, pipeline
     // variants, file-tree asset thumbnails) and are machine-written/read
     // only — pretty-printing (`null, 2`) roughly doubles write size and CPU
     // for files nobody hand-edits.
     if (canvas && projectId) {
-      const canvasFile = path.join(DATA_DIR, `canvas-${projectId}.json`);
+      const canvasFile = resolveInside(DATA_DIR, `canvas-${projectId}.json`);
       await fs.writeFile(canvasFile, JSON.stringify({
         projectId,
         projectName: projectName || 'Untitled',
@@ -46,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Save Workshop pipeline draft (per-project — see stores/pipelineStore.ts)
     if (pipeline && projectId) {
-      const pipelineFile = path.join(DATA_DIR, `pipeline-${projectId}-draft.json`);
+      const pipelineFile = resolveInside(DATA_DIR, `pipeline-${projectId}-draft.json`);
       await fs.writeFile(pipelineFile, JSON.stringify({
         projectId,
         projectName: projectName || 'Untitled',
@@ -62,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Save file tree state
     if (fileState && projectId) {
-      const fileStateFile = path.join(DATA_DIR, `filestate-${projectId}.json`);
+      const fileStateFile = resolveInside(DATA_DIR, `filestate-${projectId}.json`);
       await fs.writeFile(fileStateFile, JSON.stringify({
         projectId,
         projectName: projectName || 'Untitled',
@@ -82,10 +87,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Save settings (API keys, preferences) to dedicated file
     if (settings) {
+      // Holds provider API keys — owner-only on disk, even when created fresh.
       await fs.writeFile(SETTINGS_FILE, JSON.stringify({
         savedAt: Date.now(),
         settings,
-      }, null, 2), 'utf-8');
+      }, null, 2), { encoding: 'utf-8', mode: 0o600 });
+      await fs.chmod(SETTINGS_FILE, 0o600).catch(() => {});
     }
 
     return res.status(200).json({ success: true });
@@ -93,3 +100,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Save failed', detail: String(error) });
   }
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

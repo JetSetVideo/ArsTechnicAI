@@ -1,3 +1,4 @@
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -35,7 +36,7 @@ const SETTINGS_FILE = path.join(process.cwd(), '.ars-settings.json');
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg']);
 
-export default async function handler(_req: NextApiRequest, res: NextApiResponse) {
+async function handler(_req: NextApiRequest, res: NextApiResponse) {
   if (_req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -98,3 +99,6 @@ export default async function handler(_req: NextApiRequest, res: NextApiResponse
     return res.status(500).json({ error: 'Scan failed', detail: String(error) });
   }
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

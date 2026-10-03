@@ -1,3 +1,5 @@
+import { isSafeId, resolveInside, UnsafePathError } from '@/lib/security/safePath';
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -30,14 +32,21 @@ async function readJsonSafe<T = unknown>(filePath: string): Promise<T | null> {
   }
 }
 
+// Every id that becomes part of a file name is validated here, so no caller can skip it.
+function safeIds(...ids: string[]) {
+  for (const id of ids) if (!isSafeId(id)) throw new UnsafePathError('Invalid projectId or snapshotId');
+}
 function indexFile(projectId: string) {
-  return path.join(DATA_DIR, `pipeline-${projectId}-snapshots.json`);
+  safeIds(projectId);
+  return resolveInside(DATA_DIR, `pipeline-${projectId}-snapshots.json`);
 }
 function snapshotFile(projectId: string, snapshotId: string) {
-  return path.join(DATA_DIR, `pipeline-${projectId}-snap-${snapshotId}.json`);
+  safeIds(projectId, snapshotId);
+  return resolveInside(DATA_DIR, `pipeline-${projectId}-snap-${snapshotId}.json`);
 }
 function draftFile(projectId: string) {
-  return path.join(DATA_DIR, `pipeline-${projectId}-draft.json`);
+  safeIds(projectId);
+  return resolveInside(DATA_DIR, `pipeline-${projectId}-draft.json`);
 }
 
 async function readIndex(projectId: string): Promise<SnapshotMeta[]> {
@@ -62,6 +71,7 @@ async function listAllProjects(): Promise<Array<{ projectId: string; projectName
   }
   const results = [];
   for (const projectId of draftIds) {
+    if (!isSafeId(projectId)) continue; // a stray file name must not break the whole listing
     const draft = await readJsonSafe<{ projectName?: string; savedAt?: number; nodes?: unknown[]; scenes?: unknown[] }>(draftFile(projectId));
     const snapshots = await readIndex(projectId);
     results.push({
@@ -77,7 +87,7 @@ async function listAllProjects(): Promise<Array<{ projectId: string; projectName
   return results;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   await fs.mkdir(DATA_DIR, { recursive: true });
 
   try {
@@ -156,6 +166,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', ['GET', 'POST', 'PATCH', 'DELETE']);
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
+    if (error instanceof UnsafePathError) return res.status(400).json({ error: error.message });
     return res.status(500).json({ error: 'Pipeline workflow operation failed', detail: String(error) });
   }
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

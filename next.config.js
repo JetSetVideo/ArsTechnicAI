@@ -9,6 +9,27 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Security headers on every response (middleware/securityMiddleware.ts was never
+  // wired into any route). The CSP is deliberately narrow — framing, plugins, base
+  // and form targets — because the UI relies on inline styles and calls AI
+  // providers directly; a script/style CSP would need a nonce pass first.
+  async headers() {
+    const security = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(), geolocation=(), microphone=(self)' },
+      { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      {
+        key: 'Content-Security-Policy',
+        value: "frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com",
+      },
+    ];
+    return [
+      { source: '/:path*', headers: security },
+      { source: '/api/:path*', headers: [{ key: 'Cache-Control', value: 'no-store' }] },
+    ];
+  },
   webpack: (config) => {
     // Deno's watchFs misinterprets absolute paths passed by Next.js,
     // causing "NotFound" errors with doubled project paths.

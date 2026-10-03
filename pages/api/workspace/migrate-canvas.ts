@@ -1,3 +1,5 @@
+import { isSafeId, resolveInside } from '@/lib/security/safePath';
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -51,16 +53,17 @@ async function readJsonSafe<T>(filePath: string): Promise<T | null> {
   }
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { return res.status(400).json({ error: 'Invalid JSON' }); } }
   const { projectId, force } = body ?? {};
   if (!projectId) return res.status(400).json({ error: 'projectId is required' });
+  if (!isSafeId(projectId)) return res.status(400).json({ error: 'Invalid projectId' });
 
-  const canvasFile = path.join(DATA_DIR, `canvas-${projectId}.json`);
-  const draftFile = path.join(DATA_DIR, `pipeline-${projectId}-draft.json`);
+  const canvasFile = resolveInside(DATA_DIR, `canvas-${projectId}.json`);
+  const draftFile = resolveInside(DATA_DIR, `pipeline-${projectId}-draft.json`);
 
   const canvasData = await readJsonSafe<{ projectName?: string; items?: LegacyCanvasItem[] }>(canvasFile);
   if (!canvasData) return res.status(404).json({ error: 'No canvas-*.json found for this project' });
@@ -139,3 +142,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     totalNodesAfterMerge: mergedNodes.length,
   });
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

@@ -9,6 +9,7 @@
  * Response: { queued: true; jobId: string }
  */
 
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -18,7 +19,7 @@ try {
   prisma = require('@/lib/prisma').prisma;
 } catch { /* offline / no DB */ }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { platform, handle, videoUrl, caption = '' } = req.body as {
@@ -61,3 +62,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     message: `Publishing job queued for ${platform}. Connect OAuth in Settings → Publishing for automated posting.`,
   });
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

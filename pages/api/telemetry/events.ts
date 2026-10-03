@@ -2,6 +2,7 @@
  * Telemetry Events API — Batch error events
  */
 
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 interface EventInput {
@@ -12,7 +13,7 @@ interface EventInput {
   timestamp?: number;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{ ok: boolean; received?: number; error?: string }>
 ) {
@@ -58,3 +59,6 @@ export default async function handler(
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

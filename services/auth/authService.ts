@@ -1,6 +1,6 @@
 import { PrismaClient, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import * as jwt from 'jsonwebtoken';
+import { signToken, verifyToken as verifyJwt, type TokenClaims } from '@/lib/auth/jwt';
 
 const prisma = new PrismaClient();
 type UserWithRoles = User & { roles: UserRole[] };
@@ -216,18 +216,15 @@ export class AuthService {
   }
 
   // ─── JWT ─────────────────────────────────────────────────────────────────────
+  // Algorithm, issuer and audience are pinned in lib/auth/jwt.ts.
   private static generateJWT(user: UserWithRoles): string {
     const roles = (user.roles || []).map((r) => r.name);
-    return jwt.sign(
-      { id: user.id, email: user.email, roles },
-      process.env.JWT_SECRET!,
-      { expiresIn: (process.env.JWT_EXPIRATION || '7d') as any }
-    );
+    return signToken({ id: user.id, email: user.email, roles }, process.env.JWT_EXPIRATION || '7d');
   }
 
-  static verifyToken(token: string): { id: string; email: string; roles: string[] } {
+  static verifyToken(token: string): TokenClaims {
     try {
-      return jwt.verify(token, process.env.JWT_SECRET!) as any;
+      return verifyJwt(token);
     } catch {
       throw new Error('Invalid or expired token');
     }

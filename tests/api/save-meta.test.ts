@@ -36,8 +36,15 @@ function makeRecord(overrides: Partial<GenerationRecord> = {}): GenerationRecord
   };
 }
 
-function mockReqRes(method: string, body?: GenerationRecord) {
-  const req = { method, body } as unknown as NextApiRequest;
+// The route requires a principal (lib/auth/requestAuth): by default the
+// machine's owner over trusted loopback, as the app's own UI calls it.
+function mockReqRes(method: string, body?: GenerationRecord, from: 'owner' | 'remote' = 'owner') {
+  const req = {
+    method,
+    body,
+    headers: { host: from === 'owner' ? 'localhost:3002' : 'arstechnicai.example' },
+    socket: { remoteAddress: from === 'owner' ? '127.0.0.1' : '203.0.113.9' },
+  } as unknown as NextApiRequest;
   const json = vi.fn();
   const status = vi.fn().mockReturnValue({ json });
   const res = { status } as unknown as NextApiResponse;
@@ -51,6 +58,13 @@ describe('save-meta API', () => {
     fsMocks.mkdir.mockReset();
     fsMocks.mkdir.mockResolvedValue(undefined);
     fsMocks.writeFile.mockResolvedValue(undefined);
+  });
+
+  it('refuses a remote caller without a session', async () => {
+    const { req, res, status } = mockReqRes('POST', makeRecord(), 'remote');
+    await handler(req, res);
+    expect(status).toHaveBeenCalledWith(401);
+    expect(fsMocks.writeFile).not.toHaveBeenCalled();
   });
 
   it('POST appends when id is new', async () => {

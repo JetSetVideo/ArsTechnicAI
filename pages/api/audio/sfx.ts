@@ -9,6 +9,7 @@
  * Response: { audioUrl: string | null }
  */
 
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -25,7 +26,7 @@ const PRESET_PROMPTS: Record<string, string> = {
 
 export const config = { api: { bodyParser: { sizeLimit: '1mb' } } };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { preset = 'ambient', duration = 10 } = req.body as {
@@ -75,3 +76,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ audioUrl: null, message: String(err) });
   }
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

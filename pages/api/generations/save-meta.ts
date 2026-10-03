@@ -1,3 +1,4 @@
+import { withPrincipal } from '@/lib/auth/requestAuth';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
@@ -49,7 +50,7 @@ async function writeMetaFile(meta: MetaFile): Promise<void> {
   await fs.writeFile(META_FILE, JSON.stringify(meta, null, 2), 'utf-8');
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     const record: GenerationRecord = req.body;
     if (!record.id || !record.prompt) {
@@ -76,3 +77,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+// Owner over trusted loopback, or a signed-in user (lib/auth/requestAuth).
+export default withPrincipal(handler, { allowLocal: true });

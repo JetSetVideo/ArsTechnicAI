@@ -1,11 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth/options';
+import { authenticate, hasAtLeast } from '@/lib/auth/requestAuth';
 import { AppError, UnauthorizedError, ValidationError } from './errors';
 import { errorResponse } from './response';
 import type { ZodSchema } from 'zod';
-import type { Role } from '@prisma/client';
-import { hasRole } from '@/lib/auth/permissions';
+// The schema's enum is RoleType; roles travel as strings in the JWT (lib/auth/requestAuth).
+type Role = 'SUPERADMIN' | 'ADMIN' | 'CREATOR' | 'USER' | 'VIEWER';
 
 export interface AuthenticatedRequest extends NextApiRequest {
   userId: string;
@@ -39,18 +38,18 @@ export function createApiHandler(config: HandlerConfig, handler: RouteHandler) {
 
       const authReq = req as AuthenticatedRequest;
 
-      // Auth check
+      // Auth check — the custom JWT the UI holds, NextAuth as fallback
+      // (lib/auth/requestAuth). Database routes never accept loopback trust.
       if (config.auth !== false) {
-        const session = await getServerSession(req, res, authOptions);
-        if (!session?.user?.id) {
+        const principal = await authenticate(req, res, { allowLocal: false });
+        if (!principal || principal.kind !== 'user') {
           throw new UnauthorizedError();
         }
-        authReq.userId = session.user.id;
-        authReq.userRole = session.user.role as Role;
-        authReq.userEmail = session.user.email!;
+        authReq.userId = principal.userId;
+        authReq.userRole = principal.role as Role;
+        authReq.userEmail = principal.email;
 
-        // Role check
-        if (config.role && !hasRole(authReq.userRole, config.role)) {
+        if (config.role && !hasAtLeast(principal.roles, config.role)) {
           return errorResponse(res, 403, 'Insufficient permissions');
         }
       }

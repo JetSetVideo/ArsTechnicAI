@@ -1,26 +1,30 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import AuthService from '../../../services/auth/authService';
 import rateLimit from '../../../utils/rateLimit';
+import { clientIp } from '@/lib/security/clientIp';
 
-const limiter = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
-});
+// Per IP and per account. The key used to be the constant 'LOGIN_TOKEN' — one
+// global bucket, so ten failed logins from anyone locked everyone out.
+const ipLimiter = rateLimit({ interval: 60 * 1000, uniqueTokenPerInterval: 5000 });
+const accountLimiter = rateLimit({ interval: 15 * 60 * 1000, uniqueTokenPerInterval: 5000 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // 10 login attempts per minute per IP
-    await limiter.check(req, res, 10, 'LOGIN_TOKEN');
-
     if (req.method !== 'POST') {
       return res.status(405).json({ message: 'Method not allowed' });
     }
 
-    const { email, password } = req.body;
+    // 10 attempts per minute per IP
+    await ipLimiter.check(req, res, 10, `ip:${clientIp(req)}`);
 
-    if (!email || !password) {
+    const { email, password } = req.body ?? {};
+
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
+
+    // 20 attempts per 15 minutes per account, whatever the source IP
+    await accountLimiter.check(req, res, 20, `acct:${email.toLowerCase().trim()}`);
 
     const authResult = await AuthService.login(email, password);
 
@@ -33,6 +37,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     console.error('Login error:', error);
     if (error instanceof Error) {
+      if (error.message === 'Rate limit exceeded') {
+        res.setHeader('Retry-After', '60');
+        return res.status(429).json({ message: 'Too many attempts. Try again in a minute.' });
+      }
       if (error.message === 'Invalid credentials') {
         return res.status(401).json({ message: 'Invalid email or password' });
       }
