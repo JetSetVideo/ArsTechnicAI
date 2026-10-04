@@ -258,8 +258,9 @@ export const HomeLeftPanel: React.FC<HomeLeftPanelProps> = ({
           {TOOL_GROUPS.map((group) => (
             <div key={group.id} className={styles.toolGroup}>
               <button className={styles.quickAction} onClick={() => {
-                setOpenGroup(openGroup === group.id ? null : group.id);
-                if (group.id === 'generate') onToolAction?.('gen-image');
+                const closing = openGroup === group.id;
+                setOpenGroup(closing ? null : group.id);
+                if (group.id === 'generate') onToolAction?.(closing ? 'gen-close' : 'gen-image');
               }}>
                 {group.id === 'generate' ? <Sparkles size={12} /> : group.id === 'draw' ? <Pencil size={12} /> : <Download size={12} />}
                 {openGroup === group.id ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {group.label}

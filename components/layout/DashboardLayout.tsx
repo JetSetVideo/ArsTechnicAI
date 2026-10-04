@@ -583,9 +583,15 @@ export function DashboardLayout() {
   ]);
 
   const handleToolbarAction = useCallback((id: string) => {
+    if (id === 'gen-close') {
+      setHeroExpanded(false);
+      setActiveToolbarAction('');
+      return;
+    }
     setActiveToolbarAction(id);
     switch (id) {
       case 'gen-image':
+        setCreatorMode('generate');
         setHeroExpanded(true);
         setTimeout(() => promptRef.current?.focus(), 80);
         break;
