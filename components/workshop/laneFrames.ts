@@ -1,7 +1,7 @@
 import type { PipelineStageId } from '@/types/pipeline';
 import { STAGE_ORDER } from '@/lib/pipeline/catalog';
 import { laneMembers, showStageLane, type LaneFrame, type LaneNode } from '@/lib/pipeline/lanes';
-import { LANE_HEADER, LANE_WIDTH, NODE_GAP, NODE_H, laneX } from '@/stores/pipelineStore';
+import { LANE_HEADER, LANE_PAD_X, LANE_WIDTH, NODE_GAP, NODE_H, NODE_W, laneX } from '@/stores/pipelineStore';
 
 export interface LaneFrameOptions {
   collapsed?: readonly PipelineStageId[];
@@ -73,6 +73,16 @@ export function collapsedLaneHeight(count: number): number {
   if (count <= 0) return COLLAPSED_HEADER;
   const stack = collapsedStack(count);
   return COLLAPSED_HEADER + stack[stack.length - 1].lip + COLLAPSED_STACK_PAD;
+}
+
+/** Closed workflow plate: the same card stack as a stage group, only as wide as that stack. */
+export function collapsedClusterSize(count: number): { w: number; h: number } {
+  const stack = collapsedStack(count);
+  const shift = stack.length ? stack[stack.length - 1].shiftX : 0;
+  return {
+    w: LANE_PAD_X * 2 + NODE_W + shift,
+    h: collapsedLaneHeight(count),
+  };
 }
 
 /** Border height that hugs the stacked members. An empty pinned group is only its header. */

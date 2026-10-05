@@ -137,25 +137,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
   const [localModel, setLocalModel] = useState(settings.aiProvider.model);
   const [subscriptionPlan, setSubscriptionPlan] = useState('Free');
   const [planNote, setPlanNote] = useState(false);
-  const [capturingUndo, setCapturingUndo] = useState(false);
+  const [capturingShortcut, setCapturingShortcut] = useState<'undo' | 'search' | null>(null);
 
   useEffect(() => {
-    if (!capturingUndo) return;
+    if (!capturingShortcut) return;
     const onKey = (event: KeyboardEvent) => {
       event.preventDefault();
       event.stopPropagation();
       if (event.key === 'Escape') {
-        setCapturingUndo(false);
+        setCapturingShortcut(null);
         return;
       }
       const chord = shortcutFromEvent(event);
       if (!chord) return;
-      updateSettings({ shortcuts: { undo: chord } });
-      setCapturingUndo(false);
+      const current = useSettingsStore.getState().settings.shortcuts;
+      updateSettings({
+        shortcuts: {
+          undo: current?.undo ?? 'mod+z',
+          search: current?.search ?? 'mod+k',
+          [capturingShortcut]: chord,
+        },
+      });
+      setCapturingShortcut(null);
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [capturingUndo, updateSettings]);
+  }, [capturingShortcut, updateSettings]);
 
   // Health
   const [accountHealth, setAccountHealth] = useState<any>(null);
@@ -965,29 +972,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
               {activeTab === 'shortcuts' && (
                 <div className={styles.section}>
                   <h3>Keyboard Shortcuts</h3>
-                  <p className={styles.description}>Speed up your workflow with these keyboard shortcuts.</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: 4, marginBottom: 8 }}>
-                    <kbd style={{
-                      padding: '2px 8px', background: 'rgba(0,212,170,0.1)', border: '1px solid rgba(0,212,170,0.3)',
-                      borderRadius: 4, fontSize: '0.625rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)',
-                      minWidth: 80, textAlign: 'center',
-                    }}>{capturingUndo ? 'Press keys' : formatShortcut(settings.shortcuts?.undo ?? 'mod+z')}</kbd>
-                    <span style={{ fontSize: '0.6875rem', color: 'var(--text-primary)', flex: 1 }}>Undo workshop edit</span>
-                    <button
-                      type="button"
-                      onClick={() => setCapturingUndo(true)}
-                      style={{ border: '1px solid var(--border-color)', background: 'none', color: 'var(--text-primary)', borderRadius: 4, fontSize: '0.625rem', padding: '3px 8px', cursor: 'pointer' }}
-                    >
-                      {capturingUndo ? 'Listening…' : 'Change'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateSettings({ shortcuts: { undo: 'mod+z' } })}
-                      style={{ border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '0.625rem', cursor: 'pointer' }}
-                    >
-                      Reset
-                    </button>
-                  </div>
+                  <p className={styles.description}>
+                    Change a chord by pressing its keys. Command on Mac, Control on Windows and Linux.
+                  </p>
+                  {([
+                    { id: 'undo' as const, label: 'Undo workshop edit', fallback: 'mod+z' },
+                    { id: 'search' as const, label: 'Open search — Command K on Mac, Control K on Windows and Linux', fallback: 'mod+k' },
+                  ]).map((row) => (
+                    <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: 4, marginBottom: 8 }}>
+                      <kbd style={{
+                        padding: '2px 8px', background: 'rgba(0,212,170,0.1)', border: '1px solid rgba(0,212,170,0.3)',
+                        borderRadius: 4, fontSize: '0.625rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)',
+                        minWidth: 80, textAlign: 'center',
+                      }}>{capturingShortcut === row.id ? 'Press keys' : formatShortcut(settings.shortcuts?.[row.id] ?? row.fallback)}</kbd>
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-primary)', flex: 1 }}>{row.label}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCapturingShortcut(row.id)}
+                        style={{ border: '1px solid var(--border-color)', background: 'none', color: 'var(--text-primary)', borderRadius: 4, fontSize: '0.625rem', padding: '3px 8px', cursor: 'pointer' }}
+                      >
+                        {capturingShortcut === row.id ? 'Listening…' : 'Change'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = settings.shortcuts;
+                          updateSettings({
+                            shortcuts: {
+                              undo: current?.undo ?? 'mod+z',
+                              search: current?.search ?? 'mod+k',
+                              [row.id]: row.fallback,
+                            },
+                          });
+                        }}
+                        style={{ border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '0.625rem', cursor: 'pointer' }}
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  ))}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 380, overflow: 'auto' }}>
                     {[
                       { keys: 'G', desc: 'Focus prompt input' },
@@ -1080,7 +1103,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                       {[
                         ['ars:search:files', 'Search files by default'],
                         ['ars:search:google', 'Search Google by default'],
-                        ['ars:search:suggestions', 'Show the 3 closest names'],
+                        ['ars:search:suggestions', 'Show matching files and their pictures'],
                       ].map(([key, label]) => (
                         <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: 'var(--bg-tertiary)', borderRadius: 5 }}>
                           <input

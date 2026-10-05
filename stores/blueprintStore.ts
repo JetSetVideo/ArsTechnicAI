@@ -73,12 +73,13 @@ export const useBlueprintStore = create<BlueprintState>()(
       },
 
       ensureStarters: () => {
-        if (get().startersSeeded) return;
         const starters = STARTER_BLUEPRINTS.map(specToBlueprint);
         const have = new Set(get().blueprints.map((bp) => bp.id));
+        const missing = starters.filter((bp) => !have.has(bp.id));
+        if (missing.length === 0 && get().startersSeeded) return;
         set({
           startersSeeded: true,
-          blueprints: [...starters.filter((bp) => !have.has(bp.id)), ...get().blueprints],
+          blueprints: [...missing, ...get().blueprints],
         });
       },
 

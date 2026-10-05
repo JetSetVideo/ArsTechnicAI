@@ -233,6 +233,19 @@
   overflow: hidden;
   cursor: crosshair;
 }
+.minimapEdges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.minimapEdges line {
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
 .minimapLane {
   position: absolute;
   box-sizing: border-box;
@@ -335,6 +348,100 @@
 }
 .wheelCancel:hover { background: rgba(40, 40, 52, 0.98); }
 
+/* ── Workflow plate: a tight field of the stage color ─ */
+.cluster {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--stage-color) 28%, transparent);
+  background: color-mix(in srgb, var(--stage-color) 7%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--stage-color) 10%, transparent),
+    0 18px 40px -28px color-mix(in srgb, var(--stage-color) 45%, transparent);
+}
+.clusterHeader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  pointer-events: auto;
+  cursor: pointer;
+  gap: 10px;
+  border-bottom: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--stage-color) 14%, #12121c) 0%,
+    color-mix(in srgb, var(--stage-color) 4%, transparent) 58%,
+    transparent 100%
+  );
+  box-shadow: none;
+}
+.clusterHeader::after {
+  content: '';
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -26px;
+  height: 34px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--stage-color) 10%, #09090f);
+  filter: blur(18px);
+  opacity: 0.92;
+}
+.clusterChevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #8a8aa2;
+  transition: transform 0.25s;
+}
+.clusterCollapsed {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.clusterCollapsed .clusterHeader { z-index: 30; }
+.clusterIcon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  color: #05050c;
+  background: var(--stage-color);
+}
+.clusterTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--stage-color) 82%, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.clusterHandle {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 4;
+}
+.clusterN, .clusterS { left: 16px; right: 16px; height: 12px; cursor: ns-resize; }
+.clusterN { top: 0; }
+.clusterS { bottom: 0; }
+.clusterE, .clusterW { top: 16px; bottom: 16px; width: 12px; cursor: ew-resize; }
+.clusterE { right: 0; }
+.clusterW { left: 0; }
+.clusterNE, .clusterNW, .clusterSE, .clusterSW { width: 16px; height: 16px; }
+.clusterNE { top: 0; right: 0; cursor: nesw-resize; }
+.clusterNW { top: 0; left: 0; cursor: nwse-resize; }
+.clusterSE { bottom: 0; right: 0; cursor: nwse-resize; }
+.clusterSW { bottom: 0; left: 0; cursor: nesw-resize; }
+.scene[data-cluster-resize] .nodeWrap { transition: none; }
+
 /* ── Stage lane (auto-formed group) ──────────────────────── */
 .lane {
   position: absolute;
@@ -354,6 +461,7 @@
 }
 
 .laneHeader {
+  position: relative;
   display: flex;
   align-items: center;
   pointer-events: auto;
@@ -361,6 +469,31 @@
   padding: 10px 13px;
   cursor: pointer;
   user-select: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+.laneHeader::before,
+.laneHeader::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.laneHeader::before {
+  bottom: -36px;
+  height: 30px;
+  background: #05050a;
+  filter: blur(18px);
+  opacity: 0.95;
+}
+.laneHeader::after {
+  bottom: -14px;
+  height: 24px;
+  background: var(--stage-color);
+  filter: blur(20px);
+  opacity: 0.42;
 }
 .laneIcon {
   display: grid;
@@ -569,33 +702,8 @@
   display: block;
 }
 
-/* Imported picture: the frame is the card. No apply control, no status dot. */
-.nodePicture .node {
-  background: #101018;
-}
-.nodePicture .nodeHeader {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
-  padding: 8px 10px 18px;
-  border-bottom: none;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.62), transparent);
-  pointer-events: none;
-}
-.nodePicture .nodeTitle { font-size: 0.68rem; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
-.nodePicture .nodePreview {
-  margin: 0;
-  border: none;
-  border-radius: 16px;
-  background: #0c0c12;
-}
+/* Imported picture uses the same header as every other card. No apply control. */
 .nodePicture .nodePreview img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
   object-fit: contain;
 }
 .pictureDeck {
@@ -854,15 +962,21 @@
 
 /* ── Edges ───────────────────────────────────────────────── */
 .edgeSvg { position: absolute; overflow: visible; pointer-events: none; z-index: 1; }
+.edgeHit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18;
+  pointer-events: stroke;
+  cursor: pointer;
+}
 .edgePath {
   fill: none;
   stroke-width: 2.5;
   opacity: 0.85;
-  pointer-events: stroke;
-  cursor: pointer;
+  pointer-events: none;
   transition: stroke-width 0.12s, opacity 0.12s;
 }
-.edgePath:hover { stroke-width: 4.5; opacity: 1; }
+.edgeHit:hover + .edgePath { stroke-width: 4.5; opacity: 1; }
 .edgeGlow { fill: none; stroke-width: 8; opacity: 0.14; pointer-events: none; }
 .pendingPath { fill: none; stroke-width: 2.5; stroke-dasharray: 7 5; opacity: 0.9; animation: dash 0.6s linear infinite; }
 @keyframes dash { to { stroke-dashoffset: -12; } }

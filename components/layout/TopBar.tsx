@@ -79,12 +79,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   const handleSearch = useCallback(
     (query: string, scope: SearchScope) => {
       log('search', `Searched for "${query}" in ${scope}`, { query, scope });
-      if (scope === 'google' || scope === 'all') {
-        window.open(
-          `https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=isch`,
-          '_blank'
-        );
-      }
     },
     [log]
   );

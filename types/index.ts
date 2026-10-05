@@ -394,6 +394,8 @@ export interface AppearanceSettings {
 export interface ShortcutSettings {
   /** Chord such as `mod+z`. `mod` is ⌘ on macOS and Ctrl elsewhere. */
   undo: string;
+  /** Open the top-bar search. Default `mod+k`: Command K on Mac, Control K on Windows and Linux. */
+  search: string;
 }
 
 export interface AppSettings {

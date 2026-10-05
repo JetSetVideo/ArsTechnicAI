@@ -2,14 +2,16 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-2, 0.5rem);
+  gap: 8px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg, 8px);
-  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
-  transition: all 0.15s ease;
-  max-width: 360px;
+  padding: 4px 8px 4px 6px;
+  min-height: 32px;
+  min-width: 300px;
+  max-width: 480px;
   width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, width 0.24s ease, max-width 0.24s ease, padding 0.2s ease;
 }
 
 .searchBar:hover {
@@ -23,7 +25,8 @@
 
 .scopeButtons {
   display: flex;
-  gap: var(--space-1, 0.25rem);
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .scopeButton {
@@ -37,7 +40,7 @@
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .scopeButton:hover {
@@ -51,41 +54,160 @@
 }
 
 .inputWrapper {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-2, 0.5rem);
+  gap: 8px;
   position: relative;
+  min-width: 140px;
 }
 
 .iconBtn {
-  display: flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; padding: 0; border: none; background: none;
-  color: var(--text-muted); cursor: pointer; flex-shrink: 0; order: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  order: 0;
+  transition: color 0.2s ease;
+}
+
+.iconBtn svg {
+  display: block;
   transition: transform 0.2s ease, color 0.2s ease;
 }
-.iconActive { color: #fff; transform: rotate(90deg); order: 5; }
+
+.iconActive {
+  color: #fff;
+}
+
+.iconActive svg {
+  transform: scale(1.08);
+}
+
 .suggest {
-  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30;
-  margin: 0; padding: 4px; list-style: none;
-  background: var(--bg-elevated, #222228); border: 1px solid var(--border-color);
-  border-radius: 8px; box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 80;
+  margin: 0;
+  padding: 4px;
+  max-height: 360px;
+  overflow: auto;
+  background: var(--bg-elevated, #222228);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  min-width: 280px;
 }
+
+.fileList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .suggest button {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  width: 100%; padding: 6px 8px; border: none; border-radius: 6px;
-  background: none; color: var(--text-primary); font-size: 0.75rem; cursor: pointer; text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
 }
-.suggestActive, .suggest button:hover { background: rgba(255,255,255,0.06); }
-.suggestKind { color: var(--text-muted); font-size: 0.625rem; }
-.suggestMeta { padding: 4px 8px; color: var(--text-muted); font-size: 0.625rem; }
-@media (max-width: 800px) {
-  .searchBar:not(.open) { width: 32px; max-width: 32px; padding: 0; justify-content: center; overflow: hidden; }
-  .searchBar:not(.open) .scopeButtons,
-  .searchBar:not(.open) .inputWrapper,
-  .searchBar:not(.open) .shortcut,
-  .searchBar:not(.open) .suggest { display: none; }
-  .searchBar.open { position: absolute; left: 8px; right: 48px; width: auto; max-width: none; z-index: 40; overflow: visible; }
+
+.suggestActive,
+.fileList button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.suggestLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestKind {
+  color: var(--text-muted);
+  font-size: 0.625rem;
+  flex-shrink: 0;
+}
+
+.suggestMeta {
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-size: 0.625rem;
+}
+
+.thumb,
+.thumbFallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.thumb {
+  object-fit: cover;
+  display: block;
+}
+
+.thumbFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.webBlock {
+  padding-top: 2px;
+}
+
+.webGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+}
+
+.suggest .webTile {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background: #141418;
+  cursor: pointer;
+}
+
+.webTile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.webTileActive,
+.webTile:hover {
+  border-color: var(--accent-primary);
 }
 
 .input {
@@ -97,6 +219,7 @@
   font-size: var(--font-base, 0.8125rem);
   outline: none;
   min-width: 0;
+  width: 100%;
 }
 
 .input::placeholder {
@@ -114,7 +237,8 @@
   background: var(--bg-tertiary);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .clearButton:hover {
@@ -122,13 +246,41 @@
   color: var(--text-secondary);
 }
 
-.shortcut {
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  padding: 0.125rem 0.375rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  color: var(--text-muted);
-  flex-shrink: 0;
+.searchBar.compact {
+  min-width: 32px;
+}
+
+.searchBar.compact:not(.open) {
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.searchBar.compact:not(.open) .scopeButtons,
+.searchBar.compact:not(.open) .inputWrapper,
+.searchBar.compact:not(.open) .suggest {
+  display: none;
+}
+
+.searchBar.compact.open {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 40px;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  z-index: 70;
+  overflow: visible;
+  animation: searchExpand 0.22s ease;
+}
+
+@keyframes searchExpand {
+  from { clip-path: inset(0 70% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }

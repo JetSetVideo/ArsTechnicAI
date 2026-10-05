@@ -6,8 +6,9 @@ import type {
   AssetLayer, LayerKind, SceneRef, ParamTemplate,
 } from '@/types/pipeline';
 import type { Blueprint } from '@/types/blueprint';
-import { compileBlueprint } from '@/lib/pipeline/blueprintBridge';
+import { compileBlueprint, workflowIcon } from '@/lib/pipeline/blueprintBridge';
 import { showStageLane } from '@/lib/pipeline/lanes';
+import { CLUSTER_PAD_TOP, CLUSTER_PAD_X, findClusterOrigin, packCluster, placeCluster, type ClusterRect } from '@/lib/pipeline/clusterLayout';
 import {
   PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, defaultParams, buildPrompt, portsCompatible,
 } from '@/lib/pipeline/catalog';
@@ -206,9 +207,17 @@ interface PipelineState {
   undo: () => void;
 
   // graph helpers
-  seedStarterFlow: () => void;
+  seedStarterFlow: (options?: { beside?: boolean }) => void;
   /** Drops a saved blueprint onto this workshop. `insert` keeps the current nodes. */
-  applyBlueprint: (blueprint: Blueprint, mode: 'replace' | 'insert') => string[];
+  applyBlueprint: (
+    blueprint: Blueprint,
+    mode: 'replace' | 'insert',
+    focus?: { x: number; y: number; viewW?: number; viewH?: number },
+  ) => string[];
+  /** Reflow every card in a workflow plate so they fill the new frame. */
+  resizeCluster: (clusterId: string, frame: ClusterRect) => void;
+  /** Fold or open a workflow plate, the same way a stage group folds. */
+  toggleClusterCollapsed: (clusterId: string) => void;
   clearAll: () => void;
 }
 
@@ -345,6 +354,7 @@ function describeEdit(before: UndoEntry, after: PipelineState): string {
     if (prev.x !== node.x || prev.y !== node.y || prev.slot !== node.slot) return `Moved ${node.title}`;
     if (prev.params !== node.params) return `Edited ${node.title}`;
     if (prev.variants !== node.variants || prev.activeVariantId !== node.activeVariantId) return `Updated ${node.title}`;
+    if (prev.clusterCollapsed !== node.clusterCollapsed) return node.clusterCollapsed ? 'Closed a workflow' : 'Opened a workflow';
   }
   if (before.scenes !== after.scenes) return 'Updated the film strip';
   if (before.collapsedStages !== after.collapsedStages) return 'Folded a stage';
@@ -379,7 +389,12 @@ function nodeEdited(before: PipelineNode, after: PipelineNode): boolean {
     || before.variants !== after.variants
     || before.activeVariantId !== after.activeVariantId
     || before.collapsed !== after.collapsed
-    || before.deckOpen !== after.deckOpen;
+    || before.deckOpen !== after.deckOpen
+    || before.clusterFrame?.x !== after.clusterFrame?.x
+    || before.clusterFrame?.y !== after.clusterFrame?.y
+    || before.clusterFrame?.w !== after.clusterFrame?.w
+    || before.clusterFrame?.h !== after.clusterFrame?.h
+    || before.clusterCollapsed !== after.clusterCollapsed;
 }
 
 function graphEdited(prev: PipelineState, state: PipelineState): boolean {
@@ -1359,8 +1374,8 @@ export const usePipelineStore = create<PipelineState>()(
         applyUndo(entry);
       },
 
-      seedStarterFlow: () => {
-        if (get().nodes.length > 0) return;
+      seedStarterFlow: (options) => {
+        if (get().nodes.length > 0 && !options?.beside) return;
         const add = (type: string) => get().addNode(type);
         const mood = add('moodboard-gen');
         const dna = add('style-dna');
@@ -1425,38 +1440,114 @@ export const usePipelineStore = create<PipelineState>()(
         set({ selectedId: null });
       },
 
-      applyBlueprint: (blueprint, mode) => {
+      applyBlueprint: (blueprint, mode, focus) => {
         const compiled = compileBlueprint(blueprint);
         if (compiled.nodes.length === 0) return compiled.warnings;
+        const state = get();
+        const zoom = state.viewport.zoom || 1;
+        const viewW = focus?.viewW ?? 1280;
+        const viewH = focus?.viewH ?? 800;
+        const center = focus
+          ? { x: focus.x, y: focus.y }
+          : {
+              x: (viewW / 2 - state.viewport.x) / zoom,
+              y: (viewH / 2 - state.viewport.y) / zoom,
+            };
+        const packed = packCluster(
+          compiled.nodes.map((node) => node.id),
+          compiled.edges,
+        );
+        const obstacles = mode === 'replace'
+          ? []
+          : state.nodes.map((node) => {
+              const at = nodePosition(node);
+              return { x: at.x - 16, y: at.y - 16, w: NODE_W + 32, h: NODE_H + 32 };
+            });
+        const view = {
+          x: -state.viewport.x / zoom,
+          y: -state.viewport.y / zoom,
+          w: viewW / zoom,
+          h: viewH / zoom,
+        };
+        const origin = findClusterOrigin(center, packed.width, packed.height, obstacles, view);
+        const clusterId = uuidv4();
+        const clusterFrame = { x: origin.x, y: origin.y, w: packed.width, h: packed.height };
+        const placed = compiled.nodes.map((node) => {
+          const at = packed.positions.get(node.id) ?? { x: CLUSTER_PAD_X, y: CLUSTER_PAD_TOP };
+          return {
+            ...node,
+            inLane: false as const,
+            x: origin.x + at.x,
+            y: origin.y + at.y,
+            clusterId,
+            clusterTitle: blueprint.name,
+            clusterIcon: workflowIcon(blueprint.id, blueprint.name),
+            clusterFrame,
+          };
+        });
+        const frameRight = origin.x + packed.width;
+        const frameBottom = origin.y + packed.height;
+        const inside = origin.x >= view.x + 8
+          && origin.y >= view.y + 8
+          && frameRight <= view.x + view.w - 8
+          && frameBottom <= view.y + view.h - 8;
+        const viewport = inside
+          ? state.viewport
+          : {
+              ...state.viewport,
+              x: viewW / 2 - (origin.x + packed.width / 2) * zoom,
+              y: viewH / 2 - (origin.y + packed.height / 2) * zoom,
+            };
         if (mode === 'replace') {
           set({
-            nodes: compiled.nodes,
+            nodes: placed,
             edges: compiled.edges,
-            selectedId: null,
+            selectedId: placed[0]?.id ?? null,
             pendingEdge: null,
             lastCookedNodeId: null,
+            viewport,
           });
           return compiled.warnings;
         }
-        const existing = get().nodes;
-        const slotBase: Partial<Record<string, number>> = {};
-        for (const node of existing) {
-          slotBase[node.stage] = Math.max(slotBase[node.stage] ?? 0, node.slot + 1);
-        }
-        const shift = existing.length > 0 ? 36 : 0;
-        const placed = compiled.nodes.map((node) => ({
-          ...node,
-          slot: node.slot + (slotBase[node.stage] ?? 0),
-          x: node.x !== undefined ? node.x + shift : undefined,
-          y: node.y !== undefined ? node.y + shift : undefined,
-        }));
         set({
-          nodes: [...existing, ...placed],
-          edges: [...get().edges, ...compiled.edges],
-          selectedId: placed[0]?.id ?? get().selectedId,
+          nodes: [...state.nodes, ...placed],
+          edges: [...state.edges, ...compiled.edges],
+          selectedId: placed[0]?.id ?? state.selectedId,
           pendingEdge: null,
+          viewport,
         });
         return compiled.warnings;
+      },
+
+      resizeCluster: (clusterId, frame) => {
+        const state = get();
+        const members = state.nodes.filter((node) => node.clusterId === clusterId);
+        if (members.length === 0) return;
+        const ids = members.map((node) => node.id);
+        const idSet = new Set(ids);
+        const placed = placeCluster(
+          ids,
+          state.edges.filter((edge) => idSet.has(edge.from) && idSet.has(edge.to)),
+          frame,
+        );
+        set({
+          nodes: state.nodes.map((node) => {
+            const at = placed.get(node.id);
+            if (!at) return node;
+            return { ...node, x: at.x, y: at.y, clusterFrame: frame };
+          }),
+        });
+      },
+
+      toggleClusterCollapsed: (clusterId) => {
+        const members = get().nodes.filter((node) => node.clusterId === clusterId);
+        if (members.length === 0) return;
+        const collapsed = !members.some((node) => node.clusterCollapsed);
+        set({
+          nodes: get().nodes.map((node) => (
+            node.clusterId === clusterId ? { ...node, clusterCollapsed: collapsed } : node
+          )),
+        });
       },
 
       clearAll: () =>

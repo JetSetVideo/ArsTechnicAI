@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import {
-  Play, Loader2, Layers, FileText, ImageOff,
+  Play, Loader2, Layers, FileText, ImageOff, Sun, Eraser, CloudRain, Clock, Plus, Moon,
   Palette, Scroll, Users, LayoutGrid, Image as ImageIcon, Clapperboard,
   Music, Film, Send, Upload, Sparkles, Droplet, Fingerprint, Quote, PenLine,
   MessageCircle, ListTree, User, Contact, MapPin, Mountain, Box, ListOrdered,
@@ -33,6 +33,8 @@ const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   'clipboard-check': ClipboardCheck, captions: Captions, type: Type, heading: Heading,
   proportions: Proportions, cog: Cog, 'gallery-thumbnails': GalleryThumbnails,
   'file-text': FileText, flask: FlaskConical, pencil: Pencil, boxes: Boxes,
+  'image-off': ImageOff, sun: Sun, eraser: Eraser, 'cloud-rain': CloudRain,
+  clock: Clock, plus: Plus, moon: Moon,
 };
 
 export function nodeIcon(name: string, size = 13): React.ReactNode {
@@ -180,26 +182,24 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
 
       <div className={styles.node}>
         <div className={styles.nodeHeader}>
-          {!picture && <span className={styles.nodeIcon}>{nodeIcon(def.icon)}</span>}
+          <span className={styles.nodeIcon}>{nodeIcon(def.icon)}</span>
           <div className={styles.nodeTitleBox}>
             <div className={styles.nodeTitle}>{node.title}</div>
-            {!picture && <div className={styles.nodeSubtitle}>{def.subtitle}</div>}
+            <div className={styles.nodeSubtitle}>{def.subtitle}</div>
           </div>
-          {!picture && (
-            <span className={styles.nodeStatus}>
-              {isRunning ? (
-                <Loader2 size={13} className={styles.spin} />
-              ) : (
-                <span
-                  className={`${styles.statusDot} ${
-                    node.status === 'done' ? styles.statusDone
-                    : node.status === 'error' ? styles.statusError
-                    : styles.statusIdle
-                  }`}
-                />
-              )}
-            </span>
-          )}
+          <span className={styles.nodeStatus}>
+            {isRunning ? (
+              <Loader2 size={13} className={styles.spin} />
+            ) : (
+              <span
+                className={`${styles.statusDot} ${
+                  node.status === 'done' ? styles.statusDone
+                  : node.status === 'error' ? styles.statusError
+                  : styles.statusIdle
+                }`}
+              />
+            )}
+          </span>
         </div>
 
         <div className={styles.nodePreview}>

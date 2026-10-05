@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, ChevronDown, Play, Square, Loader2, ZoomIn, ZoomOut, Maximize,
-  Trash2, Wand2, ChevronRight, Scan, Undo2,
+  Trash2, ChevronRight, Scan, Undo2, FolderClock,
 } from 'lucide-react';
-import { usePipelineStore, nodePosition, LANE_WIDTH, LANE_HEADER, LANE_PAD_X, NODE_H, NODE_GAP, NODE_W, laneX } from '@/stores/pipelineStore';
+import { usePipelineStore, nodePosition, LANE_WIDTH, LANE_PAD_X, NODE_H, NODE_GAP, NODE_W, laneX } from '@/stores/pipelineStore';
 import { rectsOverlap } from '@/lib/pipeline/lanes';
-import { COLLAPSED_HEADER, collapsedStack, laneFrameHeight } from './laneFrames';
+import {
+  CLUSTER_GAP_MIN_X, CLUSTER_HEADER, CLUSTER_PAD_BOTTOM, CLUSTER_PAD_TOP, CLUSTER_PAD_X,
+  minClusterSize, packCluster, plateAround, resizeClusterFrame, type ClusterEdgeName,
+} from '@/lib/pipeline/clusterLayout';
+import { COLLAPSED_HEADER, collapsedClusterSize, collapsedLaneHeight, collapsedStack, laneFrameHeight } from './laneFrames';
 import { cyclePointForStage, wiringFor } from './groupCycles';
 import { settleNode } from './settleNode';
 import { PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, nodesForStage } from '@/lib/pipeline/catalog';
@@ -18,10 +22,9 @@ import { NodeInspector } from './NodeInspector';
 import { LayerEditorModal } from './LayerEditorModal';
 import { SceneStrip } from './SceneStrip';
 import { WorkshopOverview } from './WorkshopOverview';
-import { WorkflowMenu } from './WorkflowMenu';
-import { BlueprintShelf } from './BlueprintShelf';
+import { WorkflowPicker } from './WorkflowPicker';
 import { useBlueprintStore } from '@/stores/blueprintStore';
-import { PENDING_BLUEPRINT_KEY } from '@/lib/pipeline/blueprintBridge';
+import { PENDING_BLUEPRINT_KEY, specToBlueprint, workflowIcon, type BlueprintSpec } from '@/lib/pipeline/blueprintBridge';
 import { inputPortPos, outputPortPos, edgePath, PORT_COLORS } from './geometry';
 import { formatShortcut, matchShortcut } from '@/lib/shortcuts';
 import styles from './WorkshopFlow.module.css';
@@ -49,7 +52,7 @@ export const WorkshopFlow: React.FC = () => {
   const dragInsertIndex = usePipelineStore((s) => s.dragInsertIndex);
   const {
     setViewport, select, cancelEdge, removeEdge, addNode, runAll, stopRun,
-    clearAll, seedStarterFlow, groups, toggleGroupCollapsed, addVariant,
+    clearAll, groups, toggleGroupCollapsed, addVariant,
     openStage, closeStage,
   } = usePipelineStore.getState();
   const { settings } = useSettingsStore();
@@ -144,6 +147,18 @@ export const WorkshopFlow: React.FC = () => {
   const marqueeRef = useRef<{ x0: number; y0: number; x1: number; y1: number; clientX: number; clientY: number; additive: boolean } | null>(null);
   const pickedRef = useRef<string[]>([]);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showWorkflowPicker, setShowWorkflowPicker] = useState(false);
+  const fitAfterOpen = useRef(false);
+  const clusterSpacingSettled = useRef(false);
+  const clusterResize = useRef<{
+    id: string;
+    edge: ClusterEdgeName;
+    x: number;
+    y: number;
+    frame: { x: number; y: number; w: number; h: number };
+    min: { w: number; h: number };
+  } | null>(null);
+  const [clusterResizing, setClusterResizing] = useState(false);
   const [addQuery, setAddQuery] = useState('');
   const [viewFitted, setViewFitted] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
@@ -396,26 +411,149 @@ export const WorkshopFlow: React.FC = () => {
   const fitView = useCallback(() => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect || nodes.length === 0) return;
-    const populated = STAGE_ORDER.filter((st) => nodes.some((n) => n.stage === st));
-    if (populated.length === 0) return;
-    const minX = Math.min(...populated.map((st) => laneX(st)));
-    const maxX = Math.max(...populated.map((st) => laneX(st) + LANE_WIDTH));
-    const maxSlots = Math.max(
-      1,
-      ...populated.map((st) => nodes.filter((n) => n.stage === st).length)
-    );
-    const height = LANE_HEADER + maxSlots * (NODE_H + NODE_GAP) + 40;
+    const boxes = nodes.map((node) => nodePosition(node));
+    const minX = Math.min(...boxes.map((at) => at.x)) - CLUSTER_PAD_X;
+    const minY = Math.min(...boxes.map((at) => at.y)) - CLUSTER_PAD_TOP;
+    const maxX = Math.max(...boxes.map((at) => at.x)) + NODE_W + CLUSTER_PAD_X;
+    const maxY = Math.max(...boxes.map((at) => at.y)) + NODE_H + CLUSTER_PAD_BOTTOM;
+    const width = Math.max(1, maxX - minX);
+    const height = Math.max(1, maxY - minY);
     const pad = 48;
     const zoom = Math.min(
       1.4,
-      Math.max(0.15, Math.min((rect.width - pad * 2) / (maxX - minX), (rect.height - pad * 2) / height))
+      Math.max(0.15, Math.min((rect.width - pad * 2) / width, (rect.height - pad * 2) / height))
     );
     setViewport({
       zoom,
-      x: pad - minX * zoom + (rect.width - pad * 2 - (maxX - minX) * zoom) / 2,
-      y: pad,
+      x: pad - minX * zoom + (rect.width - pad * 2 - width * zoom) / 2,
+      y: pad - minY * zoom + (rect.height - pad * 2 - height * zoom) / 2,
     });
   }, [nodes, setViewport]);
+
+  const viewFocus = () => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const current = usePipelineStore.getState().viewport;
+    if (!rect || !current.zoom) return undefined;
+    return {
+      x: (rect.width / 2 - current.x) / current.zoom,
+      y: (rect.height / 2 - current.y) / current.zoom,
+      viewW: rect.width,
+      viewH: rect.height,
+    };
+  };
+
+  const clusters = useMemo(() => {
+    const grouped = new Map<string, typeof nodes>();
+    for (const node of nodes) {
+      if (!node.clusterId || node.x === undefined || node.y === undefined) continue;
+      const members = grouped.get(node.clusterId) ?? [];
+      members.push(node);
+      grouped.set(node.clusterId, members);
+    }
+    return [...grouped.entries()].map(([id, members]) => {
+      const counts = new Map<PipelineStageId, number>();
+      for (const member of members) counts.set(member.stage, (counts.get(member.stage) ?? 0) + 1);
+      const stage = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      const plate = members.find((member) => member.clusterFrame)?.clusterFrame
+        ?? plateAround(members.map((member) => ({ x: member.x ?? 0, y: member.y ?? 0 })));
+      const ordered = [...members].sort((a, b) => (a.x ?? 0) - (b.x ?? 0) || (a.y ?? 0) - (b.y ?? 0));
+      return {
+        id,
+        stage,
+        title: members.find((member) => member.clusterTitle)?.clusterTitle || STAGES[stage].title,
+        icon: members.find((member) => member.clusterIcon)?.clusterIcon
+          || workflowIcon(undefined, members.find((member) => member.clusterTitle)?.clusterTitle),
+        collapsed: members.some((member) => member.clusterCollapsed),
+        memberIds: ordered.map((member) => member.id),
+        ...plate,
+      };
+    });
+  }, [nodes]);
+
+  useEffect(() => {
+    if (clusterSpacingSettled.current) return;
+    if (isLoadingProject || loadedProjectId !== currentProject.id) return;
+    const live = usePipelineStore.getState();
+    if (live.nodes.length === 0) return;
+    clusterSpacingSettled.current = true;
+    const seen = new Set<string>();
+    for (const node of live.nodes) {
+      if (!node.clusterId || seen.has(node.clusterId) || node.x === undefined) continue;
+      seen.add(node.clusterId);
+      const members = live.nodes.filter((item) => item.clusterId === node.clusterId && item.x !== undefined);
+      const xs = members.map((item) => item.x ?? 0).sort((a, b) => a - b);
+      let gap = Infinity;
+      for (let index = 1; index < xs.length; index += 1) {
+        const between = xs[index] - xs[index - 1] - NODE_W;
+        if (between > 0) gap = Math.min(gap, between);
+      }
+      const previousDefault = Number.isFinite(gap) && Math.abs(gap - 52) < 3;
+      if (xs.length < 2 || !Number.isFinite(gap) || (gap >= CLUSTER_GAP_MIN_X && !previousDefault)) continue;
+      const ids = members.map((item) => item.id);
+      const idSet = new Set(ids);
+      const links = live.edges.filter((link) => idSet.has(link.from) && idSet.has(link.to));
+      const frame = members.find((item) => item.clusterFrame)?.clusterFrame
+        ?? plateAround(members.map((item) => ({ x: item.x ?? 0, y: item.y ?? 0 })));
+      const packed = packCluster(ids, links);
+      live.resizeCluster(node.clusterId, { x: frame.x, y: frame.y, w: packed.width, h: packed.height });
+    }
+  }, [nodes, isLoadingProject, loadedProjectId, currentProject.id]);
+
+  const clusterHandleClass: Record<ClusterEdgeName, string> = {
+    n: styles.clusterN,
+    s: styles.clusterS,
+    e: styles.clusterE,
+    w: styles.clusterW,
+    ne: styles.clusterNE,
+    nw: styles.clusterNW,
+    se: styles.clusterSE,
+    sw: styles.clusterSW,
+  };
+
+  const onClusterResizeDown = (event: React.PointerEvent, clusterId: string, edge: ClusterEdgeName, frame: { x: number; y: number; w: number; h: number }) => {
+    event.stopPropagation();
+    event.preventDefault();
+    const live = usePipelineStore.getState();
+    const members = live.nodes.filter((node) => node.clusterId === clusterId);
+    const ids = members.map((node) => node.id);
+    const idSet = new Set(ids);
+    clusterResize.current = {
+      id: clusterId,
+      edge,
+      x: event.clientX,
+      y: event.clientY,
+      frame,
+      min: minClusterSize(ids, live.edges.filter((link) => idSet.has(link.from) && idSet.has(link.to))),
+    };
+    setClusterResizing(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onClusterResizeMove = (event: React.PointerEvent) => {
+    const session = clusterResize.current;
+    if (!session) return;
+    const zoom = usePipelineStore.getState().viewport.zoom || 1;
+    const next = resizeClusterFrame(
+      session.frame,
+      session.edge,
+      (event.clientX - session.x) / zoom,
+      (event.clientY - session.y) / zoom,
+      session.min,
+    );
+    usePipelineStore.getState().resizeCluster(session.id, next);
+  };
+
+  const onClusterResizeUp = () => {
+    if (!clusterResize.current) return;
+    clusterResize.current = null;
+    setClusterResizing(false);
+  };
+
+  useEffect(() => {
+    if (!fitAfterOpen.current || nodes.length === 0) return;
+    fitAfterOpen.current = false;
+    fitView();
+  }, [nodes, fitView]);
 
   // Lane geometry: height driven by populated slots so groups grow/shrink live
   const laneHeights = useMemo(() => {
@@ -448,6 +586,12 @@ export const WorkshopFlow: React.FC = () => {
     for (const g of laneGroups) if (g.collapsed) g.nodeIds.forEach((id) => hidden.add(id));
     return hidden;
   }, [laneGroups]);
+
+  const foldedClusterIds = useMemo(() => {
+    const hidden = new Set<string>();
+    for (const cluster of clusters) if (cluster.collapsed) cluster.memberIds.forEach((id) => hidden.add(id));
+    return hidden;
+  }, [clusters]);
 
   return (
     <div className={styles.wrap}>
@@ -529,12 +673,9 @@ export const WorkshopFlow: React.FC = () => {
 
         <div className={styles.divider} />
 
-        <button className={styles.tbtn} onClick={seedStarterFlow} disabled={nodes.length > 0} title="Create the full moodboard → delivery template">
-          <Wand2 size={14} /> Starter pipeline
+        <button className={styles.tbtn} onClick={() => setShowWorkflowPicker(true)} title="Starting graphs, saved copies, and graphs you named">
+          <FolderClock size={14} /> Workflows
         </button>
-
-        <WorkflowMenu scope="project" projectId={currentProject.id} projectName={currentProject.name} />
-        <BlueprintShelf variant="workshop" />
 
         <div className={styles.divider} />
 
@@ -627,6 +768,7 @@ export const WorkshopFlow: React.FC = () => {
 
         <div
           className={styles.scene}
+          data-cluster-resize={clusterResizing ? '' : undefined}
           style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}
         >
           {/* Stage lanes — auto-formed groups */}
@@ -694,6 +836,68 @@ export const WorkshopFlow: React.FC = () => {
             );
           })}
 
+          {clusters.map((cluster) => {
+            const stage = STAGES[cluster.stage];
+            const stageColor = settings.appearance?.stageLaneColors?.[cluster.stage] || stage.color;
+            const closed = collapsedClusterSize(cluster.memberIds.length);
+            const toggle = (event: React.MouseEvent) => {
+              event.stopPropagation();
+              usePipelineStore.getState().toggleClusterCollapsed(cluster.id);
+            };
+            return (
+              <div
+                key={cluster.id}
+                className={`${styles.cluster} ${cluster.collapsed ? styles.clusterCollapsed : ''}`}
+                style={{
+                  left: cluster.x,
+                  top: cluster.y,
+                  width: cluster.collapsed ? closed.w : cluster.w,
+                  height: cluster.collapsed ? closed.h : cluster.h,
+                  ['--stage-color' as string]: stageColor,
+                }}
+                onPointerDown={(event) => { if (cluster.collapsed) event.stopPropagation(); }}
+                onClick={(event) => { if (cluster.collapsed) toggle(event); }}
+              >
+                {cluster.collapsed && cluster.memberIds.map((id, index) => {
+                  const member = nodes.find((node) => node.id === id);
+                  if (!member) return null;
+                  return (
+                    <PipelineNodeCard
+                      key={id}
+                      node={member}
+                      zoom={viewport.zoom}
+                      apiKey={apiKey}
+                      foldIndex={index}
+                      foldCount={cluster.memberIds.length}
+                    />
+                  );
+                })}
+                <div
+                  className={styles.clusterHeader}
+                  style={{ height: cluster.collapsed ? COLLAPSED_HEADER : CLUSTER_HEADER, zIndex: cluster.collapsed ? 30 : undefined }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={toggle}
+                >
+                  <span className={styles.clusterIcon}>{nodeIcon(cluster.icon, 13)}</span>
+                  <div className={styles.clusterTitle}>{cluster.title}</div>
+                  <ChevronRight size={14} className={styles.clusterChevron} style={{ transform: cluster.collapsed ? undefined : 'rotate(90deg)' }} />
+                </div>
+                {!cluster.collapsed && (Object.keys(clusterHandleClass) as ClusterEdgeName[]).map((edge) => (
+                  <div
+                    key={edge}
+                    role="button"
+                    aria-label={`Resize ${cluster.title} ${edge}`}
+                    className={`${styles.clusterHandle} ${clusterHandleClass[edge]}`}
+                    onPointerDown={(event) => onClusterResizeDown(event, cluster.id, edge, cluster)}
+                    onPointerMove={onClusterResizeMove}
+                    onPointerUp={onClusterResizeUp}
+                    onPointerCancel={onClusterResizeUp}
+                  />
+                ))}
+              </div>
+            );
+          })}
+
           {/* Edges */}
           <svg className={styles.edgeSvg} width={1} height={1}>
             {edges.map((edge) => {
@@ -703,6 +907,9 @@ export const WorkshopFlow: React.FC = () => {
               const fromFolded = from.inLane !== false && collapsedNodeIds.has(from.id);
               const toFolded = to.inLane !== false && collapsedNodeIds.has(to.id);
               if (fromFolded && toFolded && from.stage === to.stage) return null;
+              const fromCluster = from.clusterCollapsed ? clusters.find((cluster) => cluster.id === from.clusterId) : undefined;
+              const toCluster = to.clusterCollapsed ? clusters.find((cluster) => cluster.id === to.clusterId) : undefined;
+              if (fromCluster && toCluster && fromCluster.id === toCluster.id) return null;
               const foldedEnd = (node: typeof from, side: 'in' | 'out') => {
                 const wiring = collapsedWiring.get(node.stage);
                 const list = side === 'out' ? wiring?.outputs : wiring?.inputs;
@@ -710,8 +917,19 @@ export const WorkshopFlow: React.FC = () => {
                 if (!wiring || !list || index < 0) return null;
                 return cyclePointForStage(node.stage, laneHeights[node.stage] ?? COLLAPSED_HEADER, side, index, list.length);
               };
-              const p1 = fromFolded ? foldedEnd(from, 'out') : outputPortPos(from, edge.fromPort);
-              const p2 = toFolded ? foldedEnd(to, 'in') : inputPortPos(to, edge.toPort);
+              const clusterEnd = (cluster: { x: number; y: number; w: number; memberIds: string[] }, side: 'in' | 'out') => {
+                const closed = collapsedClusterSize(cluster.memberIds.length);
+                return {
+                  x: side === 'out' ? cluster.x + closed.w : cluster.x,
+                  y: cluster.y + COLLAPSED_HEADER / 2,
+                };
+              };
+              const p1 = fromCluster
+                ? clusterEnd(fromCluster, 'out')
+                : fromFolded ? foldedEnd(from, 'out') : outputPortPos(from, edge.fromPort);
+              const p2 = toCluster
+                ? clusterEnd(toCluster, 'in')
+                : toFolded ? foldedEnd(to, 'in') : inputPortPos(to, edge.toPort);
               if (!p1 || !p2) return null;
               const d = edgePath(p1.x, p1.y, p2.x, p2.y);
               const color = PORT_COLORS[edge.type] ?? '#8a8aa2';
@@ -719,13 +937,13 @@ export const WorkshopFlow: React.FC = () => {
                 <g key={edge.id}>
                   <path className={styles.edgeGlow} d={d} stroke={color} />
                   <path
-                    className={styles.edgePath}
+                    className={styles.edgeHit}
                     d={d}
-                    stroke={color}
                     onClick={(e) => { e.stopPropagation(); removeEdge(edge.id); }}
                   >
                     <title>Click to remove link</title>
                   </path>
+                  <path className={styles.edgePath} d={d} stroke={color} />
                 </g>
               );
             })}
@@ -772,7 +990,7 @@ export const WorkshopFlow: React.FC = () => {
           )}
 
           {nodes
-            .filter((n) => !collapsedNodeIds.has(n.id))
+            .filter((n) => !collapsedNodeIds.has(n.id) && !foldedClusterIds.has(n.id))
             .map((node) => {
               const push = node.inLane !== false
                 && node.id !== draggingId
@@ -868,11 +1086,42 @@ export const WorkshopFlow: React.FC = () => {
             <button
               className={styles.emptyCta}
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={seedStarterFlow}
+              onClick={() => setShowWorkflowPicker(true)}
             >
-              ✨ Create the full starter pipeline
+              ✨ Choose a starting workflow
             </button>
           </div>
+        )}
+
+        {showWorkflowPicker && (
+          <WorkflowPicker
+            projectId={currentProject.id}
+            projectName={currentProject.name}
+            nodeCount={nodes.length}
+            onClose={() => setShowWorkflowPicker(false)}
+            onFullPipeline={(mode) => {
+              fitAfterOpen.current = true;
+              if (mode === 'replace') usePipelineStore.getState().clearAll();
+              usePipelineStore.getState().seedStarterFlow({ beside: mode === 'insert' });
+              setShowWorkflowPicker(false);
+            }}
+            onApply={(spec: BlueprintSpec, mode) => {
+              if (mode === 'replace') fitAfterOpen.current = true;
+              usePipelineStore.getState().applyBlueprint(specToBlueprint(spec), mode, viewFocus());
+              setShowWorkflowPicker(false);
+            }}
+            onApplySaved={(id, mode) => {
+              const blueprint = useBlueprintStore.getState().blueprints.find((item) => item.id === id);
+              if (!blueprint) return;
+              if (mode === 'replace') fitAfterOpen.current = true;
+              usePipelineStore.getState().applyBlueprint(blueprint, mode, viewFocus());
+              setShowWorkflowPicker(false);
+            }}
+            onLoadedSnapshot={() => {
+              fitAfterOpen.current = true;
+              setShowWorkflowPicker(false);
+            }}
+          />
         )}
 
         {/* Inspector */}

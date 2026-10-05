@@ -17,7 +17,12 @@ function signature(bp: ReturnType<typeof compileBlueprint>): string[] {
 
 describe('blueprint bridge', () => {
   it('compiles every starter into a connected workshop graph', () => {
+    expect(STARTER_BLUEPRINTS.length).toBeGreaterThanOrEqual(16);
+    const ids = new Set(STARTER_BLUEPRINTS.map((spec) => spec.id));
+    expect(ids.size).toBe(STARTER_BLUEPRINTS.length);
     for (const spec of STARTER_BLUEPRINTS) {
+      expect(spec.card.image.startsWith('/workflow-cards/'), spec.id).toBe(true);
+      expect(spec.card.summary.length, spec.id).toBeGreaterThan(12);
       const compiled = compileBlueprint(specToBlueprint(spec));
       expect(compiled.warnings, spec.id).toEqual([]);
       expect(compiled.nodes).toHaveLength(spec.nodes.length);

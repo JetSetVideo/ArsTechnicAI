@@ -1,4 +1,5 @@
 .topBar {
+  position: relative;
   display: flex;
   flex-direction: row;
   padding: 0 var(--space-2, 0.5rem);
@@ -18,6 +19,7 @@
 }
 
 .topBar .section:first-child {
+  position: relative;
   flex: 1;
 }
 
@@ -28,9 +30,16 @@
 }
 
 .searchWrapper {
-  flex: 1;
-  max-width: 400px;
-  margin-left: 1rem;
+  flex: 1 1 320px;
+  max-width: 480px;
+  min-width: 0;
+  margin-left: 0.75rem;
+}
+
+.searchWrapper:has([data-search-compact="true"]:not([data-search-open="true"])) {
+  flex: 0 0 32px;
+  max-width: 32px;
+  margin-left: 0.5rem;
 }
 
 .topBar .section:last-child {

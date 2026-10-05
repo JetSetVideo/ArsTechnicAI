@@ -340,7 +340,7 @@ export const NodeInspector: React.FC<Props> = ({ node, apiKey }) => {
       {tab === 'params' && (
       <div className={styles.inspectorBody}>
         <div className={styles.nodeSubtitle} style={{ whiteSpace: 'normal' }}>
-          {node.type === 'image-import' ? 'Picture' : `${stage.title} · ${def.subtitle}`}
+          {`${stage.title} · ${def.subtitle}`}
           {def.execution.startsWith('banana') ? ' · powered by your Google banana2 key' : ''}
         </div>
 

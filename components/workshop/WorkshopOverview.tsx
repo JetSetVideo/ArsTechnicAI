@@ -3,7 +3,9 @@ import { useSettingsStore } from '@/stores';
 import { STAGES, STAGE_ORDER } from '@/lib/pipeline/catalog';
 import { usePipelineStore, nodePosition, NODE_W, NODE_H, NODE_GAP, LANE_WIDTH, LANE_HEADER, LANE_PAD_X } from '@/stores/pipelineStore';
 import type { PipelineEdge, PipelineNode, PipelineStageId, PipelineViewport, SceneRef } from '@/types/pipeline';
-import { COLLAPSED_HEADER, collapsedStack, visibleLaneFrames } from './laneFrames';
+import { COLLAPSED_HEADER, collapsedClusterSize, collapsedStack, visibleLaneFrames } from './laneFrames';
+import { plateAround } from '@/lib/pipeline/clusterLayout';
+import { PORT_COLORS } from './geometry';
 import styles from './WorkshopFlow.module.css';
 
 interface WorkshopOverviewProps {
@@ -261,12 +263,38 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
       };
     });
     const grouped = new Set(lanes.flatMap((lane) => lane.marks.map((mark) => mark.id)));
+    const foldedAway = new Set(nodes.filter((node) => node.clusterCollapsed).map((node) => node.id));
     const free = nodes
-      .filter((node) => !grouped.has(node.id))
+      .filter((node) => !grouped.has(node.id) && !foldedAway.has(node.id))
       .map((node) => {
         const pos = nodePosition(node);
         return { id: node.id, x: pos.x, y: pos.y, w: NODE_W, h: NODE_H, color: colorOf(node.stage) };
       });
+    const clusterMembers = new Map<string, PipelineNode[]>();
+    for (const node of nodes) {
+      if (!node.clusterId || node.x === undefined || node.y === undefined) continue;
+      const members = clusterMembers.get(node.clusterId) ?? [];
+      members.push(node);
+      clusterMembers.set(node.clusterId, members);
+    }
+    const clusters = [...clusterMembers.entries()].map(([id, members]) => {
+      const counts = new Map<PipelineStageId, number>();
+      for (const member of members) counts.set(member.stage, (counts.get(member.stage) ?? 0) + 1);
+      const stage = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      const plate = members.find((member) => member.clusterFrame)?.clusterFrame
+        ?? plateAround(members.map((member) => ({ x: member.x ?? 0, y: member.y ?? 0 })));
+      const collapsed = members.some((member) => member.clusterCollapsed);
+      const closed = collapsedClusterSize(members.length);
+      return {
+        id,
+        x: plate.x,
+        y: plate.y,
+        w: collapsed ? closed.w : plate.w,
+        h: collapsed ? closed.h : plate.h,
+        color: colorOf(stage),
+        memberIds: collapsed ? members.map((member) => member.id) : [],
+      };
+    });
     if (lanes.length === 0 && free.length === 0) return null;
     let minX = Infinity;
     let minY = Infinity;
@@ -280,6 +308,7 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
     };
     for (const lane of lanes) cover(lane.x, lane.y, lane.w, lane.h);
     for (const mark of free) cover(mark.x, mark.y, mark.w, mark.h);
+    for (const plate of clusters) cover(plate.x, plate.y, plate.w, plate.h);
     const pad = 80;
     minX -= pad;
     minY -= pad;
@@ -298,7 +327,7 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
       w: (size.width / viewport.zoom) * scale,
       h: (size.height / viewport.zoom) * scale,
     };
-    return { lanes, free, minX, minY, scale, ox, oy, mapW, mapH, view };
+    return { lanes, free, clusters, minX, minY, scale, ox, oy, mapW, mapH, view };
   }, [
     nodes, viewport, size, mapWidth, mapHeight,
     collapsedStages, openStages, draggingId, dragOverStage, dragInsertIndex, stageLaneColors,
@@ -353,6 +382,19 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
           onPointerDown={panTo}
           title="Pipeline map — the rectangle is this window"
         >
+          {layout.clusters.map((plate) => (
+            <span
+              key={plate.id}
+              className={styles.minimapLane}
+              style={{
+                left: (plate.x - layout.minX) * layout.scale + layout.ox,
+                top: (plate.y - layout.minY) * layout.scale + layout.oy,
+                width: Math.max(4, plate.w * layout.scale),
+                height: Math.max(3, plate.h * layout.scale),
+                ['--stage-color' as string]: plate.color,
+              }}
+            />
+          ))}
           {layout.lanes.map((lane) => (
             <span
               key={lane.stage}
@@ -408,6 +450,35 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
               }}
             />
           ))}
+          <svg className={styles.minimapEdges} viewBox={`0 0 ${layout.mapW} ${layout.mapH}`} aria-hidden>
+            {edges.map((edge) => {
+              const locate = (id: string) => {
+                for (const lane of layout.lanes) {
+                  const mark = lane.marks.find((item) => item.id === id);
+                  if (mark) return mark;
+                }
+                const folded = layout.clusters.find((plate) => plate.memberIds.includes(id));
+                if (folded) return folded;
+                return layout.free.find((item) => item.id === id);
+              };
+              const fromFold = layout.clusters.find((plate) => plate.memberIds.includes(edge.from));
+              const toFold = layout.clusters.find((plate) => plate.memberIds.includes(edge.to));
+              if (fromFold && toFold && fromFold.id === toFold.id) return null;
+              const from = locate(edge.from);
+              const to = locate(edge.to);
+              if (!from || !to) return null;
+              return (
+                <line
+                  key={edge.id}
+                  x1={(from.x + from.w - layout.minX) * layout.scale + layout.ox}
+                  y1={(from.y + from.h / 2 - layout.minY) * layout.scale + layout.oy}
+                  x2={(to.x - layout.minX) * layout.scale + layout.ox}
+                  y2={(to.y + to.h / 2 - layout.minY) * layout.scale + layout.oy}
+                  stroke={PORT_COLORS[edge.type] ?? '#8a8aa2'}
+                />
+              );
+            })}
+          </svg>
           <span
             className={styles.minimapWindow}
             style={{ left: layout.view.x, top: layout.view.y, width: layout.view.w, height: layout.view.h }}

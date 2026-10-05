@@ -71,6 +71,7 @@ const defaultAppearance: AppearanceSettings = {
 // Default AI provider settings - extracted for reuse in migration
 const defaultShortcuts: ShortcutSettings = {
   undo: 'mod+z',
+  search: 'mod+k',
 };
 
 const defaultAIProvider: AIProviderSettings = {
@@ -111,7 +112,13 @@ export const useSettingsStore = create<SettingsState>()(
 
       updateSettings: (partial) => {
         set((state) => ({
-          settings: { ...state.settings, ...partial },
+          settings: {
+            ...state.settings,
+            ...partial,
+            ...(partial.shortcuts
+              ? { shortcuts: { ...defaultShortcuts, ...state.settings.shortcuts, ...partial.shortcuts } }
+              : {}),
+          },
         }));
         if ('theme' in partial) get().applyAppearance();
       },

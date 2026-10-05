@@ -363,7 +363,7 @@ export const PIPELINE_NODE_DEFS: Record<string, PipelineNodeDef> = {
       { id: 'moodboard', label: 'Moodboard', type: 'image-set', optional: true },
     ],
     outputs: [{ id: 'script', label: 'Script', type: 'script' }],
-    promptTemplate: 'Write a {length}-minute {genre} screenplay in Fountain format. Logline: {logline}. Acts: {actStructure}. Audience: {audience}. Language: {language}. Dialogue style: {dialogueStyle}. Setting: {setting}. Include scene headings, action lines, and realistic dialogue. {notes}',
+    promptTemplate: 'Write a {length}-minute {genre} screenplay in Fountain format. Logline: {logline} {__input_logline}. Acts: {actStructure}. Audience: {audience}. Language: {language}. Dialogue style: {dialogueStyle}. Setting: {setting}. Include scene headings, action lines, and realistic dialogue. {notes}',
     params: [
       { id: 'logline', label: 'Logline (if no input)', widget: 'textarea', section: 'Story', promptable: true },
       { id: 'length', label: 'Target length (min)', widget: 'slider', section: 'Story', default: 2, min: 1, max: 30, step: 1, promptable: true },
@@ -469,7 +469,7 @@ export const PIPELINE_NODE_DEFS: Record<string, PipelineNodeDef> = {
       { id: 'ref', label: 'Face ref', type: 'image', optional: true },
     ],
     outputs: [{ id: 'sheet', label: 'Sheet', type: 'image' }],
-    promptTemplate: 'Character reference sheet: {name}, {age} years old. {appearance}. Wearing {wardrobe}. Layout: {layout}. Dominant emotion: {emotion} at {emotionIntensity} intensity. Pose: {pose}. Neutral background, consistent identity across poses, {artStyle} style. {extra}',
+    promptTemplate: 'Character reference sheet: {name}, {age} years old. {appearance}. Wearing {wardrobe}. Layout: {layout}. Dominant emotion: {emotion} at {emotionIntensity} intensity. Pose: {pose}. Neutral background, consistent identity across poses, {artStyle} style. {extra} Bible: {__input_character}',
     params: [
       { id: 'name', label: 'Name (if no input)', widget: 'text', section: 'Character', promptable: true },
       { id: 'appearance', label: 'Appearance (if no input)', widget: 'textarea', section: 'Character', promptable: true },
@@ -598,7 +598,7 @@ export const PIPELINE_NODE_DEFS: Record<string, PipelineNodeDef> = {
       { id: 'style', label: 'Style', type: 'style', optional: true },
     ],
     outputs: [{ id: 'frame', label: 'Frame', type: 'image' }],
-    promptTemplate: 'Storyboard frame, shot {shotNumber}: {action}. {shotSize} from {angle}, {lens}. {lighting} lighting. Style: {boardStyle}. Include {annotations}. {extra}',
+    promptTemplate: 'Storyboard frame, shot {shotNumber}: {action}. {shotSize} from {angle}, {lens}. {lighting} lighting. Style: {boardStyle}. Include {annotations}. {extra} Shot list: {__input_shotlist}',
     params: [
       { id: 'shotNumber', label: 'Shot #', widget: 'text', section: 'Shot', default: '1A', promptable: true },
       { id: 'action', label: 'Action in frame', widget: 'textarea', section: 'Shot', promptable: true },
@@ -883,7 +883,7 @@ export const PIPELINE_NODE_DEFS: Record<string, PipelineNodeDef> = {
       { id: 'character', label: 'Character', type: 'character', optional: true },
     ],
     outputs: [{ id: 'audio', label: 'Speech', type: 'audio' }],
-    promptTemplate: 'Prepare a TTS performance script: mark up this dialogue with pacing, pauses (…), emphasis, breaths and emotional cues for a {voiceStyle} voice, {emotion} read, {pace} pace, {language}. Text: {text}',
+    promptTemplate: 'Prepare a TTS performance script: mark up this dialogue with pacing, pauses (…), emphasis, breaths and emotional cues for a {voiceStyle} voice, {emotion} read, {pace} pace, {language}. Text: {text} {__input_script}',
     params: [
       { id: 'text', label: 'Line(s) to speak', widget: 'textarea', section: 'Text', promptable: true },
       { id: 'voiceStyle', label: 'Voice style', widget: 'select', section: 'Voice', options: VOICE_STYLES, default: 'natural', promptable: true },

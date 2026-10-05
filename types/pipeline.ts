@@ -210,6 +210,16 @@ export interface PipelineNode {
   collapsed?: boolean;
   /** Deck fanned open showing all variants. */
   deckOpen?: boolean;
+  /** Workflow plate this node was dropped in. Nodes that share an id draw one colored group. */
+  clusterId?: string;
+  /** Name painted on that plate, such as "Remove background". */
+  clusterTitle?: string;
+  /** Lucide name for the mark in that plate's header. */
+  clusterIcon?: string;
+  /** Shared plate. Resizing the border writes the same frame onto every member. */
+  clusterFrame?: { x: number; y: number; w: number; h: number };
+  /** Closed workflow plate. The cards fold under the header, the same way a stage group does. */
+  clusterCollapsed?: boolean;
 }
 
 export interface PipelineEdge {
