@@ -41,7 +41,7 @@ export const SceneStrip: React.FC = () => {
   }, [showAdd]);
 
   return (
-    <div className={`${styles.sceneStrip} ${stripOpen ? '' : styles.sceneStripClosed}`}>
+    <div data-film-strip className={`${styles.sceneStrip} ${stripOpen ? '' : styles.sceneStripClosed}`}>
       <div className={styles.sceneStripHeaderRow}>
         <button className={styles.sceneStripHeader} onClick={toggleStrip}>
           <Film size={13} />

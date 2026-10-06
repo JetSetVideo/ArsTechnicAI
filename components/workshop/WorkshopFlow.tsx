@@ -18,6 +18,8 @@ import type { PipelineStageId } from '@/types/pipeline';
 import { useSettingsStore, useLogStore } from '@/stores';
 import { useUserStore } from '@/stores/userStore';
 import { PipelineNodeCard, nodeIcon, type WireDrop } from './PipelineNodeCard';
+import { ChoiceWheel } from './ChoiceWheel';
+import type { WheelSlice } from '@/lib/pipeline/wheelSlices';
 import { NodeInspector } from './NodeInspector';
 import { LayerEditorModal } from './LayerEditorModal';
 import { SceneStrip } from './SceneStrip';
@@ -28,6 +30,45 @@ import { PENDING_BLUEPRINT_KEY, specToBlueprint, workflowIcon, type BlueprintSpe
 import { inputPortPos, outputPortPos, edgePath, PORT_COLORS } from './geometry';
 import { formatShortcut, matchShortcut } from '@/lib/shortcuts';
 import styles from './WorkshopFlow.module.css';
+
+function linkWheelSlices(
+  choices: LinkCandidate[],
+  colorOf: (stage: PipelineStageId) => string,
+): WheelSlice[] {
+  const order: PipelineStageId[] = [];
+  const groups = new Map<PipelineStageId, LinkCandidate[]>();
+  for (const choice of choices) {
+    if (!groups.has(choice.stage)) {
+      groups.set(choice.stage, []);
+      order.push(choice.stage);
+    }
+    groups.get(choice.stage)!.push(choice);
+  }
+  return order.map((stageId) => {
+    const stage = STAGES[stageId];
+    const color = colorOf(stageId);
+    const items = groups.get(stageId) ?? [];
+    return {
+      id: stageId,
+      label: items.length === 1 ? items[0].title : stage.title,
+      icon: items.length === 1 ? items[0].icon : stage.icon,
+      color,
+      options: items.map((item) => ({
+        id: item.type,
+        label: item.title,
+        hint: PIPELINE_NODE_DEFS[item.type]?.subtitle,
+        icon: item.icon,
+        color,
+      })),
+    };
+  });
+}
+
+function placeWheel(client: number, origin: number, limit: number, padStart: number, padEnd: number): number {
+  const min = padStart;
+  const max = Math.max(min, limit - padEnd);
+  return Math.min(Math.max(client - origin, min), max);
+}
 
 export const WorkshopFlow: React.FC = () => {
   // Only subscribe to the fields this component actually renders from —
@@ -1141,163 +1182,100 @@ export const WorkshopFlow: React.FC = () => {
             })}
         </div>
 
-        {linkWheel && (() => {
+        {(linkWheel || wheel) && (() => {
           const rect = canvasRef.current?.getBoundingClientRect();
-          const choices = linkWheel.choices;
-          const place = (client: number, span: number, limit: number) => (
-            rect ? Math.min(Math.max(client, span / 2 + 8), limit - span / 2 - 8) : client
+          const size = 280;
+          const room = 28;
+          const point = linkWheel ?? wheel;
+          if (!point) return null;
+          const left = rect
+            ? placeWheel(point.clientX, rect.left, rect.width, size / 2 + room, size / 2 + room)
+            : point.clientX;
+          const top = rect
+            ? placeWheel(point.clientY, rect.top, rect.height, size / 2 + room, size / 2 + room)
+            : point.clientY;
+          const edge = 16;
+          const stripTop = canvasRef.current?.parentElement?.querySelector('[data-film-strip]')?.getBoundingClientRect().top;
+          const usableBottom = rect && stripTop != null ? Math.min(rect.bottom, stripTop) : rect?.bottom;
+          const space = rect && usableBottom != null ? {
+            minX: edge - (left - size / 2),
+            minY: edge - (top - size / 2),
+            maxX: rect.width - edge - (left - size / 2),
+            maxY: usableBottom - rect.top - edge - (top - size / 2),
+          } : undefined;
+          const colorOf = (stageId: PipelineStageId) => (
+            settings.appearance?.stageLaneColors?.[stageId] || STAGES[stageId].color
           );
-          if (choices.length > 8) {
-            const left = rect
-              ? Math.min(Math.max(linkWheel.clientX - rect.left, 8), rect.width - 248)
-              : linkWheel.clientX;
-            const top = rect
-              ? Math.min(Math.max(linkWheel.clientY - rect.top, 8), rect.height - 288)
-              : linkWheel.clientY;
+          const frame = { left, top, width: size, height: size };
+          if (linkWheel) {
             return (
-              <div
-                data-wheel
-                className={styles.linkList}
-                style={{ left, top }}
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                {choices.map((choice) => {
-                  const stage = STAGES[choice.stage];
-                  const color = settings.appearance?.stageLaneColors?.[choice.stage] || stage.color;
-                  return (
-                    <button
-                      key={choice.type}
-                      type="button"
-                      style={{ ['--stage-color' as string]: color }}
-                      title={choice.title}
-                      onClick={() => {
-                        usePipelineStore.getState().spawnLinkedNode({
-                          type: choice.type,
-                          newPortId: choice.portId,
-                          sourceId: linkWheel.nodeId,
-                          sourcePortId: linkWheel.portId,
-                          sourceSide: linkWheel.side,
-                        });
-                        setLinkWheel(null);
-                      }}
-                    >
-                      {nodeIcon(choice.icon, 12)}
-                      <span>{choice.title}</span>
-                    </button>
-                  );
-                })}
-                <button type="button" className={styles.linkCancel} onClick={() => setLinkWheel(null)}>Cancel</button>
-              </div>
+              <ChoiceWheel
+                slices={linkWheelSlices(linkWheel.choices, colorOf)}
+                style={frame}
+                space={space}
+                onCancel={() => setLinkWheel(null)}
+                onPick={(stageId, type) => {
+                  const choice = linkWheel.choices.find((item) => item.type === type && item.stage === stageId);
+                  if (!choice) return;
+                  usePipelineStore.getState().spawnLinkedNode({
+                    type: choice.type,
+                    newPortId: choice.portId,
+                    sourceId: linkWheel.nodeId,
+                    sourcePortId: linkWheel.portId,
+                    sourceSide: linkWheel.side,
+                  });
+                  setLinkWheel(null);
+                }}
+              />
             );
           }
-          const size = Math.max(200, Math.min(420, settings.appearance.groupWheelSize ?? 280));
-          const left = rect ? place(linkWheel.clientX - rect.left, size, rect.width) : linkWheel.clientX;
-          const top = rect ? place(linkWheel.clientY - rect.top, size, rect.height) : linkWheel.clientY;
-          const radius = size * 0.36;
           return (
-            <div
-              data-wheel
-              className={styles.wheel}
-              style={{ left, top, width: size, height: size }}
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              <div className={styles.wheelRing} />
-              {choices.map((choice, index) => {
-                const stage = STAGES[choice.stage];
-                const color = settings.appearance?.stageLaneColors?.[choice.stage] || stage.color;
-                const angle = (index / choices.length) * Math.PI * 2 - Math.PI / 2;
-                return (
-                  <button
-                    key={choice.type}
-                    type="button"
-                    className={`${styles.wheelChoice} ${styles.wheelNode}`}
-                    style={{
-                      left: size / 2 + Math.cos(angle) * radius,
-                      top: size / 2 + Math.sin(angle) * radius,
-                      ['--stage-color' as string]: color,
-                    }}
-                    title={choice.title}
-                    onClick={() => {
-                      usePipelineStore.getState().spawnLinkedNode({
-                        type: choice.type,
-                        newPortId: choice.portId,
-                        sourceId: linkWheel.nodeId,
-                        sourcePortId: linkWheel.portId,
-                        sourceSide: linkWheel.side,
-                      });
-                      setLinkWheel(null);
-                    }}
-                  >
-                    {nodeIcon(choice.icon, 12)}
-                    <span>{choice.title}</span>
-                  </button>
-                );
-              })}
-              <button type="button" className={styles.wheelCancel} onClick={() => setLinkWheel(null)}>Cancel</button>
-            </div>
-          );
-        })()}
-
-        {wheel && (() => {
-          const size = Math.max(200, Math.min(420, settings.appearance.groupWheelSize ?? 280));
-          const rect = canvasRef.current?.getBoundingClientRect();
-          const left = rect
-            ? Math.min(Math.max(wheel.clientX - rect.left, size / 2 + 8), rect.width - size / 2 - 8)
-            : wheel.clientX;
-          const top = rect
-            ? Math.min(Math.max(wheel.clientY - rect.top, size / 2 + 8), rect.height - size / 2 - 8)
-            : wheel.clientY;
-          const radius = size * 0.36;
-          return (
-            <div
-              data-wheel
-              className={styles.wheel}
-              style={{ left, top, width: size, height: size }}
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              <div className={styles.wheelRing} />
-              {STAGE_ORDER.map((stageId, index) => {
+            <ChoiceWheel
+              slices={STAGE_ORDER.map((stageId) => {
                 const stage = STAGES[stageId];
-                const color = settings.appearance?.stageLaneColors?.[stageId] || stage.color;
-                const angle = (index / STAGE_ORDER.length) * Math.PI * 2 - Math.PI / 2;
-                return (
-                  <button
-                    key={stageId}
-                    type="button"
-                    className={styles.wheelChoice}
-                    style={{
-                      left: size / 2 + Math.cos(angle) * radius,
-                      top: size / 2 + Math.sin(angle) * radius,
-                      ['--stage-color' as string]: color,
-                    }}
-                    onClick={() => {
-                      const store = usePipelineStore.getState();
-                      const ordered = [...wheel.ids].sort((a, b) => {
-                        const left = store.nodes.find((node) => node.id === a);
-                        const right = store.nodes.find((node) => node.id === b);
-                        if (!left || !right) return 0;
-                        const pa = nodePosition(left);
-                        const pb = nodePosition(right);
-                        return pa.y - pb.y || pa.x - pb.x;
-                      });
-                      openStage(stageId);
-                      ordered.forEach((id) => usePipelineStore.getState().joinLane(id, stageId));
-                      setWheel(null);
-                      setPicked([]);
-                    }}
-                  >
-                    {stage.title}
-                  </button>
-                );
+                const color = colorOf(stageId);
+                return {
+                  id: stageId,
+                  label: stage.title,
+                  icon: stage.icon,
+                  color,
+                  options: [
+                    { id: '__place', label: 'Place selection', hint: stage.tagline, icon: stage.icon, color },
+                    ...nodesForStage(stageId).map((def) => ({
+                      id: def.type,
+                      label: def.title,
+                      hint: def.subtitle,
+                      icon: def.icon,
+                      color,
+                    })),
+                  ],
+                };
               })}
-              <button
-                type="button"
-                className={styles.wheelCancel}
-                onClick={() => { setWheel(null); setPicked([]); }}
-              >
-                Cancel
-              </button>
-            </div>
+              style={frame}
+              space={space}
+              onCancel={() => { setWheel(null); setPicked([]); }}
+              onPick={(stageId, optionId) => {
+                const stage = stageId as PipelineStageId;
+                if (optionId === '__place') {
+                  const store = usePipelineStore.getState();
+                  const ordered = [...wheel!.ids].sort((a, b) => {
+                    const leftNode = store.nodes.find((node) => node.id === a);
+                    const rightNode = store.nodes.find((node) => node.id === b);
+                    if (!leftNode || !rightNode) return 0;
+                    const pa = nodePosition(leftNode);
+                    const pb = nodePosition(rightNode);
+                    return pa.y - pb.y || pa.x - pb.x;
+                  });
+                  openStage(stage);
+                  ordered.forEach((id) => usePipelineStore.getState().joinLane(id, stage));
+                } else {
+                  openStage(stage);
+                  addNode(optionId);
+                }
+                setWheel(null);
+                setPicked([]);
+              }}
+            />
           );
         })()}
 
