@@ -12,12 +12,12 @@ import {
 import { COLLAPSED_HEADER, collapsedClusterSize, collapsedLaneHeight, collapsedStack, laneFrameHeight } from './laneFrames';
 import { cyclePointForStage, wiringFor } from './groupCycles';
 import { settleNode } from './settleNode';
-import { PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, nodesForStage } from '@/lib/pipeline/catalog';
+import { PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, linkCandidates, nodesForStage, type LinkCandidate } from '@/lib/pipeline/catalog';
 import { ingestImage, payloadStats, formatBytes } from '@/lib/pipeline/ingest';
 import type { PipelineStageId } from '@/types/pipeline';
 import { useSettingsStore, useLogStore } from '@/stores';
 import { useUserStore } from '@/stores/userStore';
-import { PipelineNodeCard, nodeIcon } from './PipelineNodeCard';
+import { PipelineNodeCard, nodeIcon, type WireDrop } from './PipelineNodeCard';
 import { NodeInspector } from './NodeInspector';
 import { LayerEditorModal } from './LayerEditorModal';
 import { SceneStrip } from './SceneStrip';
@@ -166,7 +166,10 @@ export const WorkshopFlow: React.FC = () => {
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   pickedRef.current = picked;
+  const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
+  const [selectedLane, setSelectedLane] = useState<PipelineStageId | null>(null);
   const [wheel, setWheel] = useState<{ clientX: number; clientY: number; ids: string[] } | null>(null);
+  const [linkWheel, setLinkWheel] = useState<(WireDrop & { choices: LinkCandidate[] }) | null>(null);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -189,6 +192,35 @@ export const WorkshopFlow: React.FC = () => {
   }, []);
 
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setSelectedClusterId(null);
+    setSelectedLane(null);
+  }, [selectedId]);
+
+  const deleteTarget = useMemo(() => {
+    if (selectedClusterId) {
+      const members = nodes.filter((node) => node.clusterId === selectedClusterId);
+      if (members.length === 0) return null;
+      return { ids: members.map((node) => node.id), label: members[0].clusterTitle || 'group' };
+    }
+    if (selectedLane) {
+      const members = nodes.filter((node) => node.stage === selectedLane && node.inLane !== false);
+      if (members.length === 0) return null;
+      return { ids: members.map((node) => node.id), label: STAGES[selectedLane].title };
+    }
+    if (selectedNode) return { ids: [selectedNode.id], label: selectedNode.title };
+    if (picked.length > 0) {
+      const members = nodes.filter((node) => picked.includes(node.id));
+      if (members.length === 0) return null;
+      return {
+        ids: members.map((node) => node.id),
+        label: members.length === 1 ? members[0].title : `${members.length} nodes`,
+      };
+    }
+    return null;
+  }, [nodes, picked, selectedClusterId, selectedLane, selectedNode]);
   const laneGroups = groups();
   const dragOverStage = usePipelineStore((s) => s.dragOverStage);
 
@@ -207,6 +239,7 @@ export const WorkshopFlow: React.FC = () => {
         cancelEdge();
         setShowAddMenu(false);
         setWheel(null);
+        setLinkWheel(null);
         setPicked([]);
         setMarquee(null);
         marqueeRef.current = null;
@@ -230,6 +263,7 @@ export const WorkshopFlow: React.FC = () => {
   }, [viewport]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (usePipelineStore.getState().pendingEdge) return;
     if (e.ctrlKey || e.metaKey) {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -255,6 +289,7 @@ export const WorkshopFlow: React.FC = () => {
       capture();
       return;
     }
+    if (linkWheel) setLinkWheel(null);
     if (e.button !== 0 || pendingEdge) return;
     const scene = toScene(e.clientX, e.clientY);
     marqueeRef.current = {
@@ -263,10 +298,12 @@ export const WorkshopFlow: React.FC = () => {
     };
     setSelecting(true);
     setWheel(null);
+    setSelectedClusterId(null);
+    setSelectedLane(null);
     if (!e.shiftKey) setPicked([]);
     select(null);
     capture();
-  }, [pendingEdge, select, toScene]);
+  }, [pendingEdge, select, toScene, linkWheel]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (isPanning) {
@@ -566,11 +603,51 @@ export const WorkshopFlow: React.FC = () => {
   }, [laneGroups, dragOverStage, dragInsertIndex]);
 
   const pendingSource = pendingEdge
-    ? nodes.find((n) => n.id === pendingEdge.from) ?? null
+    ? nodes.find((n) => n.id === (pendingEdge.origin === 'input' ? pendingEdge.to : pendingEdge.from)) ?? null
     : null;
   const pendingStart = pendingSource && pendingEdge
-    ? outputPortPos(pendingSource, pendingEdge.fromPort)
+    ? (pendingEdge.origin === 'input'
+      ? inputPortPos(pendingSource, pendingEdge.toPort ?? '')
+      : outputPortPos(pendingSource, pendingEdge.fromPort))
     : null;
+
+  const trackWire = useCallback((clientX: number, clientY: number) => {
+    setMouse(toScene(clientX, clientY));
+  }, [toScene]);
+
+  const openLinkMenu = useCallback((drop: WireDrop) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const inside = !!rect
+      && drop.clientX >= rect.left && drop.clientX <= rect.right
+      && drop.clientY >= rect.top && drop.clientY <= rect.bottom;
+    const store = usePipelineStore.getState();
+    const source = store.nodes.find((node) => node.id === drop.nodeId);
+    if (!inside || !source) {
+      store.cancelEdge();
+      return;
+    }
+    const choices = linkCandidates(
+      drop.portType,
+      drop.side === 'out' ? 'input' : 'output',
+      source.stage,
+    );
+    store.cancelEdge();
+    if (choices.length === 0) return;
+    setLinkWheel({ ...drop, choices });
+  }, []);
+
+  const wireHint = useMemo(() => {
+    if (pendingEdge?.origin === 'output') {
+      return { nodeId: pendingEdge.from, portId: pendingEdge.fromPort, side: 'out' as const, type: pendingEdge.portType, picking: true };
+    }
+    if (pendingEdge?.origin === 'input' && pendingEdge.to && pendingEdge.toPort) {
+      return { nodeId: pendingEdge.to, portId: pendingEdge.toPort, side: 'in' as const, type: pendingEdge.portType, picking: true };
+    }
+    if (linkWheel) {
+      return { nodeId: linkWheel.nodeId, portId: linkWheel.portId, side: linkWheel.side, type: linkWheel.portType, picking: false };
+    }
+    return null;
+  }, [pendingEdge, linkWheel]);
 
   const collapsedWiring = useMemo(() => {
     const map = new Map<PipelineStageId, ReturnType<typeof wiringFor>>();
@@ -734,10 +811,21 @@ export const WorkshopFlow: React.FC = () => {
         <button
           className={styles.tbtn}
           style={{ color: '#f87171' }}
+          disabled={!deleteTarget}
+          title={deleteTarget ? `Delete ${deleteTarget.label}` : 'Select a node or a group'}
+          aria-label={deleteTarget ? `Delete ${deleteTarget.label}` : 'Delete selection'}
           onClick={() => {
-            if (window.confirm(`Delete all ${nodes.length} nodes, their versions and layers? Undo can bring them back.`)) clearAll();
+            if (!deleteTarget) return;
+            if (deleteTarget.ids.length > 1) {
+              const confirmed = window.confirm(`Delete ${deleteTarget.label}? Undo can bring it back.`);
+              if (!confirmed) return;
+            }
+            usePipelineStore.getState().removeNodes(deleteTarget.ids);
+            if (selectedLane) closeStage(selectedLane);
+            setSelectedClusterId(null);
+            setSelectedLane(null);
+            setPicked([]);
           }}
-          title="Clear the workshop"
         >
           <Trash2 size={14} />
         </button>
@@ -751,6 +839,12 @@ export const WorkshopFlow: React.FC = () => {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onContextMenu={(event) => {
+          if (!pendingEdge && !linkWheel) return;
+          event.preventDefault();
+          cancelEdge();
+          setLinkWheel(null);
+        }}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
         onDrop={(e) => void handleDrop(e)}
       >
@@ -779,7 +873,7 @@ export const WorkshopFlow: React.FC = () => {
             return (
               <div
                 key={group.id}
-                className={`${styles.lane} ${group.collapsed ? styles.laneCollapsed : ''} ${dragOverStage === group.stage ? styles.laneHot : ''}`}
+                className={`${styles.lane} ${group.collapsed ? styles.laneCollapsed : ''} ${dragOverStage === group.stage ? styles.laneHot : ''} ${selectedLane === group.stage ? styles.groupSelected : ''}`}
                 style={{
                   left: laneX(group.stage),
                   top: 0,
@@ -788,7 +882,14 @@ export const WorkshopFlow: React.FC = () => {
                   ['--stage-color' as string]: stageColor,
                 }}
                 onPointerDown={(event) => { if (group.collapsed) event.stopPropagation(); }}
-                onClick={() => { if (group.collapsed) toggleGroupCollapsed(group.stage); }}
+                onClick={() => {
+                  if (!group.collapsed) return;
+                  setSelectedLane(group.stage);
+                  setSelectedClusterId(null);
+                  setPicked([]);
+                  select(null);
+                  toggleGroupCollapsed(group.stage);
+                }}
               >
                 {group.collapsed && group.nodeIds.map((id, index) => {
                   const member = nodes.find((node) => node.id === id);
@@ -807,7 +908,14 @@ export const WorkshopFlow: React.FC = () => {
                 <div
                   className={styles.laneHeader}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(event) => { event.stopPropagation(); toggleGroupCollapsed(group.stage); }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSelectedLane(group.stage);
+                    setSelectedClusterId(null);
+                    setPicked([]);
+                    select(null);
+                    toggleGroupCollapsed(group.stage);
+                  }}
                 >
                   <span className={styles.laneIcon}>{nodeIcon(stage.icon, 16)}</span>
                   <div>
@@ -847,7 +955,7 @@ export const WorkshopFlow: React.FC = () => {
             return (
               <div
                 key={cluster.id}
-                className={`${styles.cluster} ${cluster.collapsed ? styles.clusterCollapsed : ''}`}
+                className={`${styles.cluster} ${cluster.collapsed ? styles.clusterCollapsed : ''} ${selectedClusterId === cluster.id ? styles.groupSelected : ''}`}
                 style={{
                   left: cluster.x,
                   top: cluster.y,
@@ -856,7 +964,14 @@ export const WorkshopFlow: React.FC = () => {
                   ['--stage-color' as string]: stageColor,
                 }}
                 onPointerDown={(event) => { if (cluster.collapsed) event.stopPropagation(); }}
-                onClick={(event) => { if (cluster.collapsed) toggle(event); }}
+                onClick={(event) => {
+                  if (!cluster.collapsed) return;
+                  setSelectedClusterId(cluster.id);
+                  setSelectedLane(null);
+                  setPicked([]);
+                  select(null);
+                  toggle(event);
+                }}
               >
                 {cluster.collapsed && cluster.memberIds.map((id, index) => {
                   const member = nodes.find((node) => node.id === id);
@@ -876,7 +991,13 @@ export const WorkshopFlow: React.FC = () => {
                   className={styles.clusterHeader}
                   style={{ height: cluster.collapsed ? COLLAPSED_HEADER : CLUSTER_HEADER, zIndex: cluster.collapsed ? 30 : undefined }}
                   onPointerDown={(event) => event.stopPropagation()}
-                  onClick={toggle}
+                  onClick={(event) => {
+                    setSelectedClusterId(cluster.id);
+                    setSelectedLane(null);
+                    setPicked([]);
+                    select(null);
+                    toggle(event);
+                  }}
                 >
                   <span className={styles.clusterIcon}>{nodeIcon(cluster.icon, 13)}</span>
                   <div className={styles.clusterTitle}>{cluster.title}</div>
@@ -947,13 +1068,18 @@ export const WorkshopFlow: React.FC = () => {
                 </g>
               );
             })}
-            {pendingStart && (
-              <path
-                className={styles.pendingPath}
-                d={edgePath(pendingStart.x, pendingStart.y, mouse.x, mouse.y)}
-                stroke={PORT_COLORS[pendingEdge?.portType ?? 'any'] ?? '#cbd5e1'}
-              />
-            )}
+            {pendingStart && pendingEdge && (() => {
+              const from = pendingEdge.origin === 'input' ? mouse : pendingStart;
+              const to = pendingEdge.origin === 'input' ? pendingStart : mouse;
+              const d = edgePath(from.x, from.y, to.x, to.y);
+              const color = PORT_COLORS[pendingEdge.portType] ?? '#cbd5e1';
+              return (
+                <g>
+                  <path className={styles.edgeGlow} d={d} stroke={color} />
+                  <path className={styles.pendingPath} d={d} stroke={color} />
+                </g>
+              );
+            })()}
           </svg>
 
           {laneGroups.map((group) => {
@@ -1006,10 +1132,111 @@ export const WorkshopFlow: React.FC = () => {
                   apiKey={apiKey}
                   shiftY={push ? NODE_H + NODE_GAP : 0}
                   marked={picked.includes(node.id)}
+                  wire={wireHint}
+                  panKeyRef={spaceRef}
+                  onWireMove={trackWire}
+                  onLinkMenu={openLinkMenu}
                 />
               );
             })}
         </div>
+
+        {linkWheel && (() => {
+          const rect = canvasRef.current?.getBoundingClientRect();
+          const choices = linkWheel.choices;
+          const place = (client: number, span: number, limit: number) => (
+            rect ? Math.min(Math.max(client, span / 2 + 8), limit - span / 2 - 8) : client
+          );
+          if (choices.length > 8) {
+            const left = rect
+              ? Math.min(Math.max(linkWheel.clientX - rect.left, 8), rect.width - 248)
+              : linkWheel.clientX;
+            const top = rect
+              ? Math.min(Math.max(linkWheel.clientY - rect.top, 8), rect.height - 288)
+              : linkWheel.clientY;
+            return (
+              <div
+                data-wheel
+                className={styles.linkList}
+                style={{ left, top }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                {choices.map((choice) => {
+                  const stage = STAGES[choice.stage];
+                  const color = settings.appearance?.stageLaneColors?.[choice.stage] || stage.color;
+                  return (
+                    <button
+                      key={choice.type}
+                      type="button"
+                      style={{ ['--stage-color' as string]: color }}
+                      title={choice.title}
+                      onClick={() => {
+                        usePipelineStore.getState().spawnLinkedNode({
+                          type: choice.type,
+                          newPortId: choice.portId,
+                          sourceId: linkWheel.nodeId,
+                          sourcePortId: linkWheel.portId,
+                          sourceSide: linkWheel.side,
+                        });
+                        setLinkWheel(null);
+                      }}
+                    >
+                      {nodeIcon(choice.icon, 12)}
+                      <span>{choice.title}</span>
+                    </button>
+                  );
+                })}
+                <button type="button" className={styles.linkCancel} onClick={() => setLinkWheel(null)}>Cancel</button>
+              </div>
+            );
+          }
+          const size = Math.max(200, Math.min(420, settings.appearance.groupWheelSize ?? 280));
+          const left = rect ? place(linkWheel.clientX - rect.left, size, rect.width) : linkWheel.clientX;
+          const top = rect ? place(linkWheel.clientY - rect.top, size, rect.height) : linkWheel.clientY;
+          const radius = size * 0.36;
+          return (
+            <div
+              data-wheel
+              className={styles.wheel}
+              style={{ left, top, width: size, height: size }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <div className={styles.wheelRing} />
+              {choices.map((choice, index) => {
+                const stage = STAGES[choice.stage];
+                const color = settings.appearance?.stageLaneColors?.[choice.stage] || stage.color;
+                const angle = (index / choices.length) * Math.PI * 2 - Math.PI / 2;
+                return (
+                  <button
+                    key={choice.type}
+                    type="button"
+                    className={`${styles.wheelChoice} ${styles.wheelNode}`}
+                    style={{
+                      left: size / 2 + Math.cos(angle) * radius,
+                      top: size / 2 + Math.sin(angle) * radius,
+                      ['--stage-color' as string]: color,
+                    }}
+                    title={choice.title}
+                    onClick={() => {
+                      usePipelineStore.getState().spawnLinkedNode({
+                        type: choice.type,
+                        newPortId: choice.portId,
+                        sourceId: linkWheel.nodeId,
+                        sourcePortId: linkWheel.portId,
+                        sourceSide: linkWheel.side,
+                      });
+                      setLinkWheel(null);
+                    }}
+                  >
+                    {nodeIcon(choice.icon, 12)}
+                    <span>{choice.title}</span>
+                  </button>
+                );
+              })}
+              <button type="button" className={styles.wheelCancel} onClick={() => setLinkWheel(null)}>Cancel</button>
+            </div>
+          );
+        })()}
 
         {wheel && (() => {
           const size = Math.max(200, Math.min(420, settings.appearance.groupWheelSize ?? 280));

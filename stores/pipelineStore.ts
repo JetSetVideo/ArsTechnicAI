@@ -7,7 +7,7 @@ import type {
 } from '@/types/pipeline';
 import type { Blueprint } from '@/types/blueprint';
 import { compileBlueprint, workflowIcon } from '@/lib/pipeline/blueprintBridge';
-import { showStageLane } from '@/lib/pipeline/lanes';
+import { rectsOverlap, showStageLane } from '@/lib/pipeline/lanes';
 import { CLUSTER_PAD_TOP, CLUSTER_PAD_X, findClusterOrigin, packCluster, placeCluster, type ClusterRect } from '@/lib/pipeline/clusterLayout';
 import {
   PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, defaultParams, buildPrompt, portsCompatible,
@@ -60,6 +60,10 @@ interface PendingEdge {
   from: string;
   fromPort: string;
   portType: string;
+  /** `output` starts on a right-hand port. `input` starts on a left-hand port. */
+  origin: 'output' | 'input';
+  to?: string;
+  toPort?: string;
 }
 
 export interface PipelineSnapshotMeta {
@@ -106,6 +110,7 @@ interface PipelineState {
   // node ops
   addNode: (type: string) => PipelineNode | null;
   removeNode: (id: string) => void;
+  removeNodes: (ids: string[]) => void;
   renameNode: (id: string, title: string) => void;
   setParam: (id: string, key: string, value: unknown) => void;
   moveNodeToSlot: (id: string, stage: PipelineStageId, slot: number) => void;
@@ -155,8 +160,16 @@ interface PipelineState {
   retouchVariant: (nodeId: string, variantId: string, opLabel: string, instruction: string, apiKey: string) => Promise<void>;
 
   // edges
-  startEdge: (from: string, fromPort: string, portType: string) => void;
-  completeEdge: (to: string, toPort: string, toType: string) => boolean;
+  startEdge: (nodeId: string, portId: string, portType: string, side: 'in' | 'out') => void;
+  completeEdge: (nodeId: string, portId: string, portType: string, side: 'in' | 'out') => boolean;
+  /** Creates a node, places it with its parent, and links the port the drag started from. */
+  spawnLinkedNode: (spec: {
+    type: string;
+    newPortId: string;
+    sourceId: string;
+    sourcePortId: string;
+    sourceSide: 'in' | 'out';
+  }) => string | null;
   cancelEdge: () => void;
   removeEdge: (id: string) => void;
 
@@ -332,7 +345,13 @@ function describeEdit(before: UndoEntry, after: PipelineState): string {
   if (added.length === 1 && removed.length === 0) return `Added ${added[0].title}`;
   if (removed.length === 1 && added.length === 0) return `Removed ${removed[0].title}`;
   if (added.length > 1 && removed.length === 0) return `Added ${added.length} nodes`;
-  if (removed.length > 1 && added.length === 0) return `Removed ${removed.length} nodes`;
+  if (removed.length > 1 && added.length === 0) {
+    const clusterId = removed[0].clusterId;
+    if (clusterId && removed.every((node) => node.clusterId === clusterId)) {
+      return `Removed ${removed[0].clusterTitle || 'a workflow'}`;
+    }
+    return `Removed ${removed.length} nodes`;
+  }
   if (added.length > 0 && removed.length > 0) return `Loaded a blueprint (${added.length} nodes)`;
 
   const beforeEdgeIds = new Set(before.edges.map((edge) => edge.id));
@@ -621,20 +640,34 @@ export const usePipelineStore = create<PipelineState>()(
       },
 
       removeNode: (id) => {
+        get().removeNodes([id]);
+      },
+
+      removeNodes: (ids) => {
+        const drop = new Set(ids);
+        if (drop.size === 0) return;
         set((s) => {
-          const removed = s.nodes.find((n) => n.id === id);
-          const nodes = s.nodes
-            .filter((n) => n.id !== id)
-            .map((n) =>
-              removed && n.stage === removed.stage && n.slot > removed.slot
-                ? { ...n, slot: n.slot - 1 }
-                : n
-            );
+          const kept = s.nodes.filter((node) => !drop.has(node.id));
+          const laneNodes = new Map<string, typeof kept>();
+          for (const node of kept) {
+            if (node.inLane === false) continue;
+            const list = laneNodes.get(node.stage) ?? [];
+            list.push(node);
+            laneNodes.set(node.stage, list);
+          }
+          const slotOf = new Map<string, number>();
+          for (const list of laneNodes.values()) {
+            list.sort((a, b) => a.slot - b.slot || a.id.localeCompare(b.id));
+            list.forEach((node, index) => slotOf.set(node.id, index));
+          }
           return {
-            nodes,
-            edges: s.edges.filter((e) => e.from !== id && e.to !== id),
-            selectedId: s.selectedId === id ? null : s.selectedId,
-            lastCookedNodeId: s.lastCookedNodeId === id ? null : s.lastCookedNodeId,
+            nodes: kept.map((node) => {
+              const slot = slotOf.get(node.id);
+              return slot === undefined || slot === node.slot ? node : { ...node, slot };
+            }),
+            edges: s.edges.filter((edge) => !drop.has(edge.from) && !drop.has(edge.to)),
+            selectedId: s.selectedId && drop.has(s.selectedId) ? null : s.selectedId,
+            lastCookedNodeId: s.lastCookedNodeId && drop.has(s.lastCookedNodeId) ? null : s.lastCookedNodeId,
           };
         });
       },
@@ -1016,35 +1049,210 @@ export const usePipelineStore = create<PipelineState>()(
         }
       },
 
-      startEdge: (from, fromPort, portType) =>
-        set({ pendingEdge: { from, fromPort, portType } }),
+      startEdge: (nodeId, portId, portType, side) => {
+        if (side === 'out') {
+          set({ pendingEdge: { from: nodeId, fromPort: portId, portType, origin: 'output' } });
+          return;
+        }
+        set({ pendingEdge: { from: '', fromPort: '', portType, origin: 'input', to: nodeId, toPort: portId } });
+      },
 
-      completeEdge: (to, toPort, toType) => {
-        const { pendingEdge, edges } = get();
-        if (!pendingEdge || pendingEdge.from === to) {
+      completeEdge: (nodeId, portId, portType, side) => {
+        const { pendingEdge, edges, nodes } = get();
+        if (!pendingEdge) return false;
+        let fromId = '';
+        let fromPort = '';
+        let toId = '';
+        let toPort = '';
+        let edgeType = portType;
+        if (pendingEdge.origin === 'output') {
+          if (side !== 'in') {
+            set({ pendingEdge: null });
+            return false;
+          }
+          fromId = pendingEdge.from;
+          fromPort = pendingEdge.fromPort;
+          toId = nodeId;
+          toPort = portId;
+          edgeType = pendingEdge.portType;
+          if (!portsCompatible(edgeType, portType)) {
+            set({ pendingEdge: null });
+            return false;
+          }
+        } else {
+          if (side !== 'out' || !pendingEdge.to || !pendingEdge.toPort) {
+            set({ pendingEdge: null });
+            return false;
+          }
+          fromId = nodeId;
+          fromPort = portId;
+          toId = pendingEdge.to;
+          toPort = pendingEdge.toPort;
+          edgeType = portType;
+          if (!portsCompatible(portType, pendingEdge.portType)) {
+            set({ pendingEdge: null });
+            return false;
+          }
+        }
+        if (!fromId || fromId === toId) {
           set({ pendingEdge: null });
           return false;
         }
-        if (!portsCompatible(pendingEdge.portType, toType)) {
-          set({ pendingEdge: null });
-          return false;
-        }
-        const def = PIPELINE_NODE_DEFS[get().nodes.find((n) => n.id === to)?.type ?? ''];
-        const port = def?.inputs.find((p) => p.id === toPort);
-        // Single-input ports replace the existing edge; multi ports accumulate
-        const filtered = port?.multi
+        const target = PIPELINE_NODE_DEFS[nodes.find((node) => node.id === toId)?.type ?? ''];
+        const input = target?.inputs.find((port) => port.id === toPort);
+        const filtered = input?.multi
           ? edges
-          : edges.filter((e) => !(e.to === to && e.toPort === toPort));
+          : edges.filter((edge) => !(edge.to === toId && edge.toPort === toPort));
+        if (filtered.some((edge) => edge.from === fromId && edge.fromPort === fromPort && edge.to === toId && edge.toPort === toPort)) {
+          set({ pendingEdge: null });
+          return true;
+        }
         const edge: PipelineEdge = {
           id: uuidv4(),
-          from: pendingEdge.from,
-          fromPort: pendingEdge.fromPort,
-          to,
+          from: fromId,
+          fromPort,
+          to: toId,
           toPort,
-          type: pendingEdge.portType as PipelineEdge['type'],
+          type: edgeType as PipelineEdge['type'],
         };
         set({ edges: [...filtered, edge], pendingEdge: null });
         return true;
+      },
+
+      spawnLinkedNode: ({ type, newPortId, sourceId, sourcePortId, sourceSide }) => {
+        const def = PIPELINE_NODE_DEFS[type];
+        const state = get();
+        const source = state.nodes.find((node) => node.id === sourceId);
+        const sourceDef = source ? PIPELINE_NODE_DEFS[source.type] : undefined;
+        const newPort = (sourceSide === 'out' ? def?.inputs : def?.outputs)?.find((port) => port.id === newPortId);
+        const sourcePort = (sourceSide === 'out' ? sourceDef?.outputs : sourceDef?.inputs)?.find((port) => port.id === sourcePortId);
+        if (!def || !source || !newPort || !sourcePort) return null;
+        const compatible = sourceSide === 'out'
+          ? portsCompatible(sourcePort.type, newPort.type)
+          : portsCompatible(newPort.type, sourcePort.type);
+        if (!compatible) return null;
+
+        const id = uuidv4();
+        const node: PipelineNode = {
+          id,
+          type,
+          stage: def.stage,
+          title: def.title,
+          slot: state.nodes.filter((item) => item.stage === def.stage && item.inLane !== false).length,
+          params: defaultParams(def),
+          status: 'idle',
+          variants: [],
+        };
+        const fromId = sourceSide === 'out' ? source.id : id;
+        const fromPort = sourceSide === 'out' ? sourcePort.id : newPort.id;
+        const toId = sourceSide === 'out' ? id : source.id;
+        const toPort = sourceSide === 'out' ? newPort.id : sourcePort.id;
+        const edge: PipelineEdge = {
+          id: uuidv4(),
+          from: fromId,
+          fromPort,
+          to: toId,
+          toPort,
+          type: (sourceSide === 'out' ? sourcePort.type : newPort.type) as PipelineEdge['type'],
+        };
+
+        let nodes = state.nodes;
+        let openStages = state.openStages;
+        if (source.clusterId) {
+          const frame = source.clusterFrame
+            ?? nodes.find((item) => item.clusterId === source.clusterId)?.clusterFrame;
+          node.inLane = false;
+          node.clusterId = source.clusterId;
+          node.clusterTitle = source.clusterTitle;
+          node.clusterIcon = source.clusterIcon;
+          node.clusterCollapsed = false;
+          const members = nodes
+            .filter((item) => item.clusterId === source.clusterId)
+            .map((item) => ({ ...item, clusterCollapsed: false as const }));
+          const ids = [...members.map((item) => item.id), id];
+          const internal = [...state.edges.filter((item) => ids.includes(item.from) && ids.includes(item.to)), edge];
+          const packed = packCluster(ids, internal);
+          const origin = frame
+            ? { x: frame.x, y: frame.y }
+            : {
+                x: nodePosition(source).x - CLUSTER_PAD_X,
+                y: nodePosition(source).y - CLUSTER_PAD_TOP,
+              };
+          const plate = { x: origin.x, y: origin.y, w: packed.width, h: packed.height };
+          const placed = placeCluster(ids, internal, plate);
+          const at = placed.get(id);
+          if (at) {
+            node.x = at.x;
+            node.y = at.y;
+          }
+          node.clusterFrame = plate;
+          nodes = [
+            ...nodes.filter((item) => item.clusterId !== source.clusterId),
+            ...members.map((member) => {
+              const pos = placed.get(member.id);
+              return pos
+                ? { ...member, x: pos.x, y: pos.y, inLane: false as const, clusterFrame: plate, clusterCollapsed: false }
+                : { ...member, clusterCollapsed: false };
+            }),
+            node,
+          ];
+        } else if (source.inLane !== false && def.stage === source.stage) {
+          const lane = nodes
+            .filter((item) => item.stage === source.stage && item.inLane !== false)
+            .sort((a, b) => a.slot - b.slot || a.id.localeCompare(b.id));
+          const sourceIndex = Math.max(0, lane.findIndex((item) => item.id === source.id));
+          const insert = sourceSide === 'out' ? sourceIndex + 1 : sourceIndex;
+          const ordered = [...lane.slice(0, insert), node, ...lane.slice(insert)];
+          const slotOf = new Map(ordered.map((item, index) => [item.id, index]));
+          node.inLane = true;
+          node.slot = slotOf.get(id) ?? 0;
+          node.x = undefined;
+          node.y = undefined;
+          nodes = [
+            ...nodes.map((item) => (
+              slotOf.has(item.id)
+                ? { ...item, slot: slotOf.get(item.id)!, inLane: true as const, x: undefined, y: undefined }
+                : item
+            )),
+            node,
+          ];
+        } else if (source.inLane !== false) {
+          node.inLane = true;
+          node.stage = def.stage;
+          node.slot = nodes.filter((item) => item.stage === def.stage && item.inLane !== false).length;
+          if (!openStages.includes(def.stage)) openStages = [...openStages, def.stage];
+          nodes = [...nodes, node];
+        } else {
+          const at = nodePosition(source);
+          let x = sourceSide === 'out' ? at.x + NODE_W + 72 : at.x - (NODE_W + 72);
+          let y = at.y;
+          const occupied = nodes.map((item) => {
+            const pos = nodePosition(item);
+            return { x: pos.x, y: pos.y, w: NODE_W, h: NODE_H };
+          });
+          for (let step = 0; step < 12 && occupied.some((box) => rectsOverlap({ x, y, w: NODE_W, h: NODE_H }, box)); step += 1) {
+            y += NODE_H + 24;
+          }
+          node.inLane = false;
+          node.x = x;
+          node.y = y;
+          nodes = [...nodes, node];
+        }
+
+        const target = PIPELINE_NODE_DEFS[nodes.find((item) => item.id === toId)?.type ?? ''];
+        const input = target?.inputs.find((port) => port.id === toPort);
+        const edges = input?.multi
+          ? state.edges
+          : state.edges.filter((item) => !(item.to === toId && item.toPort === toPort));
+        set({
+          nodes,
+          edges: [...edges, edge],
+          openStages,
+          selectedId: id,
+          pendingEdge: null,
+          collapsedStages: state.collapsedStages.filter((stage) => stage !== node.stage),
+        });
+        return id;
       },
 
       cancelEdge: () => set({ pendingEdge: null }),

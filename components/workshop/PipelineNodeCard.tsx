@@ -9,7 +9,7 @@ import {
   Heading, Proportions, Cog, GalleryThumbnails, Sliders, FlaskConical, Pencil, Boxes,
 } from 'lucide-react';
 import type { PipelineNode } from '@/types/pipeline';
-import { PIPELINE_NODE_DEFS, STAGES } from '@/lib/pipeline/catalog';
+import { PIPELINE_NODE_DEFS, STAGES, portsCompatible } from '@/lib/pipeline/catalog';
 import { usePipelineStore, nodePosition, NODE_W, NODE_H, NODE_GAP, LANE_HEADER, LANE_PAD_X } from '@/stores/pipelineStore';
 import { collapsedStack } from './laneFrames';
 import { insertionIndex, laneMembers, stageAtPoint } from '@/lib/pipeline/lanes';
@@ -37,6 +37,24 @@ const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   clock: Clock, plus: Plus, moon: Moon,
 };
 
+function portLook(
+  wire: WireHint | null,
+  nodeId: string,
+  side: 'in' | 'out',
+  portId: string,
+  portType: string,
+  connected: boolean,
+): string {
+  const live = wire?.nodeId === nodeId && wire.portId === portId && wire.side === side;
+  if (live) return styles.portLive;
+  if (!wire?.picking) return connected ? styles.portOn : '';
+  if (wire.nodeId === nodeId) return styles.portDim;
+  const compatible = side === 'in'
+    ? wire.side === 'out' && portsCompatible(wire.type, portType)
+    : wire.side === 'in' && portsCompatible(portType, wire.type);
+  return compatible ? styles.portReady : styles.portDim;
+}
+
 export function nodeIcon(name: string, size = 13): React.ReactNode {
   const Icon = ICONS[name] ?? Sparkles;
   return <Icon size={size} />;
@@ -50,6 +68,24 @@ function friendlyNodeError(error?: string): string {
   return error;
 }
 
+export interface WireHint {
+  nodeId: string;
+  portId: string;
+  side: 'in' | 'out';
+  type: string;
+  /** Compatible ports invite a drop while the rubber band is out. */
+  picking: boolean;
+}
+
+export interface WireDrop {
+  clientX: number;
+  clientY: number;
+  nodeId: string;
+  portId: string;
+  portType: string;
+  side: 'in' | 'out';
+}
+
 interface Props {
   node: PipelineNode;
   zoom: number;
@@ -59,10 +95,15 @@ interface Props {
   /** Place in a closed group: cards overlap so each bottom border still shows. */
   foldIndex?: number;
   foldCount?: number;
+  wire?: WireHint | null;
+  panKeyRef?: React.MutableRefObject<boolean>;
+  onWireMove?: (clientX: number, clientY: number) => void;
+  onLinkMenu?: (drop: WireDrop) => void;
 }
 
 export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNodeCard({
   node, zoom, apiKey, shiftY = 0, marked = false, foldIndex, foldCount = 1,
+  wire = null, panKeyRef, onWireMove, onLinkMenu,
 }) {
   const def = PIPELINE_NODE_DEFS[node.type];
   const stage = STAGES[node.stage];
@@ -128,6 +169,82 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
     if (!drag?.moved) return;
     settleNode(node.id);
   }, [node.id]);
+
+  const wireRef = useRef<{
+    x: number;
+    y: number;
+    dragged: boolean;
+    mode: 'start' | 'complete';
+    side: 'in' | 'out';
+    portId: string;
+    portType: string;
+  } | null>(null);
+
+  const beginWire = useCallback((event: React.PointerEvent, side: 'in' | 'out', portId: string, portType: string) => {
+    if (event.button !== 0 || panKeyRef?.current) return;
+    event.stopPropagation();
+    const store = usePipelineStore.getState();
+    const pending = store.pendingEdge;
+    const completing = pending
+      && ((side === 'in' && pending.origin === 'output') || (side === 'out' && pending.origin === 'input'));
+    wireRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      dragged: false,
+      mode: completing ? 'complete' : 'start',
+      side,
+      portId,
+      portType,
+    };
+    if (!completing) store.startEdge(node.id, portId, portType, side);
+    onWireMove?.(event.clientX, event.clientY);
+    try { (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
+  }, [node.id, onWireMove, panKeyRef]);
+
+  const moveWire = useCallback((event: React.PointerEvent) => {
+    const gesture = wireRef.current;
+    if (!gesture) return;
+    if (Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) >= 4) gesture.dragged = true;
+    onWireMove?.(event.clientX, event.clientY);
+  }, [onWireMove]);
+
+  const endWire = useCallback((event: React.PointerEvent) => {
+    const gesture = wireRef.current;
+    wireRef.current = null;
+    if (!gesture) return;
+    try { (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId); } catch { /* already released */ }
+    const store = usePipelineStore.getState();
+    if (!store.pendingEdge) return;
+    const hit = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-port]');
+    const hitNode = hit?.getAttribute('data-node-id') ?? '';
+    const hitSide = hit?.getAttribute('data-port-side');
+    const hitPort = hit?.getAttribute('data-port-id') ?? '';
+    const hitType = hit?.getAttribute('data-port-type') ?? '';
+    if (hit && hitNode && (hitSide === 'in' || hitSide === 'out') && (gesture.dragged || gesture.mode === 'complete')) {
+      store.completeEdge(hitNode, hitPort, hitType, hitSide);
+      return;
+    }
+    if (!gesture.dragged) return;
+    if (document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-node]')) {
+      store.cancelEdge();
+      return;
+    }
+    onLinkMenu?.({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      nodeId: node.id,
+      portId: gesture.portId,
+      portType: gesture.portType,
+      side: gesture.side,
+    });
+  }, [node.id, onLinkMenu]);
+
+  const cancelWire = useCallback((event: React.SyntheticEvent) => {
+    if (!wireRef.current) return;
+    event.preventDefault();
+    wireRef.current = null;
+    usePipelineStore.getState().cancelEdge();
+  }, []);
 
   if (!def) return null;
 
@@ -259,50 +376,58 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
         )}
 
         {/* Ports */}
-        {def.inputs.map((port, i) => (
-          <div
-            key={`in-${port.id}`}
-            data-port
-            className={`${styles.port} ${styles.portIn} ${portConnected('in', port.id) ? styles.portOn : ''}`}
-            style={{
-              top: PORT_TOP + i * PORT_SPACING - 6,
-              ['--port-color' as string]: PORT_COLORS[port.type] ?? '#8a8aa2',
-            }}
-            title={`${port.label} (${port.type}${port.multi ? ', multi' : ''})`}
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerUp={(e) => {
-              e.stopPropagation();
-              const s = usePipelineStore.getState();
-              if (s.pendingEdge) s.completeEdge(node.id, port.id, port.type);
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              const s = usePipelineStore.getState();
-              if (s.pendingEdge) s.completeEdge(node.id, port.id, port.type);
-            }}
-          >
-            <span className={styles.portLabel}>{port.label}</span>
-          </div>
-        ))}
-        {def.outputs.map((port, i) => (
-          <div
-            key={`out-${port.id}`}
-            data-port
-            className={`${styles.port} ${styles.portOut} ${portConnected('out', port.id) ? styles.portOn : ''}`}
-            style={{
-              top: PORT_TOP + i * PORT_SPACING - 6,
-              ['--port-color' as string]: PORT_COLORS[port.type] ?? '#8a8aa2',
-            }}
-            title={`${port.label} (${port.type}) — drag to an input`}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              usePipelineStore.getState().startEdge(node.id, port.id, port.type);
-            }}
-          >
-            <span className={styles.portLabel}>{port.label}</span>
-          </div>
-        ))}
+        {def.inputs.map((port, i) => {
+          const look = portLook(wire, node.id, 'in', port.id, port.type, portConnected('in', port.id));
+          return (
+            <div
+              key={`in-${port.id}`}
+              data-port
+              data-node-id={node.id}
+              data-port-id={port.id}
+              data-port-side="in"
+              data-port-type={port.type}
+              className={`${styles.port} ${styles.portIn} ${look}`}
+              style={{
+                top: PORT_TOP + i * PORT_SPACING - 6,
+                ['--port-color' as string]: PORT_COLORS[port.type] ?? '#8a8aa2',
+              }}
+              title={`${port.label} (${port.type}${port.multi ? ', multi' : ''}) — drag to an output, or drop a wire here`}
+              onPointerDown={(event) => beginWire(event, 'in', port.id, port.type)}
+              onPointerMove={moveWire}
+              onPointerUp={endWire}
+              onPointerCancel={cancelWire}
+              onContextMenu={cancelWire}
+            >
+              <span className={styles.portLabel}>{port.label}</span>
+            </div>
+          );
+        })}
+        {def.outputs.map((port, i) => {
+          const look = portLook(wire, node.id, 'out', port.id, port.type, portConnected('out', port.id));
+          return (
+            <div
+              key={`out-${port.id}`}
+              data-port
+              data-node-id={node.id}
+              data-port-id={port.id}
+              data-port-side="out"
+              data-port-type={port.type}
+              className={`${styles.port} ${styles.portOut} ${look}`}
+              style={{
+                top: PORT_TOP + i * PORT_SPACING - 6,
+                ['--port-color' as string]: PORT_COLORS[port.type] ?? '#8a8aa2',
+              }}
+              title={`${port.label} (${port.type}) — drag to an input`}
+              onPointerDown={(event) => beginWire(event, 'out', port.id, port.type)}
+              onPointerMove={moveWire}
+              onPointerUp={endWire}
+              onPointerCancel={cancelWire}
+              onContextMenu={cancelWire}
+            >
+              <span className={styles.portLabel}>{port.label}</span>
+            </div>
+          );
+        })}
       </div>
 
       {/* Tabbed dropdown: layers · versions · info — flips below when near the top */}

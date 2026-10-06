@@ -15,6 +15,7 @@ import {
   Sparkles,
   Pencil,
   Trash2,
+  MoreVertical,
   PanelLeft,
   Box,
   Layers,
@@ -93,6 +94,8 @@ interface FileTreeItemProps {
   onRenameCancel: () => void;
   isSelected: boolean;
   isExpanded: boolean;
+  /** The row above this one is an open folder with the same highlight. */
+  parentHighlighted?: boolean;
 }
 
 const isFolderEmpty = (node: FileNode): boolean => {
@@ -107,22 +110,50 @@ const hasFolderContent = (node: FileNode): boolean => {
   return node.children.some((child) => child.type !== 'folder' || hasFolderContent(child));
 };
 
+const GUIDE_STEP = 8;
+
+const childFolderIsOpen = (child: FileNode, expandedPaths: Set<string>): boolean => (
+  child.type === 'folder' && expandedPaths.has(child.path) && hasFolderContent(child)
+);
+
 const FileTreeItem: React.FC<FileTreeItemProps> = ({
   node, depth, onSelect, onToggle, onDragStart, onDropNode, onStartRename, onDeleteNode, onContextMenu,
   editingPath, editingName, onEditingNameChange, onRenameSubmit, onRenameCancel, isSelected, isExpanded,
+  parentHighlighted = false,
 }) => {
+  const expandedPaths = useFileStore((s) => s.expandedPaths);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
   const isEmpty = node.type === 'folder' && isFolderEmpty(node);
   const hasContent = node.type === 'folder' && hasFolderContent(node);
   const isActiveFolder = node.type === 'folder' && isExpanded && hasContent;
+  const folderShowsOpen = node.type === 'folder' && isExpanded && (node.children?.length ?? 0) > 0;
+  const firstChild = node.children?.[0];
+  const joinsBelow = isActiveFolder && !!firstChild && childFolderIsOpen(firstChild, expandedPaths);
+  const joinsAbove = parentHighlighted && isActiveFolder;
+  const picture = node.type !== 'folder' ? node.asset?.thumbnail : undefined;
+  const editing = editingPath === node.path;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!rowRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
+  }, [menuOpen]);
 
   return (
     <div className={styles.treeItem}>
       <div
+        ref={rowRef}
         className={`${styles.treeItemRow} ${isSelected ? styles.selected : ''} ${isEmpty ? styles.emptyFolder : ''} ${isActiveFolder ? styles.activeFolder : ''}`}
-        style={{ paddingLeft: `${depth * 12 + 4}px` }}
+        style={{ paddingLeft: `${2 + depth * GUIDE_STEP}px` }}
         onClick={() => onSelect(node)}
         data-empty={isEmpty ? 'true' : undefined}
         data-active-folder={isActiveFolder ? 'true' : undefined}
+        data-join-below={joinsBelow ? 'true' : undefined}
+        data-join-above={joinsAbove ? 'true' : undefined}
         onContextMenu={(e) => onContextMenu(e, node)}
         draggable={!(node.type === 'folder' && ['/', '/projects', '/imports', '/library', '/prompts'].includes(node.path))}
         onDragStart={(e) => onDragStart(e, node)}
@@ -139,26 +170,36 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
         role="treeitem"
         aria-selected={isSelected}
       >
-        <span className={styles.expandPlaceholder} aria-hidden />
+        {depth > 0 && (
+          <span className={styles.guides} aria-hidden>
+            {Array.from({ length: depth }, (_, index) => (
+              <span key={index} className={styles.guide} style={{ left: 2 + index * GUIDE_STEP }} />
+            ))}
+          </span>
+        )}
 
         {node.type === 'folder' ? (
           <button
             type="button"
             className={styles.folderIconButton}
-            title={isExpanded ? 'Collapse folder' : 'Expand folder'}
-            aria-expanded={isExpanded}
+            title={folderShowsOpen ? 'Collapse folder' : 'Expand folder'}
+            aria-expanded={folderShowsOpen}
             onClick={(e) => {
               e.stopPropagation();
               onSelect(node);
               onToggle(node.path);
             }}
           >
-            {getFileIcon({ ...node, expanded: isExpanded })}
+            {folderShowsOpen ? <FolderOpen size={16} /> : <Folder size={16} />}
           </button>
+        ) : picture ? (
+          <span className={styles.fileThumb}>
+            <img src={picture} alt="" />
+          </span>
         ) : (
           <span className={styles.icon} style={{ color: node.asset ? (ICON_COLORS[node.asset.type] ?? undefined) : undefined }}>{getFileIcon({ ...node, expanded: isExpanded })}</span>
         )}
-        {editingPath === node.path ? (
+        {editing ? (
           <input
             className={styles.renameInput}
             value={editingName}
@@ -175,42 +216,69 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
           <span className={styles.name}>{node.name}</span>
         )}
 
-        {node.asset?.thumbnail && (
-          <div className={styles.thumbnail}>
-            <img src={node.asset.thumbnail} alt="" />
-          </div>
+        {!editing && node.type === 'folder' && (
+          <span className={styles.childCount}>{node.children?.length ?? 0}</span>
         )}
 
-        <div className={styles.rowActions}>
-          <button
-            type="button"
-            className={styles.rowActionButton}
-            title="Rename"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStartRename(node);
-            }}
-          >
-            <Pencil size={12} />
-          </button>
-          <button
-            type="button"
-            className={styles.rowActionButton}
-            title="Delete"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteNode(node);
-            }}
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
+        {!editing && (
+          <>
+            {menuOpen && (
+              <div className={styles.rowMenu} onPointerDown={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  title="Rename"
+                  aria-label={`Rename ${node.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    onStartRename(node);
+                  }}
+                >
+                  <Pencil size={13} />
+                </button>
+                <button
+                  type="button"
+                  data-danger="true"
+                  title="Delete"
+                  aria-label={`Delete ${node.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    onDeleteNode(node);
+                  }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              className={styles.rowMenuButton}
+              data-open={menuOpen ? 'true' : undefined}
+              title={menuOpen ? 'Close' : 'Rename or delete'}
+              aria-label={menuOpen ? `Close actions for ${node.name}` : `Actions for ${node.name}`}
+              aria-expanded={menuOpen}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((open) => !open);
+              }}
+            >
+              <MoreVertical size={14} />
+            </button>
+          </>
+        )}
       </div>
 
       {node.type === 'folder' && isExpanded && node.children && (
         <div className={styles.children}>
-          {node.children.map((child) => (
-            <FileTreeItemWrapper key={child.id} node={child} depth={depth + 1} />
+          {node.children.map((child, index) => (
+            <FileTreeItemWrapper
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              parentHighlighted={index === 0 && isActiveFolder}
+            />
           ))}
         </div>
       )}
@@ -218,7 +286,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
   );
 };
 
-const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({ node, depth }) => {
+const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number; parentHighlighted?: boolean }> = ({ node, depth, parentHighlighted = false }) => {
   const { selectedPath, expandedPaths, selectPath, toggleExpanded, moveNode, deleteNode, renameNode } = useFileStore();
   const log = useLogStore((s) => s.log);
   const [editingPath, setEditingPath] = useState<string | null>(null);
@@ -303,6 +371,7 @@ const FileTreeItemWrapper: React.FC<{ node: FileNode; depth: number }> = ({ node
       }}
       isSelected={selectedPath === node.path}
       isExpanded={expandedPaths.has(node.path)}
+      parentHighlighted={parentHighlighted}
     />
   );
 };

@@ -350,6 +350,56 @@ describe('FileStore', () => {
       expect(node?.name).toBe('after.png');
     });
 
+    it('renameNode keeps image bytes when the extension becomes .pn', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Extension Project');
+      const genPath = store.getProjectGeneratedPath();
+      const asset = createMockAsset({
+        id: 'ext-asset-1',
+        name: 'before.png',
+        type: 'image',
+        path: `${genPath}/before.png`,
+        thumbnail: '/generated/before.png',
+        metadata: { mimeType: 'image/png' },
+      });
+      store.addAssetToFolder(asset as any, genPath);
+
+      expect(store.renameNode(`${genPath}/before.png`, 'before.pn')).toBe(true);
+
+      const saved = store.getAsset('ext-asset-1');
+      expect(saved?.name).toBe('before.pn');
+      expect(saved?.type).toBe('image');
+      expect(saved?.thumbnail).toBe('/generated/before.png');
+      expect(saved?.metadata?.mimeType).toBe('image/png');
+      expect(store.findNodeByPath(`${genPath}/before.pn`)?.asset?.type).toBe('image');
+    });
+
+    it('renameNode rejects path tricks and structural folders, and keeps $& literal', () => {
+      const store = useFileStore.getState();
+      store.initializeFileStructure('Guard Project');
+      const genPath = store.getProjectGeneratedPath();
+      const asset = createMockAsset({
+        id: 'guard-asset-1',
+        name: 'pic.png',
+        path: `${genPath}/pic.png`,
+      });
+      store.addAssetToFolder(asset as any, genPath);
+      const filePath = `${genPath}/pic.png`;
+
+      expect(store.renameNode(filePath, '../escaped.png')).toBe(false);
+      expect(store.renameNode(filePath, 'a/b.png')).toBe(false);
+      expect(store.renameNode(filePath, 'a\\b.png')).toBe(false);
+      expect(store.renameNode(filePath, '.')).toBe(false);
+      expect(store.renameNode(filePath, '..')).toBe(false);
+      expect(store.renameNode(filePath, 'bad\u0000name.png')).toBe(false);
+      expect(store.renameNode('/imports', 'Imports.png')).toBe(false);
+      expect(store.renameNode(genPath, 'Renamed Generated')).toBe(false);
+      expect(store.findNodeByPath(filePath)?.name).toBe('pic.png');
+
+      expect(store.renameNode(filePath, 'cost $& tax.png')).toBe(true);
+      expect(store.findNodeByPath(`${genPath}/cost $& tax.png`)?.name).toBe('cost $& tax.png');
+    });
+
     it('getAssetsByLineage returns assets sharing lineageId', () => {
       const store = useFileStore.getState();
       store.initializeFileStructure('Lineage Project');

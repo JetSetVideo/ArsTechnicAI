@@ -195,6 +195,18 @@ function createImageThumbnail(dataUrl: string, maxDim = 320): Promise<string> {
 
 const normalizePath = (path: string) => path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
 
+/** A display name may use any extension, including .pn. It may not be a path. */
+const isSafeDisplayName = (name: string) => {
+  if (!name || name === '.' || name === '..') return false;
+  return !/[\\/\u0000-\u001f\u007f]/.test(name);
+};
+
+const rewritePathPrefix = (nodePath: string, from: string, to: string) => {
+  if (nodePath === from) return to;
+  if (nodePath.startsWith(`${from}/`)) return `${to}${nodePath.slice(from.length)}`;
+  return nodePath;
+};
+
 const getParentPath = (path: string) => {
   const normalized = normalizePath(path);
   if (normalized === '/') return '/';
@@ -487,7 +499,10 @@ export const useFileStore = create<FileState>()(
       renameNode: (path, newName) => {
         const targetPath = normalizePath(path);
         const safeName = newName.trim();
-        if (!safeName || targetPath === '/') return false;
+        if (!isSafeDisplayName(safeName) || targetPath === '/') return false;
+        if (WORKSPACE_PROTECTED_PATHS.has(targetPath)) return false;
+        const projectPath = get().currentProjectPath;
+        if (targetPath === `${projectPath}/generated` || targetPath === `${projectPath}/exports`) return false;
 
         const sourceNode = findNodeByPathInTree(get().rootNodes, targetPath);
         if (!sourceNode) return false;
@@ -509,13 +524,13 @@ export const useFileStore = create<FileState>()(
               const nodePath = normalizePath(node.path);
               if (nodePath === targetPath || nodePath.startsWith(`${targetPath}/`)) {
                 renamed = true;
-                const updatedPath = nodePath.replace(targetPath, nextPath);
+                const updatedPath = rewritePathPrefix(nodePath, targetPath, nextPath);
                 const updatedAsset = node.asset
                   ? {
                       ...node.asset,
-                      // Update name only for the directly renamed node
+                      // Update name only for the directly renamed node. Type, thumbnail, and bytes stay.
                       name: nodePath === targetPath ? safeName : node.asset.name,
-                      path: normalizePath(node.asset.path).replace(targetPath, nextPath),
+                      path: rewritePathPrefix(normalizePath(node.asset.path), targetPath, nextPath),
                       modifiedAt: Date.now(),
                     }
                   : undefined;
@@ -547,7 +562,7 @@ export const useFileStore = create<FileState>()(
           const nextExpanded = new Set<string>();
           state.expandedPaths.forEach((p) => {
             if (p === targetPath || p.startsWith(`${targetPath}/`)) {
-              nextExpanded.add(p.replace(targetPath, nextPath));
+              nextExpanded.add(rewritePathPrefix(p, targetPath, nextPath));
             } else {
               nextExpanded.add(p);
             }
@@ -555,7 +570,7 @@ export const useFileStore = create<FileState>()(
 
           const nextSelectedPath =
             state.selectedPath && (state.selectedPath === targetPath || state.selectedPath.startsWith(`${targetPath}/`))
-              ? state.selectedPath.replace(targetPath, nextPath)
+              ? rewritePathPrefix(state.selectedPath, targetPath, nextPath)
               : state.selectedPath;
 
           return {

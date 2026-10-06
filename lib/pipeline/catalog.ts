@@ -1193,3 +1193,49 @@ export function portsCompatible(from: string, to: string): boolean {
   if (from === 'text' && to === 'script') return true;
   return false;
 }
+
+export interface LinkCandidate {
+  type: string;
+  title: string;
+  stage: PipelineStageId;
+  icon: string;
+  /** Port on the new node that the wire will use. */
+  portId: string;
+}
+
+/**
+ * Node types that can accept a wire of `portType`.
+ * `seeking: 'input'` means the drag started on an output and the new node needs an input.
+ * Same stage first, then the next stage in the drag direction, then the rest.
+ */
+export function linkCandidates(
+  portType: string,
+  seeking: 'input' | 'output',
+  sourceStage: PipelineStageId,
+): LinkCandidate[] {
+  const catalog = Object.values(PIPELINE_NODE_DEFS);
+  const found: LinkCandidate[] = [];
+  for (const def of catalog) {
+    const ports = seeking === 'input' ? def.inputs : def.outputs;
+    const port = ports.find((item) => (
+      seeking === 'input' ? portsCompatible(portType, item.type) : portsCompatible(item.type, portType)
+    ));
+    if (!port) continue;
+    found.push({ type: def.type, title: def.title, stage: def.stage, icon: def.icon, portId: port.id });
+  }
+  const sourceIndex = STAGE_ORDER.indexOf(sourceStage);
+  const rank = (stage: PipelineStageId) => {
+    const delta = STAGE_ORDER.indexOf(stage) - sourceIndex;
+    if (delta === 0) return 0;
+    const forward = seeking === 'input' ? delta : -delta;
+    return forward > 0 ? forward : 100 + Math.abs(forward);
+  };
+  found.sort((a, b) => {
+    const byRank = rank(a.stage) - rank(b.stage);
+    if (byRank !== 0) return byRank;
+    const byStage = STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage);
+    if (byStage !== 0) return byStage;
+    return catalog.findIndex((def) => def.type === a.type) - catalog.findIndex((def) => def.type === b.type);
+  });
+  return found;
+}
