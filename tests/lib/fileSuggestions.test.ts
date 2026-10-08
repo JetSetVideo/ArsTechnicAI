@@ -35,6 +35,16 @@ describe('file suggestions', () => {
     expect(groups.files[0].thumbnail).toBe('thumb');
   });
 
+  it('shows the folder and how many matching files are in it', () => {
+    const groups = suggestionGroups([
+      { id: 'folder:/projects/demo/generated', label: 'Generated', kind: 'folder', path: '/projects/demo/generated', count: 6, text: '6 files' },
+      { id: 'a', label: 'gen_a-computer.png', kind: 'image', thumbnail: 'thumb-a', path: '/projects/demo/generated/gen_a-computer.png' },
+      { id: 'b', label: 'notes.txt', kind: 'text', path: '/projects/demo/generated/notes.txt' },
+    ], 'computer');
+    expect(groups.folders.map((hit) => [hit.label, hit.count])).toEqual([['Generated', 6]]);
+    expect(groups.files.map((hit) => hit.label)).toEqual(['gen_a-computer.png']);
+  });
+
   it('lists the folders above a file', () => {
     expect(ancestorPaths('/projects/demo/generated/gen_a-computer.png')).toEqual([
       '/projects',

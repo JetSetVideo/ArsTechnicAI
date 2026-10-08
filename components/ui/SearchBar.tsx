@@ -3,7 +3,9 @@ import { Search, X, Globe, Folder, Image as ImageIcon } from 'lucide-react';
 import styles from './SearchBar.module.css';
 import type { Asset, FileNode, SearchScope } from '@/types';
 import type { PipelineNode } from '@/types/pipeline';
-import { useFileStore } from '@/stores';
+import { useFileStore, useProjectsStore } from '@/stores';
+import { buildLibrary } from '@/lib/pipeline/canvasPictures';
+import { useCanvasPictures } from '@/hooks/useCanvasPictures';
 import { usePipelineStore } from '@/stores/pipelineStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { matchShortcut } from '@/lib/shortcuts';
@@ -36,6 +38,30 @@ function writeBool(key: string, on: boolean) {
   window.dispatchEvent(new Event('ars-search-prefs'));
 }
 
+function fileCount(node: FileNode): number {
+  if (node.type === 'file') return 1;
+  return (node.children || []).reduce((sum, child) => sum + fileCount(child), 0);
+}
+
+function collectFolders(nodes: FileNode[], into: FileSearchInput[]) {
+  for (const node of nodes) {
+    if (node.type === 'folder' && node.path !== '/') {
+      const count = fileCount(node);
+      if (count > 0) {
+        into.push({
+          id: `folder:${node.path}`,
+          label: node.name,
+          kind: 'folder',
+          path: node.path,
+          count,
+          text: `${count} file${count === 1 ? '' : 's'}`,
+        });
+      }
+    }
+    if (node.children?.length) collectFolders(node.children, into);
+  }
+}
+
 function collectFiles(nodes: FileNode[], into: FileSearchInput[], seen: Set<string>) {
   for (const node of nodes) {
     if (node.type === 'file') {
@@ -56,6 +82,7 @@ function collectFiles(nodes: FileNode[], into: FileSearchInput[], seen: Set<stri
 function buildIndex(rootNodes: FileNode[], assets: Map<string, Asset>, nodes: PipelineNode[]): FileSearchInput[] {
   const into: FileSearchInput[] = [];
   const seen = new Set<string>();
+  collectFolders(rootNodes, into);
   collectFiles(rootNodes, into, seen);
   assets.forEach((asset) => {
     if (seen.has(asset.id)) return;
@@ -115,6 +142,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const rootNodes = useFileStore((s) => s.rootNodes);
   const assets = useFileStore((s) => s.assets);
   const nodes = usePipelineStore((s) => s.nodes);
+  const canvases = useCanvasPictures();
+  const liveProjects = useProjectsStore((s) => s.projects);
   const searchShortcut = useSettingsStore((s) => s.settings.shortcuts?.search || 'mod+k');
 
   useEffect(() => {
@@ -159,19 +188,71 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const scope: SearchScope = filesOn && googleOn ? 'all' : googleOn ? 'google' : 'files';
   const fieldPlaceholder = googleOn && !filesOn ? 'Search the web...' : filesOn && googleOn ? 'Search files or the web...' : placeholder;
 
-  const index = useMemo(
-    () => buildIndex(rootNodes, assets, nodes),
-    [rootNodes, assets, nodes]
-  );
+  const index = useMemo(() => {
+    const base = buildIndex(rootNodes, assets, nodes);
+    const library = buildLibrary(
+      assets.values(),
+      canvases,
+      liveProjects.map((project) => ({ id: project.id, name: project.name })),
+    );
+    const extra: FileSearchInput[] = [];
+    const pushGroup = (id: string, label: string, folderPath: string, detail: string, rows: typeof library) => {
+      if (rows.length === 0) return;
+      extra.push({
+        id,
+        label,
+        kind: 'folder',
+        path: folderPath,
+        count: rows.length,
+        text: `${rows.length} file${rows.length === 1 ? '' : 's'}`,
+      });
+      for (const asset of rows) {
+        extra.push({
+          id: asset.id,
+          label: asset.name,
+          kind: asset.type || 'image',
+          thumbnail: asset.thumbnail,
+          path: `${folderPath}/${asset.id}`,
+          text: detail,
+        });
+      }
+    };
+    pushGroup(
+      'folder:/unassigned',
+      'No project',
+      '/unassigned',
+      'Not on a current project',
+      library.filter((asset) => asset.placeLabel === 'No project'),
+    );
+    const onCanvas = library.filter((asset) => asset.placeLabel === 'Canvas');
+    const projectNames = [...new Set(onCanvas.map((asset) => asset.placeDetail || 'Canvas'))];
+    for (const name of projectNames) {
+      const rows = onCanvas.filter((asset) => (asset.placeDetail || 'Canvas') === name);
+      pushGroup(`folder:/canvas-library/${name}`, 'Canvas', `/canvas-library/${encodeURIComponent(name)}`, name, rows);
+    }
+    return extra.length ? [...base, ...extra] : base;
+  }, [rootNodes, assets, nodes, canvases, liveProjects]);
 
   const groups = useMemo(
-    () => (filesOn && suggestOn ? suggestionGroups(index, query) : { nodes: [], files: [] }),
+    () => (filesOn && suggestOn ? suggestionGroups(index, query) : { nodes: [], folders: [], files: [] }),
     [filesOn, suggestOn, index, query]
   );
   const suggestions = useMemo(
-    () => [...groups.nodes, ...groups.files],
+    () => [...groups.nodes, ...groups.folders, ...groups.files],
     [groups]
   );
+
+  const dragAsset = (event: React.DragEvent, item: FileSearchInput) => {
+    if (item.kind === 'node' || item.kind === 'folder' || (!item.thumbnail && !item.path)) return;
+    event.dataTransfer.setData('application/json', JSON.stringify({
+      name: item.label,
+      thumbnail: item.thumbnail,
+      dataUrl: item.thumbnail?.startsWith('data:') ? item.thumbnail : undefined,
+      path: item.path,
+      type: item.kind,
+    }));
+    event.dataTransfer.effectAllowed = 'copy';
+  };
 
   useEffect(() => {
     if (!googleOn || !open) {
@@ -391,11 +472,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               </ul>
             </div>
           )}
-          {groups.files.length > 0 && (
+          {groups.folders.length > 0 && (
             <div>
-              <div className={styles.suggestMeta}>Files</div>
+              <div className={styles.suggestMeta}>Folders</div>
               <ul className={styles.fileList}>
-                {groups.files.map((item, index) => {
+                {groups.folders.map((item, index) => {
                   const choice = groups.nodes.length + index;
                   return (
                     <li key={item.id}>
@@ -404,7 +485,36 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                         role="option"
                         aria-selected={choice === activeIndex}
                         className={choice === activeIndex ? styles.suggestActive : ''}
-                        onMouseDown={(e) => { e.preventDefault(); choose(item); }}
+                        onClick={() => choose(item)}
+                      >
+                        <span className={styles.thumbFallback} aria-hidden>
+                          <Folder size={14} />
+                        </span>
+                        <span className={styles.suggestLabel}>{item.label}</span>
+                        <span className={styles.suggestKind}>{item.count ?? 0} files</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+          {groups.files.length > 0 && (
+            <div>
+              <div className={styles.suggestMeta}>Files</div>
+              <ul className={styles.fileList}>
+                {groups.files.map((item, index) => {
+                  const choice = groups.nodes.length + groups.folders.length + index;
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={choice === activeIndex}
+                        className={choice === activeIndex ? styles.suggestActive : ''}
+                        draggable={Boolean(item.thumbnail || item.path)}
+                        onDragStart={(event) => dragAsset(event, item)}
+                        onClick={() => choose(item)}
                       >
                         {item.thumbnail ? (
                           <img className={styles.thumb} src={item.thumbnail} alt="" />

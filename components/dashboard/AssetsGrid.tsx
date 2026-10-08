@@ -22,6 +22,9 @@ import {
 } from 'lucide-react';
 import { useFileStore } from '../../stores/fileStore';
 import { useUserStore } from '../../stores/userStore';
+import { useProjectsStore } from '../../stores/projectsStore';
+import { buildLibrary } from '@/lib/pipeline/canvasPictures';
+import { useCanvasPictures } from '@/hooks/useCanvasPictures';
 import styles from './AssetsGrid.module.css';
 import type { Asset, AssetType } from '../../types';
 
@@ -74,13 +77,6 @@ const TYPE_COLORS: Record<string, string> = {
   folder: '#6b7280',
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-  imported: 'Imported',
-  generated: 'Generated',
-  duplicated: 'Duplicated',
-  modified: 'Modified',
-};
-
 interface PromptTemplate {
   id: string;
   name: string;
@@ -109,7 +105,17 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
     return map;
   }, [currentProject, recentProjects]);
 
-  const allAssets = useMemo(() => Array.from(assets.values()), [assets]);
+  const canvasProjects = useCanvasPictures();
+  const projectCards = useProjectsStore((s) => s.projects);
+  const folderAssets = useMemo(() => Array.from(assets.values()), [assets]);
+  const allAssets = useMemo(
+    () => buildLibrary(
+      folderAssets,
+      canvasProjects,
+      projectCards.map((project) => ({ id: project.id, name: project.name })),
+    ),
+    [folderAssets, canvasProjects, projectCards],
+  );
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   useEffect(() => {
@@ -147,7 +153,9 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
           a.name.toLowerCase().includes(query) ||
           (a.metadata?.prompt || '').toLowerCase().includes(query) ||
           (a.metadata?.mimeType || '').toLowerCase().includes(query) ||
-          (a.metadata?.source || '').toLowerCase().includes(query)
+          (a.metadata?.source || '').toLowerCase().includes(query) ||
+          a.placeLabel.toLowerCase().includes(query) ||
+          a.placeDetail.toLowerCase().includes(query)
       );
     }
 
@@ -377,9 +385,9 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
           const typeColor = isTemplate ? '#ec4899' : (TYPE_COLORS[asset.type] || '#6b7280');
           const usageCount = meta?.usageCount || 0;
           const variationCount = meta?.variationIds?.length || 0;
+          const unassigned = asset.placeLabel === 'No project';
           const childCount = meta?.childAssetIds?.length || 0;
           const projectIds = meta?.projectIds || [];
-          const source = meta?.source;
           const fileSize = meta?.fileSize || asset.size || 0;
 
           return (
@@ -422,14 +430,16 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
                     </span>
                   ) : null}
 
-                  {source && (
-                    <span
-                      className={styles.sourceChip}
-                      style={{ borderColor: `${typeColor}60`, color: typeColor }}
-                    >
-                      {SOURCE_LABELS[source] || source}
-                    </span>
-                  )}
+                  <span
+                    className={styles.sourceChip}
+                    style={{
+                      borderColor: unassigned ? '#f59e0b' : `${typeColor}60`,
+                      color: unassigned ? '#f59e0b' : typeColor,
+                    }}
+                    title={asset.placeDetail || asset.placeLabel}
+                  >
+                    {asset.placeLabel}
+                  </span>
 
                   {meta?.mimeType && (
                     <span className={styles.mimeChip}>{meta.mimeType.split('/')[1] || meta.mimeType}</span>
@@ -469,12 +479,18 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
                 </div>
 
                 {/* Projects row */}
-                {projectIds.length > 0 && (
+                {(asset.placeDetail || projectIds.length > 0) && (
                   <div className={styles.projectsRow}>
                     <FolderOpen size={10} />
-                    {projectIds.slice(0, 3).map((pid) => (
+                    {asset.placeDetail && (
+                      <span className={styles.projectTag}>{asset.placeDetail}</span>
+                    )}
+                    {variationCount > 1 && (
+                      <span className={styles.projectTag}>{variationCount} versions</span>
+                    )}
+                    {projectIds.filter((pid) => allProjects.has(pid) && allProjects.get(pid) !== asset.placeDetail).slice(0, 3).map((pid) => (
                       <span key={pid} className={styles.projectTag}>
-                        {allProjects.get(pid) || pid.slice(0, 8)}
+                        {allProjects.get(pid)}
                       </span>
                     ))}
                     {projectIds.length > 3 && (

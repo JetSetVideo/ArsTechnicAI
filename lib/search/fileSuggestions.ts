@@ -10,6 +10,8 @@ export interface FileSearchInput {
   text?: string;
   /** Catalog type. Choosing it adds that node. Absent on a node already on the canvas. */
   nodeType?: string;
+  /** Files inside a folder result. */
+  count?: number;
 }
 
 /**
@@ -28,6 +30,7 @@ export function ancestorPaths(path: string): string[] {
 
 export interface SuggestionGroups {
   nodes: FileSearchInput[];
+  folders: FileSearchInput[];
   files: FileSearchInput[];
 }
 
@@ -55,12 +58,13 @@ export function suggestionGroups(
   limits: { nodes?: number; files?: number } = {}
 ): SuggestionGroups {
   const q = query.trim().toLowerCase();
-  if (!q) return { nodes: [], files: [] };
+  if (!q) return { nodes: [], folders: [], files: [] };
   const nodeLimit = limits.nodes ?? 24;
-  const fileLimit = limits.files ?? 6;
+  const fileLimit = limits.files ?? 8;
 
   const nodes: { item: FileSearchInput; rank: number }[] = [];
   const files: { item: FileSearchInput; rank: number; pictured: number }[] = [];
+  const folders: { item: FileSearchInput; rank: number }[] = [];
   for (const item of items) {
     const name = item.label.toLowerCase();
     const extra = (item.text || '').toLowerCase();
@@ -70,18 +74,31 @@ export function suggestionGroups(
       nodes.push({ item, rank: nameAt === 0 ? 0 : 1 + nameAt });
       continue;
     }
+    if (item.kind === 'folder') continue;
     const extraAt = nameAt >= 0 ? -1 : extra.indexOf(q);
     if (nameAt < 0 && extraAt < 0) continue;
     const rank = nameAt === 0 ? 0 : nameAt > 0 ? 1 + nameAt : 50 + extraAt;
     files.push({ item, rank, pictured: item.thumbnail ? 0 : 1 });
   }
+  for (const item of items) {
+    if (item.kind !== 'folder' || !item.path) continue;
+    const nameAt = item.label.toLowerCase().indexOf(q);
+    const childHits = files.filter((file) => file.item.path?.startsWith(`${item.path}/`)).length;
+    if (nameAt < 0 && childHits === 0) continue;
+    folders.push({ item, rank: nameAt === 0 ? 0 : childHits > 0 ? 1 : 2 + Math.max(nameAt, 0) });
+  }
 
   const byName = (a: { rank: number; item: FileSearchInput }, b: { rank: number; item: FileSearchInput }) =>
     a.rank - b.rank || a.item.label.localeCompare(b.item.label);
   nodes.sort(byName);
+  folders.sort(byName);
   files.sort((a, b) => {
     if (q.length <= 2 && a.pictured !== b.pictured) return a.pictured - b.pictured;
     return byName(a, b);
   });
-  return { nodes: takeUnique(nodes, nodeLimit), files: takeUnique(files, fileLimit) };
+  return {
+    nodes: takeUnique(nodes, nodeLimit),
+    folders: takeUnique(folders, 6),
+    files: takeUnique(files, fileLimit),
+  };
 }

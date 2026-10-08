@@ -38,6 +38,8 @@ import { useUserStore } from '../../stores/userStore';
 import { useFileStore } from '../../stores/fileStore';
 import { useDashboardStore } from '../../stores/dashboardStore';
 import { slugifyProjectName } from '../../utils/project';
+import { displayCover, entriesForProject } from '@/lib/pipeline/canvasPictures';
+import { useCanvasPictures } from '@/hooks/useCanvasPictures';
 import { WORKSPACE_ROOT_PATHS } from '../../constants/workspace';
 import { Button } from '../ui';
 import styles from './ProjectsGrid.module.css';
@@ -694,13 +696,12 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
     setDropTargetId(null);
   };
 
-  const getProjectAssets = useCallback((projectName: string) => {
-    const projectSlug = slugifyProjectName(projectName);
-    const generatedPrefix = `/projects/${projectSlug}/generated/`;
-    return Array.from(assets.values()).filter(
-      (asset) => asset.path.startsWith(generatedPrefix)
-    );
-  }, [assets]);
+  const canvasProjects = useCanvasPictures();
+
+  const getProjectAssets = useCallback((projectId: string, projectName: string) => {
+    const pictures = canvasProjects.find((item) => item.projectId === projectId)?.pictures ?? [];
+    return entriesForProject(projectId, projectName, assets.values(), pictures);
+  }, [assets, canvasProjects]);
 
   const assetTypeIcon = (type: string) => {
     switch (type) {
@@ -826,7 +827,11 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
         {/* Project Cards */}
         {!isLoadingProjects && projects.map((project) => {
           const isAssetsOpen = assetDrawerOpen === project.id;
-          const projectAssets = getProjectAssets(project.name);
+          const projectAssets = getProjectAssets(project.id, project.name);
+          const cover = displayCover(
+            project.thumbnail,
+            canvasProjects.find((item) => item.projectId === project.id)?.pictures ?? [],
+          );
           const totalBytes = projectAssets.reduce((sum, asset) => sum + measuredBytes(asset), 0);
           const chips = formatChips(project, projectAssets);
 
@@ -860,8 +865,8 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
             >
               {/* Full-bleed thumbnail */}
               <div className={styles.thumbnail}>
-                {project.thumbnail ? (
-                  <img src={project.thumbnail} alt={project.name} />
+                {cover ? (
+                  <img src={cover} alt={project.name} />
                 ) : (
                   <div className={styles.placeholderThumb}>
                     <FolderOpen size={32} />
@@ -1014,7 +1019,9 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                               <span className={styles.assetListIcon}>{assetTypeIcon(asset.type)}</span>
                             )}
                             <span className={styles.assetListName}>{asset.name}</span>
-                            <span className={styles.assetListType} data-type={asset.type}>{asset.type}</span>
+                            <span className={styles.assetListType} data-type={asset.placeLabel === 'Canvas' ? 'image' : asset.type}>
+                              {asset.placeLabel}{asset.placeDetail ? ` · ${asset.placeDetail}` : ''}
+                            </span>
                           </div>
                         ))}
                       </>
@@ -1079,7 +1086,7 @@ export function ProjectsGrid({ onOpenProject, searchQuery = '', externalFilters,
                   <span>Cover</span>
                   {(() => {
                     const record = useProjectsStore.getState().getProject(editingProject);
-                    const covers = record ? getProjectAssets(record.name).filter((asset) => asset.type === 'image' && asset.thumbnail) : [];
+                    const covers = record ? getProjectAssets(record.id, record.name).filter((asset) => asset.type === 'image' && asset.thumbnail) : [];
                     if (covers.length === 0) {
                       return <div className={styles.helperText}>No images in this project yet.</div>;
                     }
