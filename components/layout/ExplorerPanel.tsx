@@ -17,6 +17,7 @@ import {
   Trash2,
   MoreVertical,
   PanelLeft,
+  Filter,
   Box,
   Layers,
   Type,
@@ -35,6 +36,63 @@ import type { FileNode, Asset } from '@/types';
 import { WORKSPACE_DEFAULTS, WORKSPACE_PROTECTED_PATHS, WORKSPACE_ROOT_PATHS } from '@/constants/workspace';
 
 type Tab = 'local' | 'cloud';
+type TriState = 'neutral' | 'selected' | 'rejected';
+
+const FILE_FILTERS = [
+  ['folder', 'Folders'],
+  ['image', 'Images'],
+  ['video', 'Videos'],
+  ['audio', 'Audio'],
+  ['text', 'Text'],
+  ['model_3d', '3D'],
+] as const;
+
+type FilterId = (typeof FILE_FILTERS)[number][0];
+
+const NEUTRAL_FILTERS: Record<FilterId, TriState> = {
+  folder: 'neutral',
+  image: 'neutral',
+  video: 'neutral',
+  audio: 'neutral',
+  text: 'neutral',
+  model_3d: 'neutral',
+};
+
+function cycleTri(state: TriState): TriState {
+  if (state === 'neutral') return 'selected';
+  if (state === 'selected') return 'rejected';
+  return 'neutral';
+}
+
+/** Selected kinds are shown. Rejected kinds are hidden. A neutral kind is shown only when nothing is selected. */
+function kindAllowed(kind: string, modes: Record<string, TriState>): boolean {
+  const state = modes[kind] ?? 'neutral';
+  if (state === 'rejected') return false;
+  if (state === 'selected') return true;
+  return !Object.values(modes).some((value) => value === 'selected');
+}
+
+function filterTree(nodes: FileNode[], query: string, modes: Record<string, TriState>): FileNode[] {
+  const q = query.toLowerCase().trim();
+  const listed: FileNode[] = [];
+  for (const node of nodes) {
+    const nameMatch = !q || node.name.toLowerCase().includes(q);
+    if (node.type === 'folder') {
+      const children = filterTree(node.children || [], query, modes);
+      if (modes.folder === 'rejected') {
+        listed.push(...children);
+        continue;
+      }
+      if (children.length > 0 || (kindAllowed('folder', modes) && nameMatch)) {
+        listed.push({ ...node, children });
+      }
+      continue;
+    }
+    const kind = node.asset?.type || 'text';
+    if (nameMatch && kindAllowed(kind, modes)) listed.push(node);
+  }
+  return listed;
+}
 
 interface ExplorerPanelProps {
   width: number;
@@ -452,7 +510,8 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
   const { data: session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [filter, setFilter] = useState('');
-  const [filterType, setFilterType] = useState<string>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [kindFilters, setKindFilters] = useState<Record<FilterId, TriState>>(NEUTRAL_FILTERS);
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
   const [tab, setTab] = useState<Tab>('local');
 
@@ -473,29 +532,6 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
     e.target.value = '';
   }, [importFiles, log]);
 
-  // Recursive filter: if a folder matches or any child matches, include it
-  const nodeMatchesFilter = useCallback((node: FileNode, query: string, typeFilter: string): boolean => {
-    const q = query.toLowerCase().trim();
-    const nameMatch = !q || node.name.toLowerCase().includes(q);
-    const typeMatch = typeFilter === 'all' || 
-      (node.asset?.type === typeFilter) ||
-      (node.type === 'folder' && typeFilter === 'folder');
-    if (node.type !== 'folder') return nameMatch && typeMatch;
-    // Folder: match if its own name matches, or any descendant matches
-    if (typeFilter === 'folder' && nameMatch) return true;
-    if (node.children && node.children.some(c => nodeMatchesFilter(c, query, typeFilter))) return true;
-    return nameMatch && typeFilter === 'all';
-  }, []);
-
-  const filterTree = useCallback((nodes: FileNode[], query: string, typeFilter: string): FileNode[] => {
-    return nodes
-      .filter(n => nodeMatchesFilter(n, query, typeFilter))
-      .map(n => ({
-        ...n,
-        children: n.children ? filterTree(n.children, query, typeFilter) : undefined,
-      }));
-  }, [nodeMatchesFilter]);
-
   const sortNodes = useCallback((nodes: FileNode[]): FileNode[] => {
     return [...nodes].sort((a, b) => {
       // Folders first
@@ -513,13 +549,14 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
     }));
   }, [sortBy]);
 
-  const filteredNodes = sortNodes(filterTree(rootNodes, filter, filterType));
+  const filteredNodes = sortNodes(filterTree(rootNodes, filter, kindFilters));
+  const activeFilters = Object.values(kindFilters).filter((state) => state !== 'neutral').length;
+  const filtersClear = activeFilters === 0;
 
   const filteredCloud = cloudAssets.filter((a) => {
     const q = filter.toLowerCase().trim();
     const nameOk = !q || a.name.toLowerCase().includes(q) || a.prompt?.toLowerCase().includes(q);
-    const typeOk = filterType === 'all' || filterType === 'folder' || a.type === filterType;
-    return nameOk && typeOk;
+    return nameOk && kindAllowed(a.type.toLowerCase(), kindFilters);
   });
 
   return (
@@ -569,37 +606,63 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({ width, onToggle })
       </div>
 
       <div id="explorer-search-bar-with-filter-chips" className={styles.filterBar}>
-        <Input
-          placeholder={tab === 'cloud' ? 'Filter by name or prompt…' : 'Filter files…'}
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        <div className={styles.filterControls}>
-          {[
-            ['all', 'All'],
-            ['folder', 'Folders'],
-            ['image', 'Images'],
-            ['video', 'Videos'],
-            ['audio', 'Audio'],
-            ['text', 'Text'],
-            ['model_3d', '3D'],
-          ].filter(([id]) => tab === 'cloud' ? id !== 'folder' : true).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`${styles.filterChip} ${filterType === id ? styles.filterChipOn : ''}`}
-              onClick={() => setFilterType(id)}
-            >
-              {label}
-            </button>
-          ))}
-          {tab === 'local' && (
-            <>
-              <button type="button" className={`${styles.filterChip} ${sortBy === 'name' ? styles.filterChipOn : ''}`} onClick={() => setSortBy('name')}>A–Z</button>
-              <button type="button" className={`${styles.filterChip} ${sortBy === 'date' ? styles.filterChipOn : ''}`} onClick={() => setSortBy('date')}>Recent</button>
-            </>
-          )}
+        <div className={styles.filterSearchRow}>
+          <Input
+            placeholder={tab === 'cloud' ? 'Filter by name or prompt…' : 'Filter files…'}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <button
+            type="button"
+            className={`${styles.filterToggle} ${filtersOpen ? styles.filterToggleOn : ''}`}
+            aria-expanded={filtersOpen}
+            aria-label={filtersOpen ? 'Close filters' : 'Open filters'}
+            title={filtersOpen ? 'Close filters' : 'Open filters'}
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            <Filter size={14} />
+            {activeFilters > 0 && <span className={styles.filterBadge}>{activeFilters}</span>}
+          </button>
         </div>
+        {filtersOpen && (
+          <div className={styles.filterControls} role="group" aria-label="Show or hide files and folders">
+            <button
+              type="button"
+              className={`${styles.filterChip} ${filtersClear ? styles.filterChipOn : ''}`}
+              onClick={() => setKindFilters(NEUTRAL_FILTERS)}
+              title="Show every file and folder"
+            >
+              All
+            </button>
+            {FILE_FILTERS.filter(([id]) => tab === 'cloud' ? id !== 'folder' : true).map(([id, label]) => {
+              const state = kindFilters[id];
+              const hint = state === 'selected'
+                ? `${label} are shown. Click to hide them.`
+                : state === 'rejected'
+                  ? `${label} are hidden. Click to clear.`
+                  : `${label}. Click to show only these, then again to hide them.`;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  data-state={state}
+                  aria-pressed={state === 'selected'}
+                  className={`${styles.filterChip} ${state === 'selected' ? styles.filterChipOn : ''} ${state === 'rejected' ? styles.filterChipOff : ''}`}
+                  title={hint}
+                  onClick={() => setKindFilters((current) => ({ ...current, [id]: cycleTri(current[id]) }))}
+                >
+                  {label}
+                </button>
+              );
+            })}
+            {tab === 'local' && (
+              <>
+                <button type="button" className={`${styles.filterChip} ${sortBy === 'name' ? styles.filterChipOn : ''}`} onClick={() => setSortBy('name')}>A–Z</button>
+                <button type="button" className={`${styles.filterChip} ${sortBy === 'date' ? styles.filterChipOn : ''}`} onClick={() => setSortBy('date')}>Recent</button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Local tab */}

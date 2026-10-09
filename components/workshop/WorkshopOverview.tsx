@@ -6,6 +6,7 @@ import type { PipelineEdge, PipelineNode, PipelineStageId, PipelineViewport, Sce
 import { COLLAPSED_HEADER, collapsedClusterSize, collapsedStack, visibleLaneFrames } from './laneFrames';
 import { plateAround } from '@/lib/pipeline/clusterLayout';
 import { PORT_COLORS } from './geometry';
+import { formatBytes, payloadStats } from '@/lib/pipeline/ingest';
 import styles from './WorkshopFlow.module.css';
 
 interface WorkshopOverviewProps {
@@ -177,6 +178,8 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
   const mapHeight = useSettingsStore((s) => s.settings.appearance.mapHeight ?? 78);
   const mapOpacity = useSettingsStore((s) => s.settings.appearance.mapOpacity ?? 0.42);
   const mapVisible = useSettingsStore((s) => s.settings.appearance.mapVisible ?? true);
+  const updateAppearance = useSettingsStore((s) => s.updateAppearance);
+  const stats = useMemo(() => payloadStats(nodes), [nodes]);
   const resultBackdrop = useSettingsStore((s) => s.settings.appearance.resultBackdrop ?? true);
   const viewerSource = useSettingsStore((s) => s.settings.appearance.viewerSource ?? 'main');
   const viewerMax = useSettingsStore((s) => s.settings.appearance.viewerMax ?? 4);
@@ -375,10 +378,12 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
           )}
         </div>
       )}
+      <div className={styles.mapDock}>
       {layout && mapVisible && (
+        <div className={styles.mapFrame} style={{ width: layout.mapW, height: layout.mapH }}>
         <div
           className={styles.minimap}
-          style={{ width: layout.mapW, height: layout.mapH, opacity: Math.max(0.15, Math.min(1, mapOpacity)) }}
+          style={{ opacity: Math.max(0.15, Math.min(1, mapOpacity)) }}
           onPointerDown={panTo}
           title="Pipeline map — the rectangle is this window"
         >
@@ -484,7 +489,40 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
             style={{ left: layout.view.x, top: layout.view.y, width: layout.view.w, height: layout.view.h }}
           />
         </div>
+        <button
+          type="button"
+          className={styles.mapClose}
+          aria-label="Hide pipeline map"
+          title="Hide map"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => updateAppearance({ mapVisible: false })}
+        >
+          ×
+        </button>
+        </div>
       )}
+      {!mapVisible && (
+        <button
+          type="button"
+          className={styles.mapReopen}
+          onClick={() => updateAppearance({ mapVisible: true })}
+        >
+          Map
+        </button>
+      )}
+      <div className={styles.mapCaption}>
+        <div>{nodes.length} nodes · {edges.length} links</div>
+        {stats.imageCount > 0 && (
+          <div
+            className={styles.mapCaptionMedia}
+            style={{ color: stats.level === 'critical' ? '#f87171' : stats.level === 'warn' ? '#fbbf24' : undefined }}
+            title={`Media payload: ${stats.imageCount} pictures, ${formatBytes(stats.totalBytes)} (all curated on ingest: EXIF/GPS stripped, ≤2048px, stored locally only).${stats.heaviestNode ? ` Heaviest node: ${stats.heaviestNode.title} (${formatBytes(stats.heaviestNode.bytes)}).` : ''}${stats.level !== 'ok' ? ' Approaching browser storage limits — re-encode or delete old versions.' : ''}`}
+          >
+            {formatBytes(stats.totalBytes)} media{stats.level !== 'ok' ? ' ⚠' : ''}
+          </div>
+        )}
+      </div>
+      </div>
     </>
   );
 };

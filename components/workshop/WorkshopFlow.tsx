@@ -13,7 +13,7 @@ import { COLLAPSED_HEADER, collapsedClusterSize, collapsedLaneHeight, collapsedS
 import { cyclePointForStage, wiringFor } from './groupCycles';
 import { settleNode } from './settleNode';
 import { PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, linkCandidates, nodesForStage, type LinkCandidate } from '@/lib/pipeline/catalog';
-import { ingestImage, payloadStats, formatBytes } from '@/lib/pipeline/ingest';
+import { ingestImage } from '@/lib/pipeline/ingest';
 import type { PipelineStageId } from '@/types/pipeline';
 import { useSettingsStore, useLogStore } from '@/stores';
 import { useUserStore } from '@/stores/userStore';
@@ -482,9 +482,6 @@ export const WorkshopFlow: React.FC = () => {
     }));
   }, [toScene, addNode, addVariant]);
 
-  // Payload telemetry: how heavy the workshop media currently is
-  const stats = useMemo(() => payloadStats(nodes), [nodes]);
-
   // Fit the whole pipeline into the viewport (space optimization)
   const fitView = useCallback(() => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -834,20 +831,8 @@ export const WorkshopFlow: React.FC = () => {
 
         <div className={styles.spacer} />
 
-        <span className={styles.counts}>
-          {nodes.length} nodes · {edges.length} links{apiKey ? '' : ' · ⚠ no Google API key set'}
-        </span>
-        {stats.imageCount > 0 && (
-          <span
-            className={styles.counts}
-            style={{
-              color: stats.level === 'critical' ? '#f87171' : stats.level === 'warn' ? '#fbbf24' : undefined,
-              cursor: 'help',
-            }}
-            title={`Media payload: ${stats.imageCount} pictures, ${formatBytes(stats.totalBytes)} (all curated on ingest: EXIF/GPS stripped, ≤2048px, stored locally only).${stats.heaviestNode ? ` Heaviest node: ${stats.heaviestNode.title} (${formatBytes(stats.heaviestNode.bytes)}).` : ''}${stats.level !== 'ok' ? ' Approaching browser storage limits — re-encode or delete old versions.' : ''}`}
-          >
-            · {formatBytes(stats.totalBytes)} media{stats.level !== 'ok' ? ' ⚠' : ''}
-          </span>
+        {!apiKey && (
+          <span className={styles.counts}>⚠ no Google API key set</span>
         )}
         <button
           className={styles.tbtn}

@@ -221,11 +221,61 @@
   color: #8a8aa2;
   font-size: 0.68rem;
 }
-.minimap {
+.mapDock {
   position: absolute;
   right: 16px;
   bottom: 108px;
   z-index: 46;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+.mapFrame {
+  position: relative;
+  pointer-events: auto;
+}
+.mapClose,
+.mapReopen {
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(8, 8, 16, 0.82);
+  color: #e8e8f5;
+  cursor: pointer;
+}
+.mapClose {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 5px;
+  font-size: 13px;
+  line-height: 1;
+}
+.mapClose:hover,
+.mapReopen:hover { background: rgba(28, 28, 42, 0.95); }
+.mapReopen {
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.68rem;
+}
+.mapCaption {
+  pointer-events: auto;
+  color: #8a8aa2;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  text-align: right;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+.mapCaptionMedia { cursor: help; }
+.minimap {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(8, 8, 16, 0.55);
