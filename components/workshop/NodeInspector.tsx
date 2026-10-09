@@ -7,7 +7,7 @@ import type { ParamDef, PipelineNode } from '@/types/pipeline';
 import { PIPELINE_NODE_DEFS, STAGES } from '@/lib/pipeline/catalog';
 import { usePipelineStore } from '@/stores/pipelineStore';
 import { nodeIcon } from './PipelineNodeCard';
-import { LayersPanelBody, VariantInfoBody, activeVariantOf } from './LayerSystem';
+import { LayersPanelBody, LayerOverlay, VariantInfoBody, activeVariantOf } from './LayerSystem';
 import { RetouchPanel } from './RetouchPanel';
 import styles from './WorkshopFlow.module.css';
 
@@ -296,6 +296,7 @@ export const NodeInspector: React.FC<Props> = ({ node, apiKey }) => {
               {variant.image && (
                 <div className={styles.insPreview} onClick={() => openEditor(node.id)} title="Open full layer editor">
                   <img src={variant.image} alt={variant.label} />
+                  <LayerOverlay variant={variant} />
                 </div>
               )}
               <LayersPanelBody

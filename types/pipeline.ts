@@ -112,7 +112,21 @@ export type LayerKind =
   | 'shape'       // vector form: rectangle, ellipse, line, arrow
   | 'text'        // typographic layer
   | 'mask'        // AI region directive: include (edit here) / exclude (protect)
-  | 'adjustment'; // non-destructive filter (blur, saturation, contrast…)
+  | 'adjustment'  // non-destructive filter (blur, saturation, contrast…)
+  | 'draw'        // freehand ink over the picture
+  | 'group';      // folder of layers, sent together to the next generator
+
+export interface DrawPoint {
+  x: number;
+  y: number;
+}
+
+export interface DrawStroke {
+  color: string;
+  /** Stroke width as a fraction of the picture width. */
+  size: number;
+  points: DrawPoint[];
+}
 
 export type ShapeKind = 'rectangle' | 'ellipse' | 'line' | 'arrow';
 export type MaskMode = 'include' | 'exclude';
@@ -135,6 +149,12 @@ export interface AssetLayer {
   w: number;                  // 0..1 (width)
   h: number;                  // 0..1 (height)
   rotation?: number;          // degrees
+  /** Group this layer belongs to. */
+  parentId?: string;
+  /** Groups only: hide the children in the list. Pixels stay until the group is hidden. */
+  collapsed?: boolean;
+  /** Freehand ink, in picture coordinates (0..1). */
+  strokes?: DrawStroke[];
   // shape
   shape?: ShapeKind;
   fill?: string;

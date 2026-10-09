@@ -3,7 +3,7 @@
 // Client-safe.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { AssetLayer, LayerKind, NodeVariant, BlendMode } from '@/types/pipeline';
+import type { AssetLayer, DrawStroke, LayerKind, NodeVariant, BlendMode } from '@/types/pipeline';
 
 export const BLEND_MODES: BlendMode[] = [
   'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
@@ -58,9 +58,63 @@ export function createLayer(kind: LayerKind, partial: Partial<AssetLayer> = {}):
       };
     case 'adjustment':
       return { ...base, name: 'Adjustment', x: 0, y: 0, w: 1, h: 1, filter: 'contrast(1.25) saturate(1.05)', ...partial };
+    case 'draw':
+      return { ...base, name: 'Drawing', x: 0, y: 0, w: 1, h: 1, strokes: [], color: '#ff4d6d', ...partial };
+    case 'group':
+      return { ...base, name: 'Group', x: 0, y: 0, w: 1, h: 1, collapsed: false, ...partial };
     default:
       return { ...base, ...partial };
   }
+}
+
+/** A layer is shown when it and every group above it are visible. */
+export function layerShown(layer: AssetLayer, layers: AssetLayer[]): boolean {
+  if (!layer.visible) return false;
+  const byId = new Map(layers.map((item) => [item.id, item]));
+  const seen = new Set<string>();
+  let parentId = layer.parentId;
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
+    const parent = byId.get(parentId);
+    if (!parent || !parent.visible) return false;
+    parentId = parent.parentId;
+  }
+  return true;
+}
+
+/** Puts the chosen layers inside a new group, just above the highest member. */
+export function applyGroup(layers: AssetLayer[], memberIds: string[], group: AssetLayer): AssetLayer[] {
+  const ids = new Set(memberIds.filter((id) => {
+    const layer = layers.find((item) => item.id === id);
+    return Boolean(layer && layer.kind !== 'group' && layer.id !== group.id);
+  }));
+  if (ids.size < 2) return layers;
+  const next = layers.map((layer) => (ids.has(layer.id) ? { ...layer, parentId: group.id } : layer));
+  const last = Math.max(...next.map((layer, index) => (ids.has(layer.id) ? index : -1)));
+  next.splice(last + 1, 0, group);
+  return next;
+}
+
+export function applyUngroup(layers: AssetLayer[], groupId: string): AssetLayer[] {
+  return layers
+    .filter((layer) => layer.id !== groupId)
+    .map((layer) => (layer.parentId === groupId ? { ...layer, parentId: undefined } : layer));
+}
+
+function drawBounds(layer: AssetLayer): AssetLayer {
+  const points = (layer.strokes ?? []).flatMap((stroke) => stroke.points);
+  if (points.length === 0) return layer;
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return {
+    ...layer,
+    x,
+    y,
+    w: Math.max(0.02, Math.max(...xs) - x),
+    h: Math.max(0.02, Math.max(...ys) - y),
+  };
 }
 
 /** Human-readable region for prompt building: "left 30–70%, top 30–60%". */
@@ -74,17 +128,36 @@ function regionText(l: AssetLayer): string {
  * include masks say what to change where; exclude masks protect regions.
  */
 export function layerDirectives(variant: NodeVariant | undefined): string {
-  if (!variant?.layers?.length) return '';
+  const layers = variant?.layers ?? [];
+  if (layers.length === 0) return '';
+  const groupName = new Map(layers.filter((layer) => layer.kind === 'group').map((layer) => [layer.id, layer.name || 'Group']));
   const parts: string[] = [];
-  for (const l of variant.layers) {
-    if (!l.visible || l.kind !== 'mask') continue;
-    if (l.maskMode === 'exclude') {
-      parts.push(`Do NOT modify the ${regionText(l)} — keep it pixel-identical.`);
-    } else if (l.prompt?.trim()) {
-      parts.push(`In the ${regionText(l)}: ${l.prompt.trim()}.`);
+  for (const layer of layers) {
+    if (!layerShown(layer, layers) || layer.kind === 'group') continue;
+    const where = layer.parentId && groupName.get(layer.parentId)
+      ? `In the layer group "${groupName.get(layer.parentId)}", `
+      : '';
+    if (layer.kind === 'mask') {
+      if (layer.maskMode === 'exclude') {
+        parts.push(`${where}do NOT modify the ${regionText(layer)} — keep it pixel-identical.`);
+      } else if (layer.prompt?.trim()) {
+        parts.push(`${where}in the ${regionText(layer)}: ${layer.prompt.trim()}.`);
+      }
+    } else if (layer.kind === 'text' && layer.text?.trim()) {
+      parts.push(`${where}a note written on the picture says "${layer.text.trim()}" (${regionText(layer)}). Follow that note when changing the picture.`);
+    } else if (layer.kind === 'draw' && (layer.strokes?.length ?? 0) > 0) {
+      parts.push(`${where}a drawing marks the ${regionText(drawBounds(layer))}. Treat the ink as showing what to change there.`);
+    } else if (layer.kind === 'shape') {
+      parts.push(`${where}a ${layer.shape ?? 'shape'} highlights the ${regionText(layer)}.`);
     }
   }
   return parts.join(' ');
+}
+
+/** True when visible ink, text, shapes, or collage sit on top of the picture. */
+export function variantCarriesMarks(variant: NodeVariant | undefined): boolean {
+  const layers = variant?.layers ?? [];
+  return layers.some((layer) => layerShown(layer, layers) && layer.kind !== 'mask' && layer.kind !== 'group');
 }
 
 // ── Format / size transforms ─────────────────────────────────────────────────
@@ -181,8 +254,9 @@ export async function compositeVariant(variant: NodeVariant): Promise<string> {
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(baseImg, 0, 0, W, H);
 
-  for (const l of variant.layers ?? []) {
-    if (!l.visible || l.kind === 'mask') continue;
+  const layers = variant.layers ?? [];
+  for (const l of layers) {
+    if (!layerShown(l, layers) || l.kind === 'mask' || l.kind === 'group') continue;
     const x = l.x * W, y = l.y * H, w = l.w * W, h = l.h * H;
     ctx.save();
     ctx.globalAlpha = l.opacity;
@@ -238,10 +312,51 @@ export async function compositeVariant(variant: NodeVariant): Promise<string> {
       } else if (l.kind === 'image' && l.image) {
         const im = await loadImage(l.image);
         ctx.drawImage(im, x, y, w, h);
+      } else if (l.kind === 'draw') {
+        paintStrokes(ctx, l.strokes ?? [], W, H);
       }
     } finally {
       ctx.restore();
     }
   }
   return canvas.toDataURL('image/png');
+}
+
+function paintStrokes(ctx: CanvasRenderingContext2D, strokes: DrawStroke[], width: number, height: number) {
+  for (const stroke of strokes) {
+    if (stroke.points.length === 0) continue;
+    ctx.beginPath();
+    ctx.strokeStyle = stroke.color;
+    ctx.fillStyle = stroke.color;
+    ctx.lineWidth = Math.max(1.5, stroke.size * width);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    stroke.points.forEach((point, index) => {
+      const px = point.x * width;
+      const py = point.y * height;
+      if (index === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    if (stroke.points.length === 1) {
+      const point = stroke.points[0];
+      ctx.arc(point.x * width, point.y * height, Math.max(1, stroke.size * width) / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.stroke();
+    }
+  }
+}
+
+/**
+ * The picture a downstream generator should see: the base image with visible
+ * drawings, text, shapes, and collage baked in. Masks stay as words, not pixels.
+ */
+export async function pictureForGenerator(variant: NodeVariant | undefined): Promise<string | undefined> {
+  if (!variant?.image) return undefined;
+  if (!variantCarriesMarks(variant)) return variant.image;
+  try {
+    return await compositeVariant(variant);
+  } catch {
+    return variant.image;
+  }
 }

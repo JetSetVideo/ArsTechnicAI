@@ -12,7 +12,7 @@ import { CLUSTER_PAD_TOP, CLUSTER_PAD_X, findClusterOrigin, packCluster, placeCl
 import {
   PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, defaultParams, buildPrompt, portsCompatible,
 } from '@/lib/pipeline/catalog';
-import { createLayer, compositeVariant, layerDirectives, transformImage, type ImageTransformOptions } from '@/lib/pipeline/layers';
+import { applyGroup, applyUngroup, createLayer, compositeVariant, layerDirectives, pictureForGenerator, transformImage, type ImageTransformOptions } from '@/lib/pipeline/layers';
 import { useLogStore } from '@/stores/logStore';
 
 // ── Auto-layout constants (stage lanes → horizontal; slots → vertical) ──────
@@ -148,6 +148,11 @@ interface PipelineState {
   removeLayer: (nodeId: string, variantId: string, layerId: string) => void;
   duplicateLayer: (nodeId: string, variantId: string, layerId: string) => void;
   reorderLayer: (nodeId: string, variantId: string, layerId: string, dir: 1 | -1) => void;
+  /** Folds two or more layers into a named group. Returns the group, or null. */
+  groupLayers: (nodeId: string, variantId: string, layerIds: string[]) => AssetLayer | null;
+  ungroupLayers: (nodeId: string, variantId: string, groupId: string) => void;
+  /** Adds a point to a drawing. `fresh` starts a new stroke. */
+  appendDrawPoint: (nodeId: string, variantId: string, layerId: string, point: { x: number; y: number }, color: string, size: number, fresh: boolean) => void;
   /** Flattens image + layers into a new variant (next version). */
   flattenVariant: (nodeId: string, variantId: string) => Promise<void>;
   /** Crop/resize/re-encode the variant image into a new version. */
@@ -903,11 +908,22 @@ export const usePipelineStore = create<PipelineState>()(
             n.id === nodeId
               ? {
                   ...n,
-                  variants: n.variants.map((v) =>
-                    v.id === variantId
-                      ? { ...v, updatedAt: Date.now(), layers: (v.layers ?? []).filter((l) => l.id !== layerId) }
-                      : v
-                  ),
+                  variants: n.variants.map((v) => {
+                    if (v.id !== variantId) return v;
+                    const drop = new Set<string>([layerId]);
+                    const all = v.layers ?? [];
+                    let grew = true;
+                    while (grew) {
+                      grew = false;
+                      for (const layer of all) {
+                        if (layer.parentId && drop.has(layer.parentId) && !drop.has(layer.id)) {
+                          drop.add(layer.id);
+                          grew = true;
+                        }
+                      }
+                    }
+                    return { ...v, updatedAt: Date.now(), layers: all.filter((l) => !drop.has(l.id)) };
+                  }),
                 }
               : n
           ),
@@ -940,6 +956,72 @@ export const usePipelineStore = create<PipelineState>()(
           ),
         }));
       },
+
+      groupLayers: (nodeId, variantId, layerIds) => {
+        const node = get().nodes.find((n) => n.id === nodeId);
+        const variant = node?.variants.find((v) => v.id === variantId);
+        if (!variant) return null;
+        const group = createLayer('group');
+        const current = variant.layers ?? [];
+        const next = applyGroup(current, layerIds, group);
+        if (next === current) return null;
+        set((s) => ({
+          nodes: s.nodes.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  variants: n.variants.map((v) => (v.id === variantId ? { ...v, layers: next, updatedAt: Date.now() } : v)),
+                }
+              : n
+          ),
+        }));
+        return group;
+      },
+
+      ungroupLayers: (nodeId, variantId, groupId) =>
+        set((s) => ({
+          nodes: s.nodes.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  variants: n.variants.map((v) =>
+                    v.id === variantId
+                      ? { ...v, layers: applyUngroup(v.layers ?? [], groupId), updatedAt: Date.now() }
+                      : v
+                  ),
+                }
+              : n
+          ),
+        })),
+
+      appendDrawPoint: (nodeId, variantId, layerId, point, color, size, fresh) =>
+        set((s) => ({
+          nodes: s.nodes.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  variants: n.variants.map((v) => {
+                    if (v.id !== variantId) return v;
+                    return {
+                      ...v,
+                      updatedAt: Date.now(),
+                      layers: (v.layers ?? []).map((layer) => {
+                        if (layer.id !== layerId) return layer;
+                        const strokes = [...(layer.strokes ?? [])];
+                        if (fresh || strokes.length === 0) {
+                          strokes.push({ color, size, points: [point] });
+                        } else {
+                          const last = strokes[strokes.length - 1];
+                          strokes[strokes.length - 1] = { ...last, points: [...last.points, point] };
+                        }
+                        return { ...layer, strokes, updatedAt: Date.now() };
+                      }),
+                    };
+                  }),
+                }
+              : n
+          ),
+        })),
 
       reorderLayer: (nodeId, variantId, layerId, dir) =>
         set((s) => ({
@@ -1024,10 +1106,11 @@ export const usePipelineStore = create<PipelineState>()(
         set((s) => ({ runningNodeIds: [...s.runningNodeIds, nodeId] }));
         try {
           const directives = layerDirectives(variant);
+          const picture = (await pictureForGenerator(variant)) ?? variant.image;
           const result = await callBanana({
             kind: 'image-edit',
             prompt: `${instruction} ${directives}`.trim(),
-            images: [variant.image],
+            images: [picture],
             apiKey,
           });
           get().addVariant(nodeId, {
@@ -1478,15 +1561,16 @@ export const usePipelineStore = create<PipelineState>()(
             if (!src) continue;
             const v = activeVariant(src);
             if (v?.text) upstreamText[e.toPort] = (upstreamText[e.toPort] ? upstreamText[e.toPort] + '\n' : '') + v.text;
-            if (v?.image) upstreamImages.push(v.image);
-            // Mask layers drawn on upstream images become region directives
+            const picture = await pictureForGenerator(v);
+            if (picture) upstreamImages.push(picture);
+            // Drawings, notes, and masks on the upstream picture travel with it.
             const directives = layerDirectives(v);
             if (directives) maskDirectives.push(directives);
           }
 
           let prompt = buildPrompt(def, node.params, upstreamText);
-          if (def.execution === 'banana-image-edit' && maskDirectives.length > 0) {
-            prompt = `${prompt} ${maskDirectives.join(' ')}`.trim();
+          if ((def.execution === 'banana-image-edit' || def.execution === 'banana-image') && maskDirectives.length > 0) {
+            prompt = `${prompt} The source picture includes these layer notes: ${maskDirectives.join(' ')}`.trim();
           }
           const count = Math.max(1, Math.min(6, Number(node.params.variantCount ?? 1)));
           const kind: BananaRequest['kind'] =

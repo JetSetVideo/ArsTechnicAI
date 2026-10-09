@@ -1,4 +1,5 @@
 import { useState, useMemo, useDeferredValue, useCallback, useRef, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import {
   Clock,
   Image as ImageIcon,
@@ -13,20 +14,23 @@ import {
   Headphones,
   FileType,
   Loader2,
-  Layers,
   FolderOpen,
-  Eye,
   Copy,
   Download,
   Flame,
+  MoreVertical,
+  Trash2,
+  FolderInput,
 } from 'lucide-react';
 import { useFileStore } from '../../stores/fileStore';
 import { useUserStore } from '../../stores/userStore';
 import { useProjectsStore } from '../../stores/projectsStore';
-import { buildLibrary } from '@/lib/pipeline/canvasPictures';
+import { buildLibrary, type PlacedAsset } from '@/lib/pipeline/canvasPictures';
 import { useCanvasPictures } from '@/hooks/useCanvasPictures';
+import { ancestorPaths } from '@/lib/search/fileSuggestions';
+import { slugifyProjectName } from '@/utils/project';
 import styles from './AssetsGrid.module.css';
-import type { Asset, AssetType } from '../../types';
+import type { Asset, AssetType, FileNode } from '../../types';
 
 const ACCEPTED_EXTENSIONS = [
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.tif', '.avif',
@@ -77,6 +81,77 @@ const TYPE_COLORS: Record<string, string> = {
   folder: '#6b7280',
 };
 
+const DISMISS_KEY = 'ars-library-dismissed';
+
+function readDismissed(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DISMISS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDismissed(ids: string[]) {
+  localStorage.setItem(DISMISS_KEY, JSON.stringify(ids));
+}
+
+/** JPEG, PNG, and so on — the file format, separate from the asset category. */
+function fileKindLabel(asset: { name: string; type: string; thumbnail?: string; metadata?: { mimeType?: string } }): string {
+  const mime = asset.metadata?.mimeType?.split('/')[1];
+  if (mime) return mime.replace('jpeg', 'jpg').toUpperCase();
+  const data = asset.thumbnail?.match(/^data:(?:image|video|audio)\/([a-z0-9+.-]+)/i);
+  if (data) return data[1].replace('jpeg', 'jpg').split('+')[0].toUpperCase();
+  const named = asset.name.match(/\.([a-z0-9]{2,5})(?:\b|$)/i);
+  if (named) return named[1].toUpperCase();
+  return asset.type.toUpperCase();
+}
+
+function parentFolder(path: string): string | null {
+  if (!path.startsWith('/')) return null;
+  const parent = path.split('/').slice(0, -1).join('/');
+  return parent && parent !== '/' ? parent : null;
+}
+
+function listFolders(nodes: FileNode[], into: { path: string; label: string }[] = []): { path: string; label: string }[] {
+  for (const node of nodes) {
+    if (node.type !== 'folder' || node.path === '/') continue;
+    into.push({ path: node.path, label: node.path.split('/').filter(Boolean).join(' / ') });
+    if (node.children?.length) listFolders(node.children, into);
+  }
+  return into;
+}
+
+function projectIdForFolder(folderPath: string, projects: { id: string; name: string }[]): string | undefined {
+  if (!folderPath.startsWith('/projects/')) return undefined;
+  const slug = folderPath.split('/').filter(Boolean)[1];
+  if (!slug) return undefined;
+  return projects.find((project) => slugifyProjectName(project.name) === slug)?.id;
+}
+
+function folderTitle(path: string): string {
+  const part = path.split('/').filter(Boolean).pop() || 'Folder';
+  return part.charAt(0).toUpperCase() + part.slice(1);
+}
+
+const PENDING_SEARCH_KEY = 'ars-pending-file-search';
+
+function unusedName(folderPath: string, name: string): string {
+  const store = useFileStore.getState();
+  const dot = name.lastIndexOf('.');
+  const hasExt = dot > 0 && name.length - dot <= 5;
+  const stem = hasExt ? name.slice(0, dot) : name;
+  const ext = hasExt ? name.slice(dot) : '';
+  let candidate = `${stem} copy${ext}`;
+  let n = 2;
+  while (store.findNodeByPath(`${folderPath}/${candidate}`)) {
+    candidate = `${stem} copy ${n}${ext}`;
+    n += 1;
+  }
+  return candidate;
+}
+
 interface PromptTemplate {
   id: string;
   name: string;
@@ -97,6 +172,18 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const rootNodes = useFileStore((s) => s.rootNodes);
+  const findNodeByPath = useFileStore((s) => s.findNodeByPath);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+
+  useEffect(() => {
+    setDismissed(readDismissed());
+  }, []);
 
   const allProjects = useMemo(() => {
     const map = new Map<string, string>();
@@ -116,6 +203,10 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
     ),
     [folderAssets, canvasProjects, projectCards],
   );
+  const listedAssets = useMemo(
+    () => allAssets.filter((asset) => !dismissed.includes(asset.id)),
+    [allAssets, dismissed],
+  );
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   useEffect(() => {
@@ -128,16 +219,16 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
   }, []);
 
   const counts = useMemo(() => {
-    const c = { all: allAssets.length, image: 0, video: 0, audio: 0, text: 0, templates: 0 };
-    allAssets.forEach((a) => {
+    const c = { all: listedAssets.length, image: 0, video: 0, audio: 0, text: 0, templates: 0 };
+    listedAssets.forEach((a) => {
       if (a.type in c) c[a.type as keyof typeof c]++;
       if (a.type === 'prompt' && a.metadata?.templateId) c.templates++;
     });
     return c;
-  }, [allAssets]);
+  }, [listedAssets]);
 
   const filteredAssets = useMemo(() => {
-    let result = allAssets;
+    let result = listedAssets;
 
     if (filterType !== 'all' && filterType !== 'templates') {
       result = result.filter((a) => a.type === filterType);
@@ -179,10 +270,10 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
     });
 
     return result;
-  }, [allAssets, filterType, deferredSearchQuery, sortBy, sortOrder]);
+  }, [listedAssets, filterType, deferredSearchQuery, sortBy, sortOrder]);
 
   const templateMetrics = useMemo(() => {
-    const templateAssets = allAssets.filter((a) => a.type === 'prompt' && a.metadata?.templateId);
+    const templateAssets = listedAssets.filter((a) => a.type === 'prompt' && a.metadata?.templateId);
     return templates
       .map((t) => {
         const linked = templateAssets.find((a) => a.metadata?.templateId === t.id);
@@ -196,7 +287,7 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
       })
       .sort((a, b) => b.popularity - a.popularity || b.downloads - a.downloads)
       .slice(0, 8);
-  }, [templates, allAssets]);
+  }, [templates, listedAssets]);
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -237,6 +328,169 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
     },
     [importLocalFiles]
   );
+
+  const folders = useMemo(() => listFolders(rootNodes), [rootNodes]);
+
+  useEffect(() => {
+    if (!menuId && !transferOpen) return;
+    const close = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('[data-asset-menu]') || target.closest('[data-transfer]')) return;
+      setMenuId(null);
+      setTransferOpen(false);
+    };
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [menuId, transferOpen]);
+
+  const hideFromLibrary = useCallback((ids: string[]) => {
+    setDismissed((current) => {
+      const next = [...new Set([...current, ...ids])];
+      writeDismissed(next);
+      return next;
+    });
+  }, []);
+
+  const openFolder = useCallback((asset: PlacedAsset) => {
+    const folder = parentFolder(asset.path || '');
+    const store = useFileStore.getState();
+    const linkedProject = asset.metadata?.projectIds?.find((id) => projectCards.some((project) => project.id === id));
+    const host = linkedProject || projectCards[0]?.id || currentProject.id;
+    if (folder && store.findNodeByPath(folder)) {
+      for (const prefix of ancestorPaths(folder)) store.expandPath(prefix);
+      store.expandPath(folder);
+      store.selectPath(folder);
+      const ownerId = projectIdForFolder(folder, projectCards) || host;
+      if (ownerId) void router.push(`/project/${ownerId}`);
+      return;
+    }
+    if (asset.placeLabel === 'No project') {
+      sessionStorage.setItem(PENDING_SEARCH_KEY, 'No project');
+      window.dispatchEvent(new CustomEvent('ars-open-file-search', { detail: { query: 'No project' } }));
+      if (host) void router.push(`/project/${host}`);
+      return;
+    }
+    if (host) void router.push(`/project/${host}`);
+  }, [currentProject.id, projectCards, router]);
+
+  const placeCopy = useCallback((asset: PlacedAsset, folderPath: string) => {
+    const store = useFileStore.getState();
+    if (!store.findNodeByPath(folderPath)) return false;
+    const name = unusedName(folderPath, asset.name);
+    const projectId = projectIdForFolder(folderPath, projectCards);
+    const copy: Asset = {
+      id: crypto.randomUUID(),
+      name,
+      type: asset.type,
+      path: `${folderPath}/${name}`,
+      thumbnail: asset.thumbnail,
+      size: asset.size,
+      createdAt: Date.now(),
+      modifiedAt: Date.now(),
+      metadata: {
+        ...asset.metadata,
+        projectIds: projectId ? [projectId] : [],
+      },
+    };
+    store.addAssetToFolder(copy, folderPath);
+    return true;
+  }, [projectCards]);
+
+  const copyAssets = useCallback((assetsToCopy: PlacedAsset[]) => {
+    let placed = 0;
+    for (const asset of assetsToCopy) {
+      const parent = parentFolder(asset.path || '');
+      const dest = parent && findNodeByPath(parent) ? parent : (findNodeByPath('/imports') ? '/imports' : null);
+      if (dest && placeCopy(asset, dest)) placed += 1;
+    }
+    if (placed > 0) {
+      setImportSuccess(`${placed} cop${placed === 1 ? 'y' : 'ies'} added`);
+      setTimeout(() => setImportSuccess(null), 3000);
+    }
+    setMenuId(null);
+  }, [findNodeByPath, placeCopy]);
+
+  const transferAssets = useCallback((assetsToMove: PlacedAsset[], folderPath: string) => {
+    const store = useFileStore.getState();
+    let moved = 0;
+    const dropped: string[] = [];
+    for (const asset of assetsToMove) {
+      const path = asset.path || '';
+      if (path.startsWith('/') && store.findNodeByPath(path)) {
+        if (store.moveNode(path, folderPath)) {
+          moved += 1;
+          const projectId = projectIdForFolder(folderPath, projectCards);
+          const existing = store.getAsset(asset.id);
+          if (existing) {
+            store.updateAsset(asset.id, {
+              metadata: { ...existing.metadata, projectIds: projectId ? [projectId] : [] },
+            });
+          }
+        }
+        continue;
+      }
+      if (placeCopy(asset, folderPath)) {
+        moved += 1;
+        dropped.push(asset.id);
+      }
+    }
+    if (dropped.length) hideFromLibrary(dropped);
+    setSelected(new Set());
+    setTransferOpen(false);
+    setMenuId(null);
+    if (moved > 0) {
+      setImportSuccess(`${moved} asset${moved === 1 ? '' : 's'} moved to ${folderPath}`);
+      setTimeout(() => setImportSuccess(null), 3000);
+    } else {
+      setImportError('Nothing could be moved into that folder');
+    }
+  }, [hideFromLibrary, placeCopy, projectCards]);
+
+  const deleteAssets = useCallback((assetsToDelete: PlacedAsset[]) => {
+    if (assetsToDelete.length > 1) {
+      const confirmed = window.confirm(`Delete ${assetsToDelete.length} assets?`);
+      if (!confirmed) return;
+    }
+    const store = useFileStore.getState();
+    const dropped: string[] = [];
+    for (const asset of assetsToDelete) {
+      const path = asset.path || '';
+      if (path.startsWith('/') && store.findNodeByPath(path)) {
+        store.deleteNode(path);
+        continue;
+      }
+      if (store.getAsset(asset.id)) {
+        store.removeAsset(asset.id);
+        continue;
+      }
+      dropped.push(asset.id);
+    }
+    if (dropped.length) hideFromLibrary(dropped);
+    setSelected((current) => {
+      const next = new Set(current);
+      assetsToDelete.forEach((asset) => next.delete(asset.id));
+      return next;
+    });
+    setMenuId(null);
+  }, [hideFromLibrary]);
+
+  const toggleSelected = useCallback((id: string, index: number, shift: boolean) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (shift && anchorIndex != null) {
+        const [start, end] = anchorIndex < index ? [anchorIndex, index] : [index, anchorIndex];
+        for (let i = start; i <= end; i += 1) {
+          const item = filteredAssets[i];
+          if (item) next.add(item.id);
+        }
+        return next;
+      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    if (!shift) setAnchorIndex(index);
+  }, [anchorIndex, filteredAssets]);
 
   const getIconForType = (type: AssetType) => {
     switch (type) {
@@ -379,19 +633,51 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
           <span className={styles.importHint}>Images, Videos, Audio, Text</span>
         </button>
 
-        {filteredAssets.map((asset) => {
+        {filteredAssets.map((asset, index) => {
           const meta = asset.metadata;
           const isTemplate = asset.type === 'prompt' && !!asset.metadata?.templateId;
           const typeColor = isTemplate ? '#ec4899' : (TYPE_COLORS[asset.type] || '#6b7280');
-          const usageCount = meta?.usageCount || 0;
           const variationCount = meta?.variationIds?.length || 0;
           const unassigned = asset.placeLabel === 'No project';
-          const childCount = meta?.childAssetIds?.length || 0;
           const projectIds = meta?.projectIds || [];
           const fileSize = meta?.fileSize || asset.size || 0;
+          const folder = parentFolder(asset.path || '');
+          const folderReady = Boolean(folder && findNodeByPath(folder));
+          const projectNames = [...new Set([
+            ...projectIds.map((id) => allProjects.get(id) || projectCards.find((project) => project.id === id)?.name),
+            !unassigned && asset.placeDetail && asset.placeDetail !== 'Not on a current project' ? asset.placeDetail : undefined,
+          ].filter((name): name is string => Boolean(name)))];
+          const chipLabel = unassigned
+            ? 'No project'
+            : asset.placeLabel === 'Canvas'
+              ? 'Canvas'
+              : (asset.placeDetail || asset.placeLabel);
+          const placeButtonLabel = unassigned
+            ? 'Not on a current project'
+            : folderReady && folder
+              ? folderTitle(folder)
+              : (asset.placeDetail || asset.placeLabel);
+          const extraProjects = projectNames.filter((name) => name !== placeButtonLabel);
+          const isSelected = selected.has(asset.id);
+          const menuTargets = isSelected && selected.size > 1
+            ? filteredAssets.filter((item) => selected.has(item.id))
+            : [asset];
 
           return (
-            <div key={asset.id} className={styles.assetCard}>
+            <div
+              key={asset.id}
+              className={`${styles.assetCard} ${isSelected ? styles.assetCardSelected : ''}`}
+              onClick={(event) => toggleSelected(asset.id, index, event.shiftKey)}
+            >
+              <label className={styles.selectPlate} onClick={(event) => event.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  className={styles.selectBox}
+                  checked={isSelected}
+                  aria-label={`Select ${asset.name}`}
+                  onChange={(event) => toggleSelected(asset.id, index, event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey)}
+                />
+              </label>
               <div className={styles.assetThumbnail}>
                 {asset.thumbnail ? (
                   <img src={asset.thumbnail} alt={asset.name} loading="lazy" />
@@ -407,15 +693,57 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
                   </span>
                 )}
 
-                <span className={styles.typeBadge} style={{ background: typeColor }}>
-                  {isTemplate ? 'TEMPLATE' : asset.type.toUpperCase()}
-                </span>
-
-                {fileSize > 0 && (
-                  <span className={styles.sizeBadge}>
-                    {formatFileSize(fileSize)}
+                <div className={styles.badgeRow}>
+                  <span className={styles.typeBadge} style={{ background: typeColor }}>
+                    {isTemplate ? 'TEMPLATE' : asset.type.toUpperCase()}
                   </span>
+                  <span
+                    className={styles.sourceChip}
+                    style={{
+                      borderColor: unassigned ? '#f59e0b' : `${typeColor}99`,
+                      color: unassigned ? '#f59e0b' : '#fff',
+                      background: 'rgba(0, 0, 0, 0.62)',
+                    }}
+                    title={chipLabel}
+                  >
+                    {chipLabel}
+                  </span>
+                </div>
+
+                <div className={styles.cornerTools}>
+                  <span className={styles.fileKindBadge}>{fileKindLabel(asset)}</span>
+                  <button
+                    type="button"
+                    className={styles.moreButton}
+                    data-asset-menu=""
+                    aria-label={`Actions for ${asset.name}`}
+                    aria-expanded={menuId === asset.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setTransferOpen(false);
+                      setMenuId((current) => current === asset.id ? null : asset.id);
+                    }}
+                  >
+                    <MoreVertical size={14} />
+                  </button>
+                </div>
+                {menuId === asset.id && (
+                  <div className={styles.cardMenu} data-asset-menu="" role="menu">
+                    <button type="button" role="menuitem" onClick={(event) => { event.stopPropagation(); setMenuId(null); openFolder(asset); }}>
+                      <FolderOpen size={13} /> Open folder
+                    </button>
+                    <button type="button" role="menuitem" onClick={(event) => { event.stopPropagation(); setMenuId(null); setSelected(new Set(menuTargets.map((item) => item.id))); setTransferOpen(true); }}>
+                      <FolderInput size={13} /> Transfer{menuTargets.length > 1 ? ` ${menuTargets.length}` : ''}
+                    </button>
+                    <button type="button" role="menuitem" onClick={(event) => { event.stopPropagation(); copyAssets(menuTargets); }}>
+                      <Copy size={13} /> Copy{menuTargets.length > 1 ? ` ${menuTargets.length}` : ''}
+                    </button>
+                    <button type="button" role="menuitem" className={styles.menuDanger} onClick={(event) => { event.stopPropagation(); deleteAssets(menuTargets); }}>
+                      <Trash2 size={13} /> Delete{menuTargets.length > 1 ? ` ${menuTargets.length}` : ''}
+                    </button>
+                  </div>
                 )}
+
               </div>
 
               <div className={styles.assetInfo}>
@@ -425,77 +753,41 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
 
                 <div className={styles.assetMeta}>
                   {meta?.width && meta?.height ? (
-                    <span className={styles.metaChip}>
-                      {meta.width}&times;{meta.height}
-                    </span>
+                    <span className={styles.metaChip}>{meta.width}&times;{meta.height}</span>
                   ) : null}
-
-                  <span
-                    className={styles.sourceChip}
-                    style={{
-                      borderColor: unassigned ? '#f59e0b' : `${typeColor}60`,
-                      color: unassigned ? '#f59e0b' : typeColor,
-                    }}
-                    title={asset.placeDetail || asset.placeLabel}
-                  >
-                    {asset.placeLabel}
-                  </span>
-
-                  {meta?.mimeType && (
-                    <span className={styles.mimeChip}>{meta.mimeType.split('/')[1] || meta.mimeType}</span>
+                  {fileSize > 0 && (
+                    <span className={styles.metaChip}>{formatFileSize(fileSize)}</span>
                   )}
-                </div>
-
-                {/* Stats row */}
-                <div className={styles.statsRow}>
-                  <span
-                    className={`${styles.statItem} ${usageCount > 0 ? styles.statActive : ''}`}
-                    title={`Used ${usageCount} time${usageCount !== 1 ? 's' : ''}`}
-                  >
-                    <Eye size={11} /> {usageCount}
-                  </span>
-                  <span
-                    className={`${styles.statItem} ${variationCount > 0 ? styles.statActive : ''}`}
-                    title={`${variationCount} variation${variationCount !== 1 ? 's' : ''}`}
-                  >
-                    <Copy size={11} /> {variationCount}
-                  </span>
-                  <span
-                    className={`${styles.statItem} ${childCount > 0 ? styles.statActive : ''}`}
-                    title={`${childCount} child asset${childCount !== 1 ? 's' : ''}`}
-                  >
-                    <Layers size={11} /> {childCount}
-                  </span>
+                  {variationCount > 1 && (
+                    <span className={styles.metaChip}>{variationCount} versions</span>
+                  )}
                   {isTemplate && (
                     <>
-                      <span className={`${styles.statItem} ${(meta?.templateUsageCount || 0) > 0 ? styles.statActive : ''}`} title="Template popularity">
-                        <Flame size={11} /> {meta?.templateUsageCount || 0}
-                      </span>
-                      <span className={`${styles.statItem} ${(meta?.templateDownloads || 0) > 0 ? styles.statActive : ''}`} title="Template downloads">
-                        <Download size={11} /> {meta?.templateDownloads || 0}
-                      </span>
+                      <span className={styles.metaChip} title="Template popularity"><Flame size={10} /> {meta?.templateUsageCount || 0}</span>
+                      <span className={styles.metaChip} title="Template downloads"><Download size={10} /> {meta?.templateDownloads || 0}</span>
                     </>
                   )}
                 </div>
 
-                {/* Projects row */}
-                {(asset.placeDetail || projectIds.length > 0) && (
-                  <div className={styles.projectsRow}>
-                    <FolderOpen size={10} />
-                    {asset.placeDetail && (
-                      <span className={styles.projectTag}>{asset.placeDetail}</span>
-                    )}
-                    {variationCount > 1 && (
-                      <span className={styles.projectTag}>{variationCount} versions</span>
-                    )}
-                    {projectIds.filter((pid) => allProjects.has(pid) && allProjects.get(pid) !== asset.placeDetail).slice(0, 3).map((pid) => (
-                      <span key={pid} className={styles.projectTag}>
-                        {allProjects.get(pid)}
-                      </span>
+                <div className={styles.projectsRow}>
+                  <button
+                    type="button"
+                    className={styles.folderButton}
+                    title={folderReady && folder ? `Open ${folder}` : unassigned ? 'Open the files that are not on a project' : 'Open the project'}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openFolder(asset);
+                    }}
+                  >
+                    <FolderOpen size={12} />
+                    <span>{placeButtonLabel}</span>
+                  </button>
+                </div>
+                {extraProjects.length > 0 && (
+                  <div className={styles.projectTags}>
+                    {extraProjects.map((name) => (
+                      <span key={name} className={styles.projectTag}>{name}</span>
                     ))}
-                    {projectIds.length > 3 && (
-                      <span className={styles.projectMore}>+{projectIds.length - 3}</span>
-                    )}
                   </div>
                 )}
 
@@ -510,6 +802,39 @@ export function AssetsGrid({ searchQuery = '' }: AssetsGridProps) {
           );
         })}
       </div>
+
+      {selected.size > 0 && (
+        <div className={styles.selectionBar} data-transfer="">
+          <span className={styles.selectionCount}>{selected.size} selected</span>
+          <button type="button" onClick={() => setTransferOpen((open) => !open)}>
+            <FolderInput size={13} /> Transfer
+          </button>
+          <button type="button" onClick={() => copyAssets(filteredAssets.filter((asset) => selected.has(asset.id)))}>
+            <Copy size={13} /> Copy
+          </button>
+          <button type="button" className={styles.menuDanger} onClick={() => deleteAssets(filteredAssets.filter((asset) => selected.has(asset.id)))}>
+            <Trash2 size={13} /> Delete
+          </button>
+          <button type="button" onClick={() => { setSelected(new Set()); setTransferOpen(false); }}>
+            Clear
+          </button>
+          {transferOpen && (
+            <div className={styles.transferMenu} data-transfer="" role="menu">
+              {folders.length === 0 && <div className={styles.transferEmpty}>No folders yet</div>}
+              {folders.map((folder) => (
+                <button
+                  key={folder.path}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => transferAssets(filteredAssets.filter((asset) => selected.has(asset.id)), folder.path)}
+                >
+                  {folder.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {filteredAssets.length === 0 && !importing && (
         <div className={styles.empty}>

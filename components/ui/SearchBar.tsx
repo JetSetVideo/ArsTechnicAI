@@ -147,6 +147,29 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const searchShortcut = useSettingsStore((s) => s.settings.shortcuts?.search || 'mod+k');
 
   useEffect(() => {
+    const openQuery = (value: string) => {
+      setFilesOn(true);
+      setQuery(value);
+      setActiveIndex(0);
+      setOpen(true);
+      window.setTimeout(() => inputRef.current?.focus(), 40);
+    };
+    const pending = sessionStorage.getItem('ars-pending-file-search');
+    if (pending) {
+      sessionStorage.removeItem('ars-pending-file-search');
+      openQuery(pending);
+    }
+    const onOpen = (event: Event) => {
+      const value = (event as CustomEvent<{ query?: string }>).detail?.query;
+      if (!value) return;
+      sessionStorage.removeItem('ars-pending-file-search');
+      openQuery(value);
+    };
+    window.addEventListener('ars-open-file-search', onOpen);
+    return () => window.removeEventListener('ars-open-file-search', onOpen);
+  }, []);
+
+  useEffect(() => {
     setFilesOn(readBool(PREF_FILES, true));
     setGoogleOn(readBool(PREF_GOOGLE, false));
     setSuggestOn(readBool(PREF_SUGGEST, true));

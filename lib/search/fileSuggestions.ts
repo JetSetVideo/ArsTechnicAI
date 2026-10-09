@@ -87,6 +87,15 @@ export function suggestionGroups(
     if (nameAt < 0 && childHits === 0) continue;
     folders.push({ item, rank: nameAt === 0 ? 0 : childHits > 0 ? 1 : 2 + Math.max(nameAt, 0) });
   }
+  const namedFolders = folders.filter((folder) => folder.item.label.toLowerCase().includes(q));
+  if (namedFolders.length > 0) {
+    const listed = new Set(files.map((file) => file.item.id));
+    for (const item of items) {
+      if (item.kind === 'folder' || item.kind === 'node' || !item.path || listed.has(item.id)) continue;
+      if (!namedFolders.some((folder) => item.path?.startsWith(`${folder.item.path}/`))) continue;
+      files.push({ item, rank: 80, pictured: item.thumbnail ? 0 : 1 });
+    }
+  }
 
   const byName = (a: { rank: number; item: FileSearchInput }, b: { rank: number; item: FileSearchInput }) =>
     a.rank - b.rank || a.item.label.localeCompare(b.item.label);

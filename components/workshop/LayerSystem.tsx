@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Eye, EyeOff, Lock, Unlock, Trash2, Copy, ChevronUp, ChevronDown,
+  Eye, EyeOff, Lock, Unlock, Trash2, Copy, ChevronUp, ChevronDown, ChevronRight,
   Square, Circle, Type as TypeIcon, Image as ImageIcon, Scan, Ban,
   SlidersHorizontal, MoveUpRight, Layers as LayersIcon, Download,
-  Crop, Loader2, Film,
+  Crop, Loader2, Film, Pencil, FolderPlus, Folder,
 } from 'lucide-react';
 import type { AssetLayer, LayerKind, NodeVariant, PipelineNode, ShapeKind } from '@/types/pipeline';
-import { BLEND_MODES, FILTER_PRESETS } from '@/lib/pipeline/layers';
+import { BLEND_MODES, FILTER_PRESETS, layerShown } from '@/lib/pipeline/layers';
 import { ASPECT_RATIOS } from '@/lib/pipeline/catalog';
 import { usePipelineStore } from '@/stores/pipelineStore';
 import styles from './WorkshopFlow.module.css';
@@ -27,6 +27,8 @@ export function layerKindIcon(layer: AssetLayer, size = 12): React.ReactNode {
     case 'image': return <ImageIcon size={size} />;
     case 'mask': return layer.maskMode === 'exclude' ? <Ban size={size} /> : <Scan size={size} />;
     case 'adjustment': return <SlidersHorizontal size={size} />;
+    case 'draw': return <Pencil size={size} />;
+    case 'group': return <Folder size={size} />;
     default: return <LayersIcon size={size} />;
   }
 }
@@ -34,11 +36,29 @@ export function layerKindIcon(layer: AssetLayer, size = 12): React.ReactNode {
 // ── Display overlay: renders layers over an image (non-interactive) ─────────
 
 export const LayerOverlay: React.FC<{ variant: NodeVariant; showMasks?: boolean }> = ({ variant, showMasks = true }) => {
-  if (!variant.layers?.length) return null;
+  const layers = variant.layers ?? [];
+  if (!layers.length) return null;
   return (
     <div className={styles.layerOverlay} aria-hidden>
-      {variant.layers.map((l) => {
-        if (!l.visible) return null;
+      {layers.map((l) => {
+        if (!layerShown(l, layers) || l.kind === 'group') return null;
+        if (l.kind === 'draw') {
+          return (
+            <svg key={l.id} className={styles.layerInk} viewBox="0 0 100 100" preserveAspectRatio="none">
+              {(l.strokes ?? []).map((stroke, index) => (
+                <polyline
+                  key={index}
+                  points={stroke.points.map((point) => `${point.x * 100},${point.y * 100}`).join(' ')}
+                  fill="none"
+                  stroke={stroke.color}
+                  strokeWidth={Math.max(1.4, stroke.size * 100)}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+            </svg>
+          );
+        }
         const box: React.CSSProperties = {
           left: `${l.x * 100}%`,
           top: `${l.y * 100}%`,
@@ -104,17 +124,79 @@ export const LayerOverlay: React.FC<{ variant: NodeVariant; showMasks?: boolean 
 
 // ── Layer list + per-layer detail editor ────────────────────────────────────
 
+const INK_COLORS = ['#ff4d6d', '#ffe14d', '#00d4aa', '#ffffff', '#111111'];
+
+const PaintStage: React.FC<{ nodeId: string; variant: NodeVariant; layer: AssetLayer }> = ({ nodeId, variant, layer }) => {
+  const appendDrawPoint = usePipelineStore((s) => s.appendDrawPoint);
+  const [color, setColor] = useState(layer.color || '#ff4d6d');
+  const drawing = React.useRef(false);
+
+  const pointOf = (event: React.PointerEvent) => {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width))),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(1, rect.height))),
+    };
+  };
+
+  return (
+    <div className={styles.paintBox}>
+      <div className={styles.paintSwatches}>
+        {INK_COLORS.map((swatch) => (
+          <button
+            key={swatch}
+            type="button"
+            className={`${styles.paintSwatch} ${color === swatch ? styles.paintSwatchOn : ''}`}
+            style={{ background: swatch }}
+            aria-label={`Ink ${swatch}`}
+            aria-pressed={color === swatch}
+            onClick={() => setColor(swatch)}
+          />
+        ))}
+      </div>
+      <div
+        className={styles.paintStage}
+        data-layer-paint=""
+        role="button"
+        aria-label="Draw on the picture"
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+          drawing.current = true;
+          appendDrawPoint(nodeId, variant.id, layer.id, pointOf(event), color, 0.012, true);
+        }}
+        onPointerMove={(event) => {
+          if (!drawing.current) return;
+          appendDrawPoint(nodeId, variant.id, layer.id, pointOf(event), color, 0.012, false);
+        }}
+        onPointerUp={() => { drawing.current = false; }}
+        onPointerCancel={() => { drawing.current = false; }}
+      >
+        {variant.image ? <img src={variant.image} alt="" draggable={false} /> : <div className={styles.paintEmpty} />}
+        <LayerOverlay variant={variant} showMasks={false} />
+      </div>
+    </div>
+  );
+};
+
 export const LayersPanelBody: React.FC<{
   node: PipelineNode;
   variant: NodeVariant;
   selectedLayerId: string | null;
   onSelectLayer: (id: string | null) => void;
   compact?: boolean;
-}> = ({ node, variant, selectedLayerId, onSelectLayer, compact }) => {
-  const { addLayer, updateLayer, removeLayer, duplicateLayer, reorderLayer, flattenVariant } = usePipelineStore();
+  /** The full editor draws on its own canvas, so the list stays groups and layers. */
+  hidePaint?: boolean;
+}> = ({ node, variant, selectedLayerId, onSelectLayer, compact, hidePaint }) => {
+  const { addLayer, updateLayer, removeLayer, duplicateLayer, reorderLayer, flattenVariant, groupLayers, ungroupLayers } = usePipelineStore();
   const layers = variant.layers ?? [];
   const selected = layers.find((l) => l.id === selectedLayerId) ?? null;
   const fileRef = React.useRef<HTMLInputElement>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+
+  const togglePicked = (id: string) => {
+    setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
 
   const addBtn = (kind: LayerKind, label: string, icon: React.ReactNode, partial?: Partial<AssetLayer>) => (
     <button
@@ -132,49 +214,35 @@ export const LayersPanelBody: React.FC<{
     </button>
   );
 
-  return (
-    <div className={styles.layersBody}>
-      {/* Add-layer bar */}
-      <div className={styles.layerAddBar}>
-        {addBtn('shape', 'Shape', <Square size={12} />)}
-        {addBtn('text', 'Text', <TypeIcon size={12} />)}
-        {addBtn('image', 'Image', <ImageIcon size={12} />)}
-        {addBtn('mask', 'Include', <Scan size={12} />, { maskMode: 'include' })}
-        {addBtn('mask', 'Exclude', <Ban size={12} />, { maskMode: 'exclude' })}
-        {addBtn('adjustment', 'Filter', <SlidersHorizontal size={12} />)}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-              const layer = addLayer(node.id, variant.id, 'image', { image: reader.result as string, name: file.name });
-              onSelectLayer(layer.id);
-            };
-            reader.readAsDataURL(file);
-            e.target.value = '';
-          }}
-        />
-      </div>
-
-      {/* Layer rows — topmost layer first (Photoshop order) */}
-      <div className={styles.layerList}>
-        {layers.length === 0 && (
-          <div className={styles.layerEmptyHint}>
-            No layers yet. Add shapes, text, collage images, include/exclude masks
-            or filters — all non-destructive over the generated picture.
-          </div>
-        )}
-        {[...layers].reverse().map((l) => (
+  const renderLayerRows = (parentId: string | undefined, depth: number): React.ReactNode => {
+    const rows = layers.filter((layer) => (layer.parentId || undefined) === parentId).reverse();
+    return rows.map((l) => {
+      const collapsed = l.kind === 'group' && l.collapsed;
+      return (
+        <React.Fragment key={l.id}>
           <div
-            key={l.id}
-            className={`${styles.layerRow} ${l.id === selectedLayerId ? styles.layerRowActive : ''}`}
-            onClick={() => onSelectLayer(l.id === selectedLayerId ? null : l.id)}
+            className={`${styles.layerRow} ${l.id === selectedLayerId || picked.includes(l.id) ? styles.layerRowActive : ''}`}
+            style={{ marginLeft: depth * 12 }}
+            onClick={() => onSelectLayer(l.id)}
           >
+            {l.kind === 'group' ? (
+              <button
+                type="button"
+                className={styles.layerIconBtn}
+                aria-label={collapsed ? 'Expand group' : 'Collapse group'}
+                onClick={(e) => { e.stopPropagation(); updateLayer(node.id, variant.id, l.id, { collapsed: !l.collapsed }); }}
+              >
+                {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`${styles.layerPick} ${picked.includes(l.id) ? styles.layerPickOn : ''}`}
+                aria-pressed={picked.includes(l.id)}
+                aria-label={`Include ${l.name} in a group`}
+                onClick={(e) => { e.stopPropagation(); togglePicked(l.id); }}
+              />
+            )}
             <span className={styles.layerKindIcon} data-mask={l.kind === 'mask' ? l.maskMode : undefined}>
               {layerKindIcon(l)}
             </span>
@@ -214,17 +282,102 @@ export const LayersPanelBody: React.FC<{
               </>
             )}
             <button className={styles.layerIconBtn} title="Delete"
-              onClick={(e) => { e.stopPropagation(); removeLayer(node.id, variant.id, l.id); if (selectedLayerId === l.id) onSelectLayer(null); }}>
+              onClick={(e) => {
+                e.stopPropagation();
+                removeLayer(node.id, variant.id, l.id);
+                setPicked((current) => current.filter((id) => id !== l.id));
+                if (selectedLayerId === l.id) onSelectLayer(null);
+              }}>
               <Trash2 size={12} />
             </button>
           </div>
-        ))}
+          {l.kind === 'group' && !collapsed && renderLayerRows(l.id, depth + 1)}
+        </React.Fragment>
+      );
+    });
+  };
+
+  return (
+    <div className={styles.layersBody}>
+      {/* Add-layer bar */}
+      <div className={styles.layerAddBar}>
+        {addBtn('shape', 'Shape', <Square size={12} />)}
+        {addBtn('text', 'Text', <TypeIcon size={12} />)}
+        {addBtn('draw', 'Draw', <Pencil size={12} />)}
+        {addBtn('image', 'Image', <ImageIcon size={12} />)}
+        {addBtn('mask', 'Include', <Scan size={12} />, { maskMode: 'include' })}
+        {addBtn('mask', 'Exclude', <Ban size={12} />, { maskMode: 'exclude' })}
+        {addBtn('adjustment', 'Filter', <SlidersHorizontal size={12} />)}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+              const layer = addLayer(node.id, variant.id, 'image', { image: reader.result as string, name: file.name });
+              onSelectLayer(layer.id);
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+          }}
+        />
       </div>
+      <button
+        type="button"
+        className={styles.layerAddBtn}
+        disabled={picked.length < 2}
+        title="Put the checked layers into one group"
+        onClick={() => {
+          const group = groupLayers(node.id, variant.id, picked);
+          if (!group) return;
+          setPicked([group.id]);
+          onSelectLayer(group.id);
+        }}
+      >
+        <FolderPlus size={12} />
+        <span>Group{picked.length > 1 ? ` ${picked.length}` : ''}</span>
+      </button>
+
+      {selected?.kind === 'draw' && !hidePaint && (
+        <PaintStage nodeId={node.id} variant={variant} layer={selected} />
+      )}
+
+      {/* Layer rows — topmost layer first, groups holding their children */}
+      <div className={styles.layerList}>
+        {layers.length === 0 && (
+          <div className={styles.layerEmptyHint}>
+            Draw or write on the picture, then group the marks. The next generator
+            receives the picture with those layers on it, and the notes as instructions.
+          </div>
+        )}
+        {renderLayerRows(undefined, 0)}
+      </div>
+
+      <p className={styles.layerSendNote}>
+        Checked layers can be grouped. Visible drawings, text, and shapes are baked
+        into the picture the next generator receives, and the written notes go with the prompt.
+      </p>
 
       {/* Selected layer detail */}
       {selected && !compact && (
         <div className={styles.layerDetail}>
           <div className={styles.sectionTitle}>Layer settings</div>
+          {selected.kind === 'group' && (
+            <button
+              type="button"
+              className={styles.layerAddBtn}
+              onClick={() => {
+                ungroupLayers(node.id, variant.id, selected.id);
+                onSelectLayer(null);
+              }}
+            >
+              <Folder size={12} /> Ungroup
+            </button>
+          )}
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Opacity</label>
             <div className={styles.sliderRow}>

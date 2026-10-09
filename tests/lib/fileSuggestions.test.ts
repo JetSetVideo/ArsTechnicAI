@@ -45,6 +45,16 @@ describe('file suggestions', () => {
     expect(groups.files.map((hit) => hit.label)).toEqual(['gen_a-computer.png']);
   });
 
+  it('opens a named folder onto the files inside it', () => {
+    const groups = suggestionGroups([
+      { id: 'folder:/unassigned', label: 'No project', kind: 'folder', path: '/unassigned', count: 2 },
+      { id: 'a', label: 'Animate Image', kind: 'image', thumbnail: 'thumb-a', path: '/unassigned/a' },
+      { id: 'b', label: 'Key Visual', kind: 'image', thumbnail: 'thumb-b', path: '/unassigned/b' },
+    ], 'No project');
+    expect(groups.folders.map((hit) => hit.label)).toEqual(['No project']);
+    expect(groups.files.map((hit) => hit.label).sort()).toEqual(['Animate Image', 'Key Visual']);
+  });
+
   it('lists the folders above a file', () => {
     expect(ancestorPaths('/projects/demo/generated/gen_a-computer.png')).toEqual([
       '/projects',

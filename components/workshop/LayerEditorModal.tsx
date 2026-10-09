@@ -1,7 +1,7 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   X, MousePointer2, Square, Circle, MoveUpRight, Type as TypeIcon,
-  Scan, Ban, Image as ImageIcon, Layers as LayersIcon,
+  Scan, Ban, Image as ImageIcon, Layers as LayersIcon, Pencil,
 } from 'lucide-react';
 import type { AssetLayer, LayerKind, ShapeKind } from '@/types/pipeline';
 import { usePipelineStore } from '@/stores/pipelineStore';
@@ -13,10 +13,11 @@ type Tool =
   | { id: 'shape'; shape: ShapeKind }
   | { id: 'text' }
   | { id: 'mask'; mode: 'include' | 'exclude' }
-  | { id: 'image' };
+  | { id: 'image' }
+  | { id: 'ink' };
 
 interface DragState {
-  kind: 'draw' | 'move' | 'resize';
+  kind: 'draw' | 'move' | 'resize' | 'ink';
   layerId?: string;
   startX: number;  // normalized
   startY: number;
@@ -36,11 +37,39 @@ export const LayerEditorModal: React.FC = () => {
   const node = nodes.find((n) => n.id === editorNodeId) ?? null;
   const variant = node ? activeVariantOf(node) : undefined;
 
+  const INK = ['#ff4d6d', '#ffe14d', '#00d4aa', '#7aa2ff', '#ffffff', '#111111'];
   const [tool, setTool] = useState<Tool>({ id: 'select' });
+  const [inkColor, setInkColor] = useState('#ff4d6d');
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [natural, setNatural] = useState({ w: 0, h: 0 });
+  const [frame, setFrame] = useState({ w: 0, h: 0 });
   const stageRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const inkRef = useRef(inkColor);
+  inkRef.current = inkColor;
+
+  const fitFrame = useCallback(() => {
+    const wrap = wrapRef.current;
+    if (!wrap || !natural.w || !natural.h) return;
+    const maxW = Math.max(120, wrap.clientWidth - 8);
+    const maxH = Math.max(120, wrap.clientHeight - 18);
+    const scale = Math.min(maxW / natural.w, maxH / natural.h);
+    setFrame({
+      w: Math.max(1, Math.floor(natural.w * scale)),
+      h: Math.max(1, Math.floor(natural.h * scale)),
+    });
+  }, [natural.w, natural.h]);
+
+  useEffect(() => {
+    fitFrame();
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const observer = new ResizeObserver(() => fitFrame());
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, [fitFrame]);
 
   const norm = useCallback((clientX: number, clientY: number) => {
     const rect = stageRef.current?.getBoundingClientRect();
@@ -60,7 +89,8 @@ export const LayerEditorModal: React.FC = () => {
       // Hit-test topmost layer under the cursor
       const layers = variant.layers ?? [];
       const hit = [...layers].reverse().find(
-        (l) => l.visible && !l.locked && p.x >= l.x && p.x <= l.x + l.w && p.y >= l.y && p.y <= l.y + l.h
+        (l) => l.visible && !l.locked && l.kind !== 'draw' && l.kind !== 'group'
+          && p.x >= l.x && p.x <= l.x + l.w && p.y >= l.y && p.y <= l.y + l.h
       );
       setSelectedLayerId(hit?.id ?? null);
       if (hit) {
@@ -70,6 +100,15 @@ export const LayerEditorModal: React.FC = () => {
     }
 
     if (tool.id === 'image') { fileRef.current?.click(); return; }
+
+    if (tool.id === 'ink') {
+      const existing = (variant.layers ?? []).find((layer) => layer.id === selectedLayerId && layer.kind === 'draw');
+      const layer = existing ?? addLayer(node.id, variant.id, 'draw');
+      setSelectedLayerId(layer.id);
+      usePipelineStore.getState().appendDrawPoint(node.id, variant.id, layer.id, p, inkRef.current, 0.012, true);
+      dragRef.current = { kind: 'ink', layerId: layer.id, startX: p.x, startY: p.y };
+      return;
+    }
 
     if (tool.id === 'text') {
       const layer = addLayer(node.id, variant.id, 'text', { x: p.x, y: p.y, w: 0.35, h: 0.1, text: 'New text' });
@@ -86,12 +125,16 @@ export const LayerEditorModal: React.FC = () => {
     const layer = addLayer(node.id, variant.id, kind, partial);
     setSelectedLayerId(layer.id);
     dragRef.current = { kind: 'draw', layerId: layer.id, startX: p.x, startY: p.y };
-  }, [node, variant, tool, norm, addLayer]);
+  }, [node, variant, tool, norm, addLayer, selectedLayerId]);
 
   const handleStagePointerMove = useCallback((e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d || !node || !variant || !d.layerId) return;
     const p = norm(e.clientX, e.clientY);
+    if (d.kind === 'ink') {
+      usePipelineStore.getState().appendDrawPoint(node.id, variant.id, d.layerId, p, inkRef.current, 0.012, false);
+      return;
+    }
     if (d.kind === 'draw') {
       updateLayer(node.id, variant.id, d.layerId, {
         x: Math.min(d.startX, p.x),
@@ -145,12 +188,18 @@ export const LayerEditorModal: React.FC = () => {
     <div className={styles.editorOverlay} onPointerDown={(e) => e.stopPropagation()}>
       <div className={styles.editorModal}>
         <div className={styles.editorHeader}>
-          <LayersIcon size={15} />
-          <span className={styles.editorTitle}>
-            {node.title} — v{variant.version ?? 1} · {variant.label}
-          </span>
+          <div className={styles.editorTitleRow}>
+            <LayersIcon size={15} />
+            <span className={styles.editorTitle} title={`${node.title} — v${variant.version ?? 1} · ${variant.label}`}>
+              {node.title} — v{variant.version ?? 1} · {variant.label}
+            </span>
+            <button className={styles.inspectorClose} onClick={closeEditor} title="Close editor">
+              <X size={16} />
+            </button>
+          </div>
           <div className={styles.editorTools}>
             {toolBtn({ id: 'select' }, <MousePointer2 size={14} />, 'Select / move (V)')}
+            {toolBtn({ id: 'ink' }, <Pencil size={14} />, 'Draw on the picture')}
             {toolBtn({ id: 'shape', shape: 'rectangle' }, <Square size={14} />, 'Draw rectangle')}
             {toolBtn({ id: 'shape', shape: 'ellipse' }, <Circle size={14} />, 'Draw ellipse')}
             {toolBtn({ id: 'shape', shape: 'arrow' }, <MoveUpRight size={14} />, 'Draw arrow')}
@@ -158,31 +207,72 @@ export const LayerEditorModal: React.FC = () => {
             {toolBtn({ id: 'mask', mode: 'include' }, <Scan size={14} />, 'Include mask — AI edits inside')}
             {toolBtn({ id: 'mask', mode: 'exclude' }, <Ban size={14} />, 'Exclude mask — AI keeps intact')}
             {toolBtn({ id: 'image' }, <ImageIcon size={14} />, 'Add image (collage)')}
+            <div className={styles.editorInk}>
+              {INK.map((swatch) => (
+                <button
+                  key={swatch}
+                  type="button"
+                  className={`${styles.paintSwatch} ${inkColor === swatch ? styles.paintSwatchOn : ''}`}
+                  style={{ background: swatch }}
+                  aria-label={`Ink ${swatch}`}
+                  aria-pressed={inkColor === swatch}
+                  onClick={() => { setInkColor(swatch); setTool({ id: 'ink' }); }}
+                />
+              ))}
+              <input
+                type="color"
+                className={styles.editorColor}
+                value={inkColor}
+                aria-label="Ink color"
+                onChange={(event) => { setInkColor(event.target.value); setTool({ id: 'ink' }); }}
+              />
+            </div>
           </div>
-          <button className={styles.inspectorClose} onClick={closeEditor} title="Close editor">
-            <X size={16} />
-          </button>
         </div>
 
         <div className={styles.editorBody}>
           {/* Interactive stage */}
-          <div className={styles.editorStageWrap}>
+          <div className={styles.editorStageWrap} ref={wrapRef}>
             <div
               ref={stageRef}
               className={styles.editorStage}
               data-tool={tool.id}
+              style={frame.w ? { width: frame.w, height: frame.h } : undefined}
               onPointerDown={handleStagePointerDown}
               onPointerMove={handleStagePointerMove}
               onPointerUp={handleStagePointerUp}
             >
               {variant.image ? (
-                <img src={variant.image} alt={variant.label} draggable={false} />
+                <img
+                  src={variant.image}
+                  alt={variant.label}
+                  draggable={false}
+                  onLoad={(event) => {
+                    const img = event.currentTarget;
+                    setNatural({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 });
+                  }}
+                />
               ) : (
                 <div className={styles.previewEmpty}>No picture on this version</div>
               )}
+              <svg className={styles.layerInk} viewBox="0 0 100 100" preserveAspectRatio="none">
+                {(variant.layers ?? []).filter((layer) => layer.kind === 'draw' && layer.visible).flatMap((layer) =>
+                  (layer.strokes ?? []).map((stroke, index) => (
+                    <polyline
+                      key={`${layer.id}-${index}`}
+                      points={stroke.points.map((point) => `${point.x * 100},${point.y * 100}`).join(' ')}
+                      fill="none"
+                      stroke={stroke.color}
+                      strokeWidth={Math.max(1.2, stroke.size * 100)}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ))
+                )}
+              </svg>
               {/* Interactive layer chrome */}
               {(variant.layers ?? []).map((l) => {
-                if (!l.visible) return null;
+                if (!l.visible || l.kind === 'draw' || l.kind === 'group') return null;
                 const isSel = l.id === selectedLayerId;
                 const boxStyle: React.CSSProperties = {
                   left: `${l.x * 100}%`, top: `${l.y * 100}%`,
@@ -241,8 +331,7 @@ export const LayerEditorModal: React.FC = () => {
               })}
             </div>
             <div className={styles.editorHint}>
-              Draw with the shape/mask tools · drag layers to move · corner dot resizes ·
-              double-click text to edit · include-masks + instructions feed banana2 edits downstream.
+              Drag to move · corner resizes · double-click text · ink and notes go to the next generator
             </div>
           </div>
 
@@ -253,6 +342,7 @@ export const LayerEditorModal: React.FC = () => {
               variant={variant}
               selectedLayerId={selectedLayerId}
               onSelectLayer={setSelectedLayerId}
+              hidePaint
             />
           </div>
         </div>
