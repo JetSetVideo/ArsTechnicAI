@@ -105,6 +105,9 @@ export const ThreeDViewer: React.FC<ThreeDViewerProps> = ({
     const handleMouseUp = () => { isDragging.current = false; };
     const handleWheel = (e: WheelEvent) => {
       if (!camera) return;
+      // The viewer owns its wheel/pinch: dolly the camera, never zoom or
+      // scroll the dashboard behind it (non-passive listener below).
+      e.preventDefault();
       const dir = camera.position.clone().normalize();
       const dist = camera.position.length();
       const newDist = Math.max(2, Math.min(15, dist + e.deltaY * 0.01));
@@ -113,7 +116,7 @@ export const ThreeDViewer: React.FC<ThreeDViewerProps> = ({
     dom.addEventListener('mousedown', handleMouseDown);
     dom.addEventListener('mousemove', handleMouseMove);
     dom.addEventListener('mouseup', handleMouseUp);
-    dom.addEventListener('wheel', handleWheel);
+    dom.addEventListener('wheel', handleWheel, { passive: false });
 
     // Ground plane with grid
     if (gridVisible) {

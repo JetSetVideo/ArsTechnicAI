@@ -9,6 +9,7 @@ import type { Blueprint } from '@/types/blueprint';
 import { compileBlueprint, workflowIcon } from '@/lib/pipeline/blueprintBridge';
 import { rectsOverlap, showStageLane } from '@/lib/pipeline/lanes';
 import { CLUSTER_PAD_TOP, CLUSTER_PAD_X, findClusterOrigin, packCluster, placeCluster, type ClusterRect } from '@/lib/pipeline/clusterLayout';
+import { groupIntoPlate, nextGroupTitle, removeFromPlates, renamePlate, ungroupPlate } from '@/lib/pipeline/nodeGroups';
 import {
   PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, defaultParams, buildPrompt, portsCompatible,
 } from '@/lib/pipeline/catalog';
@@ -151,6 +152,12 @@ interface PipelineState {
   /** Folds two or more layers into a named group. Returns the group, or null. */
   groupLayers: (nodeId: string, variantId: string, layerIds: string[]) => AssetLayer | null;
   ungroupLayers: (nodeId: string, variantId: string, groupId: string) => void;
+  /**
+   * Replaces a variant's layers with what `update` returns (the layer panel's
+   * tree operations). Returning the same array is a refused or empty change
+   * and writes nothing, so it leaves no undo step.
+   */
+  setVariantLayers: (nodeId: string, variantId: string, update: (current: AssetLayer[]) => AssetLayer[]) => boolean;
   /** Adds a point to a drawing. `fresh` starts a new stroke. */
   appendDrawPoint: (nodeId: string, variantId: string, layerId: string, point: { x: number; y: number }, color: string, size: number, fresh: boolean) => void;
   /** Flattens image + layers into a new variant (next version). */
@@ -236,6 +243,13 @@ interface PipelineState {
   resizeCluster: (clusterId: string, frame: ClusterRect) => void;
   /** Fold or open a workflow plate, the same way a stage group folds. */
   toggleClusterCollapsed: (clusterId: string) => void;
+  /** Puts the nodes into a new named group (plate). Returns its id, or null. */
+  groupNodes: (ids: string[], title?: string) => string | null;
+  /** Dissolves a group; its cards stay where they are. */
+  ungroupCluster: (clusterId: string) => void;
+  /** Takes cards out of their group; they stay where they are. */
+  removeFromGroup: (ids: string[]) => void;
+  renameCluster: (clusterId: string, title: string) => void;
   clearAll: () => void;
 }
 
@@ -374,6 +388,12 @@ function describeEdit(before: UndoEntry, after: PipelineState): string {
   for (const node of after.nodes) {
     const prev = before.nodes.find((item) => item.id === node.id);
     if (!prev) continue;
+    if (prev.clusterId !== node.clusterId) {
+      if (!node.clusterId) return `Ungrouped ${prev.clusterTitle || 'a group'}`;
+      const count = after.nodes.filter((item) => item.clusterId === node.clusterId).length;
+      return `Grouped ${count} node${count === 1 ? '' : 's'} as ${node.clusterTitle || 'a group'}`;
+    }
+    if (prev.clusterTitle !== node.clusterTitle) return `Renamed group ${prev.clusterTitle || ''} to ${node.clusterTitle || ''}`.replace(/\s+/g, ' ').trim();
     if (prev.title !== node.title) return `Renamed ${prev.title}`;
     if (prev.x !== node.x || prev.y !== node.y || prev.slot !== node.slot) return `Moved ${node.title}`;
     if (prev.params !== node.params) return `Edited ${node.title}`;
@@ -418,7 +438,9 @@ function nodeEdited(before: PipelineNode, after: PipelineNode): boolean {
     || before.clusterFrame?.y !== after.clusterFrame?.y
     || before.clusterFrame?.w !== after.clusterFrame?.w
     || before.clusterFrame?.h !== after.clusterFrame?.h
-    || before.clusterCollapsed !== after.clusterCollapsed;
+    || before.clusterCollapsed !== after.clusterCollapsed
+    || before.clusterId !== after.clusterId
+    || before.clusterTitle !== after.clusterTitle;
 }
 
 function graphEdited(prev: PipelineState, state: PipelineState): boolean {
@@ -976,6 +998,26 @@ export const usePipelineStore = create<PipelineState>()(
           ),
         }));
         return group;
+      },
+
+      setVariantLayers: (nodeId, variantId, update) => {
+        const node = get().nodes.find((n) => n.id === nodeId);
+        const variant = node?.variants.find((v) => v.id === variantId);
+        if (!variant) return false;
+        const current = variant.layers ?? [];
+        const next = update(current);
+        if (next === current) return false;
+        set((s) => ({
+          nodes: s.nodes.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  variants: n.variants.map((v) => (v.id === variantId ? { ...v, layers: next, updatedAt: Date.now() } : v)),
+                }
+              : n
+          ),
+        }));
+        return true;
       },
 
       ungroupLayers: (nodeId, variantId, groupId) =>
@@ -1840,6 +1882,35 @@ export const usePipelineStore = create<PipelineState>()(
             node.clusterId === clusterId ? { ...node, clusterCollapsed: collapsed } : node
           )),
         });
+      },
+
+      groupNodes: (ids, title) => {
+        const state = get();
+        const clusterId = uuidv4();
+        const nodes = groupIntoPlate(state.nodes, ids, {
+          clusterId,
+          title: title?.trim() || nextGroupTitle(state.nodes),
+          edges: state.edges,
+          compact: (list) => compactInLane(list),
+        });
+        if (nodes === state.nodes) return null;
+        set({ nodes, selectedId: null });
+        return clusterId;
+      },
+
+      ungroupCluster: (clusterId) => {
+        const nodes = ungroupPlate(get().nodes, clusterId);
+        if (nodes !== get().nodes) set({ nodes });
+      },
+
+      removeFromGroup: (ids) => {
+        const nodes = removeFromPlates(get().nodes, ids);
+        if (nodes !== get().nodes) set({ nodes });
+      },
+
+      renameCluster: (clusterId, title) => {
+        const nodes = renamePlate(get().nodes, clusterId, title);
+        if (nodes !== get().nodes) set({ nodes });
       },
 
       clearAll: () =>

@@ -22,19 +22,26 @@ This document is how the donor's work gets into the destination without breaking
 3. **"Done" means it ran.** A claim of completion quotes the real output of the gates below, from
    this session. Anything else is a failed round, no matter how good the code looks.
 
-## The ten agents
+## The seventeen agents
 
 | Agent | Verb it owns | Territory |
 | ----- | ------------ | --------- |
 | `conductor` | plan, route, close | the ledger, the backlog, the gates |
+| `advocate` | satisfy | the user's words → acceptance criteria; the close-out note with click paths |
 | `surveyor` | understand | both repositories; parity maps; never edits |
 | `porter` | merge, update | translating a donor feature into this app's idiom |
 | `interface-smith` | improve | home, canvas, the four panels, the top bar |
+| `ergonomist` | fit the hand | trackpad, mouse, keyboard, touch; gestures, shortcuts; every screen size and DPR |
+| `accessibilist` | include | WCAG 2.2 AA: keyboard, focus, names, contrast, reduced motion, zoom |
 | `graph-engineer` | solve | nodes, ports, edges, loops, execution |
 | `provider-broker` | connect | models, keys, cost, Nano Banana |
+| `guardian` | protect | the user's work and secrets; input, exposure, loss, reach |
 | `optimiser` | optimise | speed and memory, always measured |
+| `steward` | keep clean | diff review; the type-error ratchet; tests that fail without the fix |
 | `breaker` | break | adversarial testing before the user finds it |
 | `evidence` | test | running it, photographing it, comparing runs |
+| `scribe` | keep true | docs and in-app help match the code; built / declared / planned |
+| `shipwright` | ship | git, build, run commands, PM2/nginx, rollback — push only on a yes |
 | `surgeon` | delete | removals, one at a time, with approval |
 
 Definitions live in `.claude/agents/`. Invoke one by name; it reads this file first.
@@ -60,16 +67,23 @@ something else. Disagreement is recorded, then `conductor` decides and records w
 
 ## A round
 
-1. **Intake** — `conductor` picks the next backlog row and writes the dispatch.
+1. **Intake** — `conductor` picks the next backlog row and writes the dispatch; `advocate` writes
+   the acceptance criteria in the user's words.
 2. **Survey** — `surveyor` establishes the real state of both sides. No code changes.
 3. **Before-shot** — `evidence` photographs the surfaces the change will touch.
-4. **Build** — `porter`, `interface-smith`, `graph-engineer` or `provider-broker` does the work.
-5. **Break** — `breaker` runs the battery against it.
+4. **Build** — `porter`, `interface-smith`, `ergonomist`, `graph-engineer` or `provider-broker`
+   does the work; `guardian` threat-models it when it touches data, keys or the network.
+5. **Break** — `breaker` runs the battery against it; `accessibilist` runs its battery on any
+   visible or interactive change.
 6. **Measure** — `optimiser` where speed is claimed or at risk.
-7. **After-shot and compare** — `evidence` re-shoots and runs the comparison **in chronological
+7. **Review** — `steward` reviews the diff and quotes the type-error ratchet; `scribe` updates the
+   docs and in-app help the change made untrue.
+8. **After-shot and compare** — `evidence` re-shoots and runs the comparison **in chronological
    order**, reading the pictures as well as the numbers.
-8. **Close** — `conductor` runs the gates, quotes them, and moves the backlog row. If a gate is red,
-   the row does not move; the round stays open and says why.
+9. **Close** — `conductor` runs the gates, quotes them, and moves the backlog row; `advocate` walks
+   the acceptance criteria and writes the user's note; `shipwright` prepares the commit (and pushes
+   only on the user's yes). If a gate is red, the row does not move; the round stays open and says
+   why.
 
 ## The gates
 

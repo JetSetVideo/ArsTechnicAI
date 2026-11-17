@@ -383,6 +383,7 @@ export const WorkshopOverview: React.FC<WorkshopOverviewProps> = ({
         <div className={styles.mapFrame} style={{ width: layout.mapW, height: layout.mapH }}>
         <div
           className={styles.minimap}
+          data-canvas-overlay
           style={{ opacity: Math.max(0.15, Math.min(1, mapOpacity)) }}
           onPointerDown={panTo}
           title="Pipeline map — the rectangle is this window"

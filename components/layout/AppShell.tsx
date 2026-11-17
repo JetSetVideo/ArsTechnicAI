@@ -14,6 +14,7 @@ import { useProjectSync, saveProjectWorkspaceState, loadProjectWorkspaceState } 
 import { useSettingsSync } from '@/hooks/useSettingsSync';
 import { useDiskReconciliation } from '@/hooks/useDiskReconciliation';
 import { saveToDisk } from '@/hooks/useDiskSave';
+import { usePreventPageZoom } from '@/hooks/useCanvasGestures';
 import { PanelLeft, Music, Share2 } from 'lucide-react';
 import styles from './AppShell.module.css';
 import type { WorkspaceLayout } from '@/types';
@@ -38,6 +39,9 @@ export const AppShell: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
 
+  // A trackpad pinch never zooms the whole interface: over the canvas it zooms
+  // the canvas (WorkshopFlow); over panels and bars it does nothing.
+  usePreventPageZoom();
   // First-run onboarding (Design.md §22)
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0); // 0=hidden
   const pipelineNodeCount = usePipelineStore((s) => s.nodes.length);

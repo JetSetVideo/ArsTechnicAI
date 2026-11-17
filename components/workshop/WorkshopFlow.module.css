@@ -60,8 +60,8 @@
 
 .divider { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.08); margin: 0 0.25rem; }
 .spacer { flex: 1; }
-.counts { font-size: 0.7rem; color: var(--text-tertiary, #71718a); }
-.zoomLabel { font-size: 0.7rem; color: var(--text-tertiary, #71718a); min-width: 2.6rem; text-align: center; }
+.counts { font-size: 0.7rem; color: var(--text-secondary, #a1a1aa); }
+.zoomLabel { font-size: 0.7rem; color: var(--text-secondary, #a1a1aa); min-width: 2.6rem; text-align: center; }
 
 /* Add-node menu */
 .addMenuWrap { position: relative; }
@@ -150,10 +150,16 @@
   min-height: 0;
   overflow: hidden;
   cursor: crosshair;
+  /* Gestures belong to the canvas: no page pinch-zoom, no swipe-back
+     navigation, no scroll chaining into the page (hooks/useCanvasGestures). */
+  touch-action: none;
+  overscroll-behavior: none;
 }
+.canvas:focus { outline: none; }
+.canvas:focus-visible { outline: 2px solid var(--accent-primary, #8b5cf6); outline-offset: -2px; }
 .canvas.panning { cursor: grabbing; }
 .canvas.selecting { cursor: crosshair; }
-.canvas.connecting { cursor: crosshair; touch-action: none; }
+.canvas.connecting { cursor: crosshair; }
 
 .grid {
   position: absolute;
@@ -1984,3 +1990,100 @@
   transition: transform 0.15s;
 }
 .emptyCta:hover { transform: translateY(-2px); }
+
+/* ── Selection bar (components/workshop/SelectionBar.tsx) ─────────────────
+   Floats over the canvas next to the selection; screen-sized, never zoomed. */
+.selectionBar {
+  position: absolute;
+  z-index: 70;
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 24px);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-secondary, #16161c) 92%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.selectionLabel {
+  padding: 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selectionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.selectionBtn:hover { background: var(--bg-elevated, rgba(255, 255, 255, 0.06)); color: var(--text-primary); }
+.selectionBtn:focus-visible, .selectionSelect:focus-visible, .selectionRenameInput:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+.selectionDanger:hover { color: #ff6b6b; }
+.selectionSelect {
+  min-height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 0 6px;
+}
+.selectionRename { display: inline-flex; align-items: center; gap: 4px; }
+.selectionRenameInput {
+  width: 12rem;
+  min-height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--accent-primary);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  padding: 0 8px;
+}
+@media (pointer: coarse) {
+  .selectionBtn, .selectionSelect, .selectionRenameInput { min-height: 40px; min-width: 40px; }
+}
+@container (max-width: 560px) {
+  .selectionBtnText { display: none; }
+}
+@media (max-width: 760px) {
+  .selectionBtnText { display: none; }
+}
+
+/* Group headers: the chevron folds; a click on the header only selects. */
+.groupFoldBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  margin-left: auto;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.groupFoldBtn:hover { background: rgba(255, 255, 255, 0.08); }
+.groupFoldBtn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }

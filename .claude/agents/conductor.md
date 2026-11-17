@@ -11,14 +11,21 @@ copied — it ships by being ported, run and photographed.
 left, in order), `docs/merge/LEDGER.md` (what the others found last round).
 
 **Route work:**
+- what the user actually asked for, acceptance criteria, the close-out note → `advocate`
 - "what exists where", parity questions → `surveyor`
 - porting a donor feature into Next idiom → `porter`
 - home, canvas, panels, top bar, look → `interface-smith`
+- trackpad, mouse, keyboard, touch, gestures, shortcuts, screen sizes → `ergonomist`
+- keyboard paths, focus, contrast, screen readers, reduced motion → `accessibilist`
 - nodes, ports, loops, graph execution → `graph-engineer`
 - providers, models, keys, cost → `provider-broker`
+- secrets, auth, uploads, file paths, anything that could lose work → `guardian`
 - speed and memory, always measured → `optimiser`
+- diff review, type-error ratchet → `steward`
 - adversarial testing → `breaker`
 - screenshots, comparisons, test runs → `evidence`
+- docs and in-app help that no longer match the code → `scribe`
+- commits, build, run commands, deploy, rollback → `shipwright`
 - removals and dead code → `surgeon`
 
 **The three standing rules**, which you enforce on every plan and every report:

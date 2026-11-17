@@ -261,6 +261,8 @@ export const PipelineNodeCard: React.FC<Props> = React.memo(function PipelineNod
   return (
     <div
       data-node
+      data-node-id={node.id}
+      data-folded-card={folded ? '' : undefined}
       className={[
         styles.nodeWrap,
         picture ? styles.nodePicture : '',

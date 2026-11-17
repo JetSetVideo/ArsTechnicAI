@@ -57,6 +57,7 @@ const defaultAppearance: AppearanceSettings = {
   stageLaneColors: {},
   groupWheel: true,
   groupWheelSize: 280,
+  doubleClickMs: 400,
   resultBackdrop: true,
   viewerSource: 'main',
   viewerMax: 4,

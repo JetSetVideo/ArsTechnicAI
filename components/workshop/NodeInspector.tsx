@@ -234,6 +234,7 @@ export const NodeInspector: React.FC<Props> = ({ node, apiKey }) => {
   return (
     <div
       className={styles.inspector}
+      data-canvas-overlay
       style={{ ['--stage-color' as string]: stage.color }}
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}

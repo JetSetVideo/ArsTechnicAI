@@ -22,10 +22,49 @@ import { useSettingsStore, useLogStore, useTelemetryStore, useProjectsStore } fr
 import { RECOMMENDED_GENERATION_MODELS } from '@/stores/settingsStore';
 import { STAGES, STAGE_ORDER } from '@/lib/pipeline/catalog';
 import { formatShortcut, shortcutFromEvent } from '@/lib/shortcuts';
+import { clampDoubleClickMs, DOUBLE_CLICK_MS_MAX, DOUBLE_CLICK_MS_MIN, isDoubleClick, type ClickStamp } from '@/lib/canvas/gestures';
 import { useUserStore } from '@/stores/userStore';
 import { useAuthStore } from '@/stores/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
 import styles from './SettingsModal.module.css';
+
+/**
+ * Try the double-click speed with the same rule the canvas uses: two clicks
+ * within the window, on the same spot, count as one double-click.
+ */
+const DoubleClickTester: React.FC<{ windowMs: number }> = ({ windowMs }) => {
+  const last = React.useRef<ClickStamp | null>(null);
+  const [result, setResult] = useState<'idle' | 'double' | 'single'>('idle');
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        const stamp: ClickStamp = { key: 'tester', at: performance.now(), x: event.clientX, y: event.clientY };
+        if (isDoubleClick(last.current, stamp, windowMs)) {
+          last.current = null;
+          setResult('double');
+        } else {
+          last.current = stamp;
+          setResult('single');
+        }
+      }}
+      style={{
+        marginTop: 8,
+        width: '100%',
+        minHeight: 36,
+        borderRadius: 8,
+        border: '1px dashed var(--border-color)',
+        background: result === 'double' ? 'color-mix(in srgb, var(--accent-primary) 18%, transparent)' : 'transparent',
+        color: 'var(--text-primary)',
+        fontSize: '0.75rem',
+        cursor: 'pointer',
+      }}
+      aria-live="polite"
+    >
+      {result === 'double' ? 'Double-click recognised ✓' : result === 'single' ? 'Single click — click again faster to test' : 'Double-click here to test the speed'}
+    </button>
+  );
+};
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -675,22 +714,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                   </div>
 
                   <div style={{ margin: '20px 0 14px', borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
-                    <span style={{ ...labelStyle, fontWeight: 700 }}>Grouping</span>
+                    <span style={{ ...labelStyle, fontWeight: 700 }}>Canvas selection &amp; groups</span>
                     <p className={styles.description} style={{ marginTop: 4 }}>
-                      Drag a rectangle on the workshop canvas to select nodes. Releasing the mouse opens a wheel of every group. Middle-click or hold Space to pan.
+                      Drag a rectangle on empty canvas to select every node it touches. A bar then offers Group (⌘G),
+                      Center, and Delete; on a group it also offers Rename and Ungroup (⇧⌘G). Double-click a node or a
+                      group header to zoom onto it. Drop a wire from a port on empty canvas to open the node wheel.
+                      Middle-click or hold Space to pan.
                     </p>
                   </div>
 
-                  <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="checkbox" id="group-wheel" checked={appearance.groupWheel !== false}
-                      onChange={e => updateAppearance({ groupWheel: e.target.checked })} />
-                    <label htmlFor="group-wheel" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                      Show the group wheel after a selection
+                  <div style={{ marginBottom: 14 }}>
+                    <label htmlFor="double-click-ms" style={labelStyle}>
+                      Double-click speed: {clampDoubleClickMs(appearance.doubleClickMs)} ms
+                      {' '}({clampDoubleClickMs(appearance.doubleClickMs) <= 300 ? 'fast' : clampDoubleClickMs(appearance.doubleClickMs) >= 600 ? 'slow' : 'medium'})
                     </label>
+                    <input id="double-click-ms" type="range" min={DOUBLE_CLICK_MS_MIN} max={DOUBLE_CLICK_MS_MAX} step={25}
+                      value={clampDoubleClickMs(appearance.doubleClickMs)}
+                      aria-valuetext={`${clampDoubleClickMs(appearance.doubleClickMs)} milliseconds between the two clicks`}
+                      onChange={e => updateAppearance({ doubleClickMs: Number(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
+                    <DoubleClickTester windowMs={clampDoubleClickMs(appearance.doubleClickMs)} />
                   </div>
 
                   <div style={{ marginBottom: 14 }}>
-                    <span style={labelStyle}>Wheel size: {appearance.groupWheelSize ?? 280}px</span>
+                    <span style={labelStyle}>Node wheel size: {appearance.groupWheelSize ?? 280}px</span>
                     <input id="group-wheel-size" type="range" min={200} max={420} step={10} value={appearance.groupWheelSize ?? 280}
                       onChange={e => updateAppearance({ groupWheelSize: Number(e.target.value) })}
                       style={{ width: '100%', accentColor: 'var(--accent-primary)' }} />
@@ -1029,8 +1076,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, d
                       { keys: 'Ctrl+A', desc: 'Select all' },
                       { keys: 'Ctrl+D', desc: 'Deselect' },
                       { keys: 'Space', desc: 'Pan canvas (hold + drag)' },
-                      { keys: 'Mouse Wheel', desc: 'Zoom canvas' },
-                      { keys: 'Ctrl+0', desc: 'Reset zoom' },
+                      { keys: 'Two-finger scroll / Wheel', desc: 'Pan canvas (Shift = sideways)' },
+                      { keys: 'Pinch / ⌘ or Ctrl + Scroll', desc: 'Zoom canvas around the pointer' },
+                      { keys: 'Arrows (canvas focused)', desc: 'Pan canvas (Shift = bigger steps)' },
+                      { keys: '+ / − (canvas focused)', desc: 'Zoom canvas' },
+                      { keys: '0 (canvas focused)', desc: 'Fit the whole pipeline' },
                       { keys: 'Ctrl+,', desc: 'Open Settings' },
                       { keys: 'Esc', desc: 'Close modal / Cancel' },
                       { keys: '/', desc: 'Search modules' },

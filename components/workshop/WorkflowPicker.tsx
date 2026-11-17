@@ -168,7 +168,7 @@ export const WorkflowPicker: React.FC<WorkflowPickerProps> = ({
   };
 
   const body = (
-    <div className={styles.backdrop} onPointerDown={onClose}>
+    <div className={styles.backdrop} data-canvas-overlay onPointerDown={onClose}>
       <div
         className={styles.panel}
         role="dialog"

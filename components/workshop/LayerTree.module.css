@@ -1,0 +1,383 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   LayerTree — layers list. Tokens only (raw colours appear solely as var()
+   fallbacks). Sizes grow on coarse pointers; the header drops its labels
+   below 260 px through a container query, so the same component fits the
+   right panel and the narrow node deck.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.root {
+  --lt-indent: 14px;
+  --lt-row-h: 30px;
+  --lt-btn: 24px;
+  --lt-accent: var(--accent-primary, #00d4aa);
+  --lt-guide: var(--border-strong, #3f3f46);
+  --lt-danger-text: var(--error-text, #f87171); /* #ef4444 is under 4.5:1 on the menu surface */
+  position: relative;
+  container-type: inline-size;
+  container-name: layertree;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-primary, #fafafa);
+  font-size: 0.72rem;
+}
+
+@media (pointer: coarse) {
+  .root {
+    --lt-row-h: 40px;
+    --lt-btn: 28px;
+  }
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.addWrap { position: relative; }
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--lt-btn);
+  padding: 3px 10px 3px 8px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--lt-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--lt-accent) 14%, transparent);
+  color: var(--text-primary, #fafafa);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.addBtn:hover { background: color-mix(in srgb, var(--lt-accent) 24%, transparent); }
+
+.count {
+  font-size: 0.66rem;
+  color: var(--text-secondary, #a1a1aa);
+  white-space: nowrap;
+}
+
+.tools {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.toolBtn,
+.iconBtn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: var(--lt-btn);
+  min-height: var(--lt-btn);
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #a1a1aa);
+  cursor: pointer;
+}
+.toolBtn:hover:not(:disabled),
+.iconBtn:hover {
+  color: var(--text-primary, #fafafa);
+  background: color-mix(in srgb, var(--text-primary, #fafafa) 10%, transparent);
+}
+.toolBtn:disabled { opacity: 0.4; cursor: default; }
+.toolDanger:hover:not(:disabled) { color: var(--lt-danger-text); }
+
+.iconBtn[data-on] { color: var(--accent-tertiary, #f59e0b); }
+
+@container layertree (max-width: 259px) {
+  .addLabel,
+  .count { display: none; }
+  .addBtn { padding: 3px 6px; }
+}
+
+/* ── List ────────────────────────────────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Always leave a strip below the last row: dropping there means "bottom of the stack". */
+  padding-bottom: 18px;
+  min-height: 48px;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: var(--lt-row-h);
+  padding-right: 4px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  color: var(--text-primary, #fafafa);
+  cursor: default;
+  /* Dragging must never start a text selection or the iOS callout. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.row:hover { background: color-mix(in srgb, var(--text-primary, #fafafa) 5%, transparent); }
+.row[data-selected] {
+  background: color-mix(in srgb, var(--lt-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--lt-accent) 60%, transparent);
+}
+.row[data-hidden] .name {
+  color: var(--text-secondary, #a1a1aa);
+  font-style: italic;
+}
+.row[data-hidden] .kind { opacity: 0.55; }
+.row[data-dragging] { opacity: 0.45; }
+
+.grip {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  flex-shrink: 0;
+  width: 16px;
+  color: var(--text-secondary, #a1a1aa);
+  opacity: 0.5;
+  cursor: grab;
+  /* The only place a finger starts a drag: the browser must not scroll from here. */
+  touch-action: none;
+}
+.row:hover .grip,
+.row[data-selected] .grip { opacity: 1; }
+
+@media (pointer: coarse) {
+  .grip { width: 28px; opacity: 1; }
+}
+
+.indent {
+  align-self: stretch;
+  flex-shrink: 0;
+  width: calc(var(--depth, 0) * var(--lt-indent));
+  /* One faint guide line per nesting level. */
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0 6px,
+    var(--lt-guide) 6px 7px,
+    transparent 7px var(--lt-indent)
+  );
+}
+
+.chevronSpacer {
+  flex-shrink: 0;
+  width: var(--lt-btn);
+}
+
+.kind {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text-primary, #fafafa) 7%, transparent);
+  color: var(--text-secondary, #a1a1aa);
+}
+.kind[data-mask='include'] { color: var(--lt-accent); }
+.kind[data-mask='exclude'] { color: var(--lt-danger-text); }
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.renameInput {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--lt-accent);
+  border-radius: 5px;
+  background: var(--bg-primary, #0a0a0b);
+  color: var(--text-primary, #fafafa);
+  font: inherit;
+  font-weight: 600;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ── Drag feedback ───────────────────────────────────────── */
+
+.root[data-dragging],
+.root[data-dragging] * { cursor: grabbing !important; }
+.root[data-dragging] .row[data-drop-invalid] { cursor: not-allowed !important; }
+
+.row[data-drop='before']::after,
+.row[data-drop='after']::after {
+  content: '';
+  position: absolute;
+  left: calc(22px + var(--drop-depth, 0) * var(--lt-indent));
+  right: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--lt-accent);
+  pointer-events: none;
+}
+.row[data-drop='before']::after { top: -2px; }
+.row[data-drop='after']::after { bottom: -3px; }
+
+.row[data-drop='into'] {
+  background: color-mix(in srgb, var(--lt-accent) 22%, transparent);
+  box-shadow: inset 0 0 0 2px var(--lt-accent);
+}
+.row[data-drop-invalid] { box-shadow: inset 0 0 0 1px var(--error, #ef4444); }
+
+.ghost {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 220px;
+  padding: 5px 9px;
+  border: 1px solid var(--lt-accent);
+  border-radius: 7px;
+  background: var(--bg-elevated, #222228);
+  color: var(--text-primary, #fafafa);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.92;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--bg-primary, #0a0a0b) 70%, transparent);
+}
+.ghost[data-invalid] { border-color: var(--error, #ef4444); }
+.ghostLabel { overflow: hidden; text-overflow: ellipsis; }
+.ghostNote { font-size: 0.62rem; color: var(--lt-danger-text); }
+
+/* ── Menus ───────────────────────────────────────────────── */
+
+.menu {
+  position: absolute;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: min(260px, calc(100vw - 16px));
+  padding: 4px;
+  border: 1px solid var(--border-strong, #3f3f46);
+  border-radius: 9px;
+  background: var(--bg-elevated, #222228);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--bg-primary, #0a0a0b) 75%, transparent);
+}
+.addWrap > .menu {
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, #fafafa);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible { background: color-mix(in srgb, var(--lt-accent) 16%, transparent); }
+.menuItem:disabled { opacity: 0.45; cursor: default; }
+.menuDanger { color: var(--lt-danger-text); }
+
+@media (pointer: coarse) {
+  .menuItem { min-height: 40px; }
+}
+
+.menuIcon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  flex-shrink: 0;
+  color: var(--text-secondary, #a1a1aa);
+}
+.menuDanger .menuIcon { color: inherit; }
+.menuLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menuHint {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 0.62rem;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 8px;
+  border: 1px dashed var(--border-strong, #3f3f46);
+  border-radius: 8px;
+}
+.empty p {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+/* ── Focus, motion, assistive text ───────────────────────── */
+
+.addBtn:focus-visible,
+.toolBtn:focus-visible,
+.iconBtn:focus-visible,
+.menuItem:focus-visible {
+  outline: 2px solid var(--lt-accent);
+  outline-offset: 1px;
+}
+.row:focus { outline: none; }
+.row:focus-visible {
+  outline: 2px solid var(--lt-accent);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .row,
+  .addBtn,
+  .toolBtn,
+  .iconBtn,
+  .menuItem {
+    transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

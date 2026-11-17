@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Eye, EyeOff, Lock, Unlock, Trash2, Copy, ChevronUp, ChevronDown, ChevronRight,
-  Square, Circle, Type as TypeIcon, Image as ImageIcon, Scan, Ban,
+  Copy, Square, Circle, Type as TypeIcon, Image as ImageIcon, Scan, Ban,
   SlidersHorizontal, MoveUpRight, Layers as LayersIcon, Download,
-  Crop, Loader2, Film, Pencil, FolderPlus, Folder,
+  Crop, Loader2, Film, Pencil, Folder,
 } from 'lucide-react';
 import type { AssetLayer, LayerKind, NodeVariant, PipelineNode, ShapeKind } from '@/types/pipeline';
-import { BLEND_MODES, FILTER_PRESETS, layerShown } from '@/lib/pipeline/layers';
+import { BLEND_MODES, FILTER_PRESETS, createLayer, layerShown } from '@/lib/pipeline/layers';
+import { duplicateLayers, groupLayers, moveLayers, removeLayers, ungroup } from '@/lib/pipeline/layerTree';
+import { LayerTree } from './LayerTree';
 import { ASPECT_RATIOS } from '@/lib/pipeline/catalog';
 import { usePipelineStore } from '@/stores/pipelineStore';
 import styles from './WorkshopFlow.module.css';
@@ -188,177 +189,97 @@ export const LayersPanelBody: React.FC<{
   /** The full editor draws on its own canvas, so the list stays groups and layers. */
   hidePaint?: boolean;
 }> = ({ node, variant, selectedLayerId, onSelectLayer, compact, hidePaint }) => {
-  const { addLayer, updateLayer, removeLayer, duplicateLayer, reorderLayer, flattenVariant, groupLayers, ungroupLayers } = usePipelineStore();
+  const { addLayer, updateLayer, flattenVariant, setVariantLayers } = usePipelineStore();
   const layers = variant.layers ?? [];
   const selected = layers.find((l) => l.id === selectedLayerId) ?? null;
   const fileRef = React.useRef<HTMLInputElement>(null);
-  const [picked, setPicked] = useState<string[]>([]);
-
-  const togglePicked = (id: string) => {
-    setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  };
-
-  const addBtn = (kind: LayerKind, label: string, icon: React.ReactNode, partial?: Partial<AssetLayer>) => (
-    <button
-      key={label}
-      className={styles.layerAddBtn}
-      title={`Add ${label} layer`}
-      onClick={() => {
-        if (kind === 'image') { fileRef.current?.click(); return; }
-        const layer = addLayer(node.id, variant.id, kind, partial);
-        onSelectLayer(layer.id);
-      }}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-
-  const renderLayerRows = (parentId: string | undefined, depth: number): React.ReactNode => {
-    const rows = layers.filter((layer) => (layer.parentId || undefined) === parentId).reverse();
-    return rows.map((l) => {
-      const collapsed = l.kind === 'group' && l.collapsed;
-      return (
-        <React.Fragment key={l.id}>
-          <div
-            className={`${styles.layerRow} ${l.id === selectedLayerId || picked.includes(l.id) ? styles.layerRowActive : ''}`}
-            style={{ marginLeft: depth * 12 }}
-            onClick={() => onSelectLayer(l.id)}
-          >
-            {l.kind === 'group' ? (
-              <button
-                type="button"
-                className={styles.layerIconBtn}
-                aria-label={collapsed ? 'Expand group' : 'Collapse group'}
-                onClick={(e) => { e.stopPropagation(); updateLayer(node.id, variant.id, l.id, { collapsed: !l.collapsed }); }}
-              >
-                {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={`${styles.layerPick} ${picked.includes(l.id) ? styles.layerPickOn : ''}`}
-                aria-pressed={picked.includes(l.id)}
-                aria-label={`Include ${l.name} in a group`}
-                onClick={(e) => { e.stopPropagation(); togglePicked(l.id); }}
-              />
-            )}
-            <span className={styles.layerKindIcon} data-mask={l.kind === 'mask' ? l.maskMode : undefined}>
-              {layerKindIcon(l)}
-            </span>
-            <input
-              className={styles.layerName}
-              value={l.name}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => updateLayer(node.id, variant.id, l.id, { name: e.target.value })}
-            />
-            {l.kind === 'mask' && (
-              <span className={`${styles.maskBadge} ${l.maskMode === 'exclude' ? styles.maskBadgeExclude : ''}`}>
-                {l.maskMode === 'exclude' ? 'protect' : 'edit'}
-              </span>
-            )}
-            <button className={styles.layerIconBtn} title={l.visible ? 'Hide' : 'Show'}
-              onClick={(e) => { e.stopPropagation(); updateLayer(node.id, variant.id, l.id, { visible: !l.visible }); }}>
-              {l.visible ? <Eye size={12} /> : <EyeOff size={12} />}
-            </button>
-            <button className={styles.layerIconBtn} title={l.locked ? 'Unlock' : 'Lock'}
-              onClick={(e) => { e.stopPropagation(); updateLayer(node.id, variant.id, l.id, { locked: !l.locked }); }}>
-              {l.locked ? <Lock size={12} /> : <Unlock size={12} />}
-            </button>
-            {!compact && (
-              <>
-                <button className={styles.layerIconBtn} title="Move up"
-                  onClick={(e) => { e.stopPropagation(); reorderLayer(node.id, variant.id, l.id, 1); }}>
-                  <ChevronUp size={12} />
-                </button>
-                <button className={styles.layerIconBtn} title="Move down"
-                  onClick={(e) => { e.stopPropagation(); reorderLayer(node.id, variant.id, l.id, -1); }}>
-                  <ChevronDown size={12} />
-                </button>
-                <button className={styles.layerIconBtn} title="Duplicate"
-                  onClick={(e) => { e.stopPropagation(); duplicateLayer(node.id, variant.id, l.id); }}>
-                  <Copy size={12} />
-                </button>
-              </>
-            )}
-            <button className={styles.layerIconBtn} title="Delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeLayer(node.id, variant.id, l.id);
-                setPicked((current) => current.filter((id) => id !== l.id));
-                if (selectedLayerId === l.id) onSelectLayer(null);
-              }}>
-              <Trash2 size={12} />
-            </button>
-          </div>
-          {l.kind === 'group' && !collapsed && renderLayerRows(l.id, depth + 1)}
-        </React.Fragment>
-      );
+  // Multi-selection for the list; the primary layer drives the settings pane.
+  const [selectedIds, setSelectedIds] = useState<string[]>(selectedLayerId ? [selectedLayerId] : []);
+  useEffect(() => {
+    // Keep the list selection in step when the primary changes elsewhere
+    // (canvas click, editor) and drop ids of layers that no longer exist.
+    setSelectedIds((current) => {
+      const alive = current.filter((id) => layers.some((layer) => layer.id === id));
+      if (selectedLayerId && !alive.includes(selectedLayerId)) return [selectedLayerId];
+      if (!selectedLayerId && alive.length > 0 && current.length === alive.length) return alive;
+      return alive.length === current.length ? current : alive;
     });
+  }, [selectedLayerId, layers]);
+
+  const selectIds = (ids: string[], primary: string | null) => {
+    setSelectedIds(ids);
+    onSelectLayer(primary ?? ids[0] ?? null);
   };
+  const edit = (update: (current: AssetLayer[]) => AssetLayer[]) => setVariantLayers(node.id, variant.id, update);
 
   return (
     <div className={styles.layersBody}>
-      {/* Add-layer bar */}
-      <div className={styles.layerAddBar}>
-        {addBtn('shape', 'Shape', <Square size={12} />)}
-        {addBtn('text', 'Text', <TypeIcon size={12} />)}
-        {addBtn('draw', 'Draw', <Pencil size={12} />)}
-        {addBtn('image', 'Image', <ImageIcon size={12} />)}
-        {addBtn('mask', 'Include', <Scan size={12} />, { maskMode: 'include' })}
-        {addBtn('mask', 'Exclude', <Ban size={12} />, { maskMode: 'exclude' })}
-        {addBtn('adjustment', 'Filter', <SlidersHorizontal size={12} />)}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-              const layer = addLayer(node.id, variant.id, 'image', { image: reader.result as string, name: file.name });
-              onSelectLayer(layer.id);
-            };
-            reader.readAsDataURL(file);
-            e.target.value = '';
-          }}
-        />
-      </div>
-      <button
-        type="button"
-        className={styles.layerAddBtn}
-        disabled={picked.length < 2}
-        title="Put the checked layers into one group"
-        onClick={() => {
-          const group = groupLayers(node.id, variant.id, picked);
-          if (!group) return;
-          setPicked([group.id]);
-          onSelectLayer(group.id);
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const layer = addLayer(node.id, variant.id, 'image', { image: reader.result as string, name: file.name });
+            selectIds([layer.id], layer.id);
+          };
+          reader.readAsDataURL(file);
+          e.target.value = '';
         }}
-      >
-        <FolderPlus size={12} />
-        <span>Group{picked.length > 1 ? ` ${picked.length}` : ''}</span>
-      </button>
+      />
 
       {selected?.kind === 'draw' && !hidePaint && (
         <PaintStage nodeId={node.id} variant={variant} layer={selected} />
       )}
 
-      {/* Layer rows — topmost layer first, groups holding their children */}
-      <div className={styles.layerList}>
-        {layers.length === 0 && (
-          <div className={styles.layerEmptyHint}>
-            Draw or write on the picture, then group the marks. The next generator
-            receives the picture with those layers on it, and the notes as instructions.
-          </div>
-        )}
-        {renderLayerRows(undefined, 0)}
-      </div>
+      <LayerTree
+        layers={layers}
+        selectedIds={selectedIds}
+        compact={compact}
+        onSelect={selectIds}
+        onMove={(ids, target) => { edit((current) => moveLayers(current, ids, target)); }}
+        onRename={(id, name) => updateLayer(node.id, variant.id, id, { name })}
+        onPatch={(id, patch) => updateLayer(node.id, variant.id, id, patch)}
+        onDuplicate={(ids) => {
+          let created: string[] = [];
+          edit((current) => {
+            const result = duplicateLayers(current, ids, () => createLayer('group').id, Date.now());
+            created = result.newIds;
+            return result.layers;
+          });
+          if (created.length > 0) selectIds(created, created[0]);
+        }}
+        onDelete={(ids) => {
+          if (edit((current) => removeLayers(current, ids))) selectIds([], null);
+        }}
+        onGroup={(ids) => {
+          const group = createLayer('group');
+          if (edit((current) => groupLayers(current, ids, group))) selectIds([group.id], group.id);
+        }}
+        onUngroup={(groupId) => {
+          const children = layers.filter((layer) => layer.parentId === groupId).map((layer) => layer.id);
+          if (edit((current) => ungroup(current, groupId))) selectIds(children, children[0] ?? null);
+        }}
+        onAdd={(kind, partial) => {
+          if (kind === 'image') { fileRef.current?.click(); return; }
+          const layer = addLayer(node.id, variant.id, kind, partial);
+          // A new layer lands just above the selected one, in the same group.
+          const anchor = selected && selected.id !== layer.id ? selected : null;
+          if (anchor) {
+            const siblings = layers.filter((item) => (item.parentId || undefined) === (anchor.parentId || undefined));
+            const displayIndex = siblings.length - 1 - siblings.findIndex((item) => item.id === anchor.id);
+            edit((current) => moveLayers(current, [layer.id], { parentId: anchor.parentId || undefined, index: displayIndex }));
+          }
+          selectIds([layer.id], layer.id);
+        }}
+      />
 
       <p className={styles.layerSendNote}>
-        Checked layers can be grouped. Visible drawings, text, and shapes are baked
+        Drag rows to reorder or to move them into a group. Visible drawings, text, and shapes are baked
         into the picture the next generator receives, and the written notes go with the prompt.
       </p>
 
@@ -366,18 +287,6 @@ export const LayersPanelBody: React.FC<{
       {selected && !compact && (
         <div className={styles.layerDetail}>
           <div className={styles.sectionTitle}>Layer settings</div>
-          {selected.kind === 'group' && (
-            <button
-              type="button"
-              className={styles.layerAddBtn}
-              onClick={() => {
-                ungroupLayers(node.id, variant.id, selected.id);
-                onSelectLayer(null);
-              }}
-            >
-              <Folder size={12} /> Ungroup
-            </button>
-          )}
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Opacity</label>
             <div className={styles.sliderRow}>

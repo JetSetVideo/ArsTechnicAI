@@ -596,3 +596,133 @@ Append-only. Newest round at the bottom. Format and rules: `PROGRAM.md`.
 - **Who**  the next round, after this server is stopped: `next build`, then move U7.
 - **How**  the browser session above; no `next build` in this round.
 - **Result**  open. Dev server left on `http://127.0.0.1:3010`.
+
+## Round 6 — the canvas belongs to the fingers (2026-10-28)
+
+The user's words: *"when I zoom with the trackpad changing distance between 2 fingers on the canvas
+in the workshop, the whole interface is zoomed while only the elements on the canvas should be
+zoomed (not the panels on the side). It must be the same for all screen sizes."* Also: create
+agents for every aspect of efficient, safe, ergonomic, clean, agreeable development and client
+satisfaction.
+
+### R6.0 conductor — seven agents join
+- **What**  `advocate`, `ergonomist`, `accessibilist`, `guardian`, `steward`, `scribe`,
+  `shipwright` added to `.claude/agents/`; `PROGRAM.md` table and round order, and the
+  `conductor` routing list, updated (17 agents).
+- **Why**  no agent owned input ergonomics, accessibility, security and data safety, diff review,
+  documentation truth, release, or the user's satisfaction.
+- **When**  round 6; applies from now.
+- **Where**  `.claude/agents/*.md`, `docs/merge/PROGRAM.md`.
+- **Who**  every round from 7 runs intake through `advocate` and review through `steward`.
+- **How**  read `PROGRAM.md`, then the agent file.
+- **Result**  files written; no agent has run a round yet.
+
+### R6.1 ergonomist — pinch zoomed the whole interface (U9)
+- **What**  A trackpad pinch on the canvas zoomed the canvas *and* the page; on the side panels and
+  top bar it zoomed the page. Trackpad zoom was also over-sensitive.
+- **Why**  `WorkshopFlow` used React `onWheel`, which React registers as **passive**: it cannot call
+  `preventDefault()`, and did not try. Chrome delivers a pinch as `ctrl+wheel`; Safari as
+  `gesturestart/change/end`; neither was stopped. A fixed ×1.1 per event turned trackpad deltas of
+  −2 into the same step as a mouse notch. Evidence (Chrome, CDP, before the change):
+  6 × ctrl+wheel −40 → canvas 85 %→151 %; `synthesizePinchGesture` ×1.6 on canvas →
+  `visualViewport.scale` **1 → 1.6**; on the left panel → **2.56**; every wheel event
+  `defaultPrevented: false`.
+- **When**  round 6. Unblocks every canvas interaction on a laptop.
+- **Where**  new `lib/canvas/gestures.ts` (pure math), `hooks/useCanvasGestures.ts` (native
+  non-passive listeners: ctrl/⌘+wheel zoom, two-finger pan, Shift+wheel sideways, Safari
+  `gesture*`, touch two-finger pinch, rAF-coalesced; `usePreventPageZoom`), `WorkshopFlow.tsx`
+  (hook wired, toolbar zoom now keeps the centre fixed and is labelled), `AppShell.tsx` (page-zoom
+  guard for the editor), `WorkshopFlow.module.css` (`touch-action: none; overscroll-behavior: none`
+  on the canvas — also stops macOS swipe-back), `data-canvas-overlay` on NodeInspector,
+  LayerEditorModal, WorkflowPicker, SceneStrip, minimap; Settings → Shortcuts wording.
+- **Who**  `breaker` and `accessibilist` next; the user for one real Safari pinch.
+- **How**  `NODE_ENV=test deno run -A node_modules/vitest/vitest.mjs run tests/lib/canvasGestures.test.ts`;
+  browser probes as below.
+- **Result**  `Tests 19 passed (19)`. After the change, same probes: page scale stays **1** for
+  pinch on canvas, left panel, top bar and scene strip; ×0.5 pinch 250 %→125 % exactly, anchored
+  (translate −809.6→−150.8 px = formula); emulated Safari `gesturechange` scale 1.5: 125 %→187.5 %,
+  all gesture events `defaultPrevented: true`; two-finger scroll and Shift+wheel pan; scroll over
+  the scene strip left to the strip (`defaultPrevented: false`). Type gate: **516 errors before,
+  516 after**, none in the new or touched lines (B4 baseline).
+
+### R6.2 ergonomist — the same pinch must zoom the same on every screen
+- **What**  Chromium divides the pinch's ctrl+wheel delta by `devicePixelRatio`.
+- **Why**  measured with one ×1.4 `synthesizePinchGesture`: ΣdeltaY **−33.65 at DPR 1, −16.82 at
+  DPR 2, −11.22 at DPR 3**, so a Retina MacBook zoomed half as much as a 1080p monitor
+  (ratio 1.183 vs 1.4).
+- **Where**  `zoomDeltaScale()` in `lib/canvas/gestures.ts` (Chromium only — `HeadlessChrome`
+  included after the first regex missed it; Safari uses `GestureEvent.scale`, Firefox does not
+  divide).
+- **Who**  the user: one pinch in Safari and one in Chrome on the laptop, then on an external
+  monitor.
+- **How**  `Emulation.setDeviceMetricsOverride` per size, ×1.4 pinch at 30 %/40 % of the canvas.
+- **Result**  ratio **1.400** at 1280×800@2, 1440×900@2, 1512×982@2, 1920×1080@1, 2560×1440@1,
+  1024×768@2, 820×1180@3; page scale 1 everywhere; anchor drift ≤ 0.32 px. Firefox and real Safari
+  not run here — **open**.
+
+### R6.3 breaker — new empty project ids on each load (U10)
+- **What**  Three loads of `/home` in the headless profile produced three project ids
+  (`1c277061…`, `18525350…`, `c0204fdd…`), each with an empty draft in `.ars-data/`
+  (0 nodes). The user's real project `dca0fe77…` (22 nodes, 30 edges, saved 11:27 by the user's
+  own tab) and the older drafts are untouched.
+- **Why**  unknown; a direct `/project/<id>` load also bounces to `/home`.
+- **Who**  `breaker` to reproduce in a normal browser profile; `guardian` if it can orphan work.
+  The three empty drafts stay until the user says otherwise (`surgeon` rule).
+- **Result**  open.
+
+### R6.4 conductor — what is not yet run
+- **What**  build gate (`next build`) not run: the user's dev server on :3002 is serving this
+  checkout. Port 3010 not used this round — the work ran against :3002 because the user asked to
+  run the app there first.
+- **Result**  U9 stays **in round 6** until a real Safari pinch, the build gate, and `breaker`.
+
+### R6.5 steward · breaker · accessibilist — first review wave of the new agents
+- **What**  Three read-only reviews of the U9 diff: steward 18 findings, breaker 11 from code + 6
+  needing a device, accessibilist 7 + passes. Findings files:
+  `~/.hermes/cache/scratch/ars-r6/{steward,breaker,accessibilist}.md`.
+- **Why**  consensus is not evidence; the reviewers' job was to contradict R6.1–R6.2. Each finding
+  was re-checked against the code or the browser before acting.
+- **Where / fixed this round** (`lib/canvas/gestures.ts`, `hooks/useCanvasGestures.ts`,
+  `WorkshopFlow.tsx`, `WorkshopFlow.module.css`, `AppShell.tsx`, `ThreeDViewer.tsx`,
+  `SettingsModal.tsx`):
+  - Fit clamped to 0.15 while pinch/buttons floored at 0.2, so the first zoom-out after Fit zoomed
+    in → one floor `CANVAS_ZOOM_MIN = 0.15`, `FIT_ZOOM_MAX` shared (confirmed in code).
+  - rAF frame could undo a Fit/minimap/button write → frame dropped if the store changed since it
+    was built.
+  - iPad: gesture* and touch pinch could both drive one pinch → one owner; stale touch ids cleared on
+    a new primary touch; a Safari gesture with no event for 300 ms (or window blur) expires.
+  - A page already pinch-zoomed (dashboard, Smart Zoom) could not be un-zoomed in the editor → the
+    browser keeps zoom-out while `visualViewport.scale > 1`.
+  - DPR boost now only for the pinch signature (ctrl without ⌘). Measured: Chrome divides *every*
+    wheel delta by DPR under emulation (⌘/ctrl/plain −40 → −20 at DPR 2), so real-device ⌘+scroll
+    speed is **unverified** — ask the user.
+  - Open node deck counted as a panel (pinch dead over it) → the deck is canvas content again.
+  - Space-to-pan swallowed Space on every focused button and stuck after ⌘Tab → Space keeps its
+    meaning on controls unless the pointer is over the canvas; reset on blur.
+  - No keyboard pan/zoom (WCAG 2.1.1) → canvas focusable, labelled; arrows pan (Shift ×4),
+    + / − zoom, 0 fits; `:focus-visible` ring; Settings list updated; bogus "Ctrl+0 Reset zoom"
+    row removed (no handler existed; Ctrl+0 is the browser's).
+  - Zoom % and counts at ~3.9:1 (`--text-tertiary` undefined) → `--text-secondary`.
+  - Fit toggle named only by `title` → `aria-label`.
+  - Dashboard 3D viewer: pinch zoomed page *and* camera → non-passive, `preventDefault`.
+  - Firefox ⌘+wheel page zoom over panels; sideways swipe-Back over panels → guard covers ⌘,
+    `overscroll-behavior-x: none` on `<html>` while the editor is mounted.
+  - Space/middle-drag pan read the render closure → reads the store; `onPointerCancel` resets
+    marquee/pan; touches on panels no longer start a marquee.
+  - Tests: one tautology replaced; `wheelIntent` (the routing decision) and `isPinchWheel` now tested.
+- **Who**  deferred rows U11–U14 below; the user for the device checks.
+- **How**  `NODE_ENV=test deno run -A node_modules/vitest/vitest.mjs run`; tsc as in R6.1; browser
+  probes as in R6.1–R6.2 plus keyboard and middle-drag.
+- **Result**  `Test Files 29 passed (29) · Tests 448 passed (448)` (gesture file 26). Type gate
+  **516 → 516**. Browser: page scale 1 for pinch on canvas and explorer; ×1.4 pinch 0.85→1.19;
+  → pans 60 px, + / − zoom ×1.2 around the centre; Space on a focused button not prevented;
+  middle-drag +100,+50 → translate +100,+50 exactly. Fit not exercised (test project empty).
+
+## Round 7 — selection, groups, focus and layers (2026-10-28)
+
+- **R7.1 Marquee hit-test.** The release used fixed NODE_W×NODE_H boxes against model positions, which do not match drawn cards (decks, free/plated nodes, folded stacks). It now tests what is drawn (`[data-node][data-node-id]` boxes, folded lanes/plates as one block) and previews live during the drag. Note: ports also carry `data-node-id`, so the selector must include `[data-node]`. Verified: a box over one card picks one; over two picks two.
+- **R7.2 No wheel after a selection.** The stage wheel opens only when a wire is dropped on empty canvas. A floating `SelectionBar` replaces it: Group (⌘G), Move to lane…, Remove from group, Rename, Ungroup (⇧⌘G), Delete, Clear. Groups are plates (`lib/pipeline/nodeGroups.ts`), so fold/resize/undo come for free; undo labels "Grouped N nodes as …", "Ungrouped …", "Renamed group …". A new plate that lands off-screen is brought into view.
+- **R7.3 Headers select, chevrons fold.** A click on a lane or plate header now selects it (bar appears); folding moved to a real chevron button with aria-expanded.
+- **R7.4 Focus.** Double-click (window from Settings → Appearance → Double-click speed, 150–900 ms, default 400, with a tester) on a node or group header fits it (eased, reduced-motion respected). Toolbar "Center on selection" centres without zooming. Verified: fit 0.85→1.95 card centred to the pixel; center keeps zoom, offset [0,0]; two clicks 550 ms apart do not zoom at 400.
+- **R7.5 Layers panel.** New `LayerTree` (controlled, pointer-event drag; touch drags from the grip) + pure `lib/pipeline/layerTree.ts` (move/duplicate/remove/group/ungroup with nesting, 25 tests). Store gained `setVariantLayers` (no write on same reference). Verified in browser: add menu (8 kinds), ⌘-click multi-select, Group, double-click rename, drag into group / out of group / refused onto own child ("Can't drop here"), ⌘D, ⌥↑↓, F2, ⇧↑↓ range, ⌘G/⇧⌘G (layer groups, not canvas), ⌫ (layers only, node stays), ⌘Z; narrow 240 px icons-only, coarse pointer rows 40 px.
+- Gates: vitest 491/491, tsc 516 (= baseline). Not verified: real Safari trackpad, iPad touch drag, LayerEditorModal (shares the panel body).

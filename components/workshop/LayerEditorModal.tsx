@@ -185,7 +185,7 @@ export const LayerEditorModal: React.FC = () => {
   };
 
   return (
-    <div className={styles.editorOverlay} onPointerDown={(e) => e.stopPropagation()}>
+    <div className={styles.editorOverlay} data-canvas-overlay onPointerDown={(e) => e.stopPropagation()}>
       <div className={styles.editorModal}>
         <div className={styles.editorHeader}>
           <div className={styles.editorTitleRow}>

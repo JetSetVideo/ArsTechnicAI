@@ -368,10 +368,12 @@ export interface AppearanceSettings {
   /** Per-stage Workshop lane color overrides, keyed by PipelineStageId. */
   stageLaneColors?: Record<string, string>;
 
-  /** After a selection rectangle, offer every group on a wheel. */
+  /** Legacy: the wheel no longer opens after a selection rectangle (unused). */
   groupWheel: boolean;
-  /** Wheel diameter in pixels. */
+  /** Diameter of the wheel opened by dropping a wire on empty canvas, in pixels. */
   groupWheelSize: number;
+  /** Two clicks on the same node or group within this many ms are a double-click. */
+  doubleClickMs?: number;
 
   /** Node-viewer bank drawn behind the workshop graph. */
   resultBackdrop: boolean;

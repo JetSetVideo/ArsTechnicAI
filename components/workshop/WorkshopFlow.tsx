@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, ChevronDown, Play, Square, Loader2, ZoomIn, ZoomOut, Maximize,
-  Trash2, ChevronRight, Scan, Undo2, FolderClock,
+  Trash2, ChevronRight, Scan, Undo2, FolderClock, LocateFixed,
 } from 'lucide-react';
 import { usePipelineStore, nodePosition, LANE_WIDTH, LANE_PAD_X, NODE_H, NODE_GAP, NODE_W, laneX } from '@/stores/pipelineStore';
 import { rectsOverlap } from '@/lib/pipeline/lanes';
@@ -14,7 +14,7 @@ import { cyclePointForStage, wiringFor } from './groupCycles';
 import { settleNode } from './settleNode';
 import { PIPELINE_NODE_DEFS, STAGES, STAGE_ORDER, linkCandidates, nodesForStage, type LinkCandidate } from '@/lib/pipeline/catalog';
 import { ingestImage } from '@/lib/pipeline/ingest';
-import type { PipelineStageId } from '@/types/pipeline';
+import type { PipelineStageId, PipelineViewport } from '@/types/pipeline';
 import { useSettingsStore, useLogStore } from '@/stores';
 import { useUserStore } from '@/stores/userStore';
 import { PipelineNodeCard, nodeIcon, type WireDrop } from './PipelineNodeCard';
@@ -29,7 +29,22 @@ import { useBlueprintStore } from '@/stores/blueprintStore';
 import { PENDING_BLUEPRINT_KEY, specToBlueprint, workflowIcon, type BlueprintSpec } from '@/lib/pipeline/blueprintBridge';
 import { inputPortPos, outputPortPos, edgePath, PORT_COLORS } from './geometry';
 import { formatShortcut, matchShortcut } from '@/lib/shortcuts';
+import {
+  BUTTON_ZOOM_STEP, CANVAS_ZOOM_MIN, DOUBLE_CLICK_SLOP_PX, FIT_ZOOM_MAX, KEY_PAN_STEP,
+  centerOnRect, clampDoubleClickMs, fitRect, interpolateViewport, isDoubleClick, panByScroll, unionRects, zoomAround,
+  type ClickStamp, type SceneRect,
+} from '@/lib/canvas/gestures';
+import { sharedPlate } from '@/lib/pipeline/nodeGroups';
+import { SelectionBar } from './SelectionBar';
+import { useCanvasGestures } from '@/hooks/useCanvasGestures';
 import styles from './WorkshopFlow.module.css';
+
+/** In-canvas panels: they scroll themselves and never zoom with the canvas.
+ *  (A node's deck is canvas content: it zooms with its node.) */
+const CANVAS_OVERLAYS = '[data-canvas-overlay]';
+
+/** Space on these keeps its own meaning (press a button, tick a box). */
+const SPACE_OWNERS = 'button, a[href], select, summary, input, textarea, [contenteditable="true"], [role="button"], [role="checkbox"], [role="switch"], [role="menuitem"], [role="tab"]';
 
 function linkWheelSlices(
   choices: LinkCandidate[],
@@ -185,7 +200,8 @@ export const WorkshopFlow: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const spaceRef = useRef(false);
-  const marqueeRef = useRef<{ x0: number; y0: number; x1: number; y1: number; clientX: number; clientY: number; additive: boolean } | null>(null);
+  const overCanvasRef = useRef(false);
+  const marqueeRef = useRef<{ x0: number; y0: number; x1: number; y1: number; clientX: number; clientY: number; additive: boolean; base: string[] } | null>(null);
   const pickedRef = useRef<string[]>([]);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showWorkflowPicker, setShowWorkflowPicker] = useState(false);
@@ -209,7 +225,6 @@ export const WorkshopFlow: React.FC = () => {
   pickedRef.current = picked;
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
   const [selectedLane, setSelectedLane] = useState<PipelineStageId | null>(null);
-  const [wheel, setWheel] = useState<{ clientX: number; clientY: number; ids: string[] } | null>(null);
   const [linkWheel, setLinkWheel] = useState<(WireDrop & { choices: LinkCandidate[] }) | null>(null);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
@@ -218,17 +233,24 @@ export const WorkshopFlow: React.FC = () => {
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       if (event.code !== 'Space') return;
+      // A focused button keeps Space unless the pointer is on the canvas —
+      // click a toolbar button, then Space-drag, still pans.
+      if (!overCanvasRef.current && target?.closest?.(SPACE_OWNERS)) return;
       spaceRef.current = true;
       event.preventDefault();
     };
     const up = (event: KeyboardEvent) => {
       if (event.code === 'Space') spaceRef.current = false;
     };
+    // ⌘Tab away while holding Space never delivers keyup: forget it.
+    const reset = () => { spaceRef.current = false; };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    window.addEventListener('blur', reset);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', reset);
     };
   }, []);
 
@@ -279,8 +301,9 @@ export const WorkshopFlow: React.FC = () => {
       if (e.key === 'Escape') {
         cancelEdge();
         setShowAddMenu(false);
-        setWheel(null);
         setLinkWheel(null);
+        setSelectedClusterId(null);
+        setSelectedLane(null);
         setPicked([]);
         setMarquee(null);
         marqueeRef.current = null;
@@ -303,25 +326,33 @@ export const WorkshopFlow: React.FC = () => {
     };
   }, [viewport]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (usePipelineStore.getState().pendingEdge) return;
-    if (e.ctrlKey || e.metaKey) {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      const zoom = Math.min(2.5, Math.max(0.2, viewport.zoom * factor));
-      const zf = zoom / viewport.zoom;
-      setViewport({ zoom, x: mx - zf * (mx - viewport.x), y: my - zf * (my - viewport.y) });
-    } else {
-      setViewport({ ...viewport, x: viewport.x - e.deltaX, y: viewport.y - e.deltaY });
-    }
-  }, [viewport, setViewport]);
+  // Pinch / ⌘-wheel zoom, two-finger pan, Safari and touch pinch — native,
+  // non-passive listeners so the browser never zooms the whole page instead.
+  useCanvasGestures(canvasRef, {
+    getViewport: () => usePipelineStore.getState().viewport,
+    setViewport,
+    // While a wire is pending its preview end only follows pointermove, so the
+    // canvas holds still (as before this hook). Backlog U11 tracks allowing it.
+    enabled: () => !usePipelineStore.getState().pendingEdge,
+    overlaySelector: CANVAS_OVERLAYS,
+    onPinchStart: () => {
+      marqueeRef.current = null;
+      setSelecting(false);
+      setMarquee(null);
+      setIsPanning(false);
+    },
+  });
+
+  // Toolbar zoom keeps the centre of the visible canvas fixed.
+  const zoomFromCentre = useCallback((factor: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const current = usePipelineStore.getState().viewport;
+    setViewport(zoomAround(current, current.zoom * factor, (rect?.width ?? 0) / 2, (rect?.height ?? 0) / 2));
+  }, [setViewport]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('[data-node], [data-wheel]')) return;
+    if (target.closest('[data-node], [data-wheel], [data-canvas-overlay]')) return;
     const capture = () => {
       try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
     };
@@ -335,20 +366,53 @@ export const WorkshopFlow: React.FC = () => {
     const scene = toScene(e.clientX, e.clientY);
     marqueeRef.current = {
       x0: scene.x, y0: scene.y, x1: scene.x, y1: scene.y,
-      clientX: e.clientX, clientY: e.clientY, additive: e.shiftKey,
+      clientX: e.clientX, clientY: e.clientY, additive: e.shiftKey || e.metaKey,
+      base: e.shiftKey || e.metaKey ? pickedRef.current : [],
     };
     setSelecting(true);
-    setWheel(null);
     setSelectedClusterId(null);
     setSelectedLane(null);
-    if (!e.shiftKey) setPicked([]);
+    if (!(e.shiftKey || e.metaKey)) setPicked([]);
     select(null);
     capture();
   }, [pendingEdge, select, toScene, linkWheel]);
 
+  /**
+   * Nodes touched by a scene-space rectangle, read from what is actually drawn
+   * (card boxes on screen), so the selection is exactly what the user sees:
+   * a card counts when any part of it is inside. A folded lane or group counts
+   * as one block — touching it takes all of its cards.
+   */
+  const nodesInSceneRect = useCallback((rect: { x: number; y: number; w: number; h: number }): string[] => {
+    const root = canvasRef.current;
+    if (!root) return [];
+    const bounds = root.getBoundingClientRect();
+    const { viewport: vp, nodes: all } = usePipelineStore.getState();
+    const left = bounds.left + vp.x + rect.x * vp.zoom;
+    const top = bounds.top + vp.y + rect.y * vp.zoom;
+    const right = left + rect.w * vp.zoom;
+    const bottom = top + rect.h * vp.zoom;
+    const touches = (box: DOMRect) => left < box.right && right > box.left && top < box.bottom && bottom > box.top;
+    const ids = new Set<string>();
+    root.querySelectorAll<HTMLElement>('[data-folded-group]').forEach((el) => {
+      if (!touches(el.getBoundingClientRect())) return;
+      const stage = el.dataset.laneStage;
+      const clusterId = el.dataset.clusterId;
+      for (const node of all) {
+        if (stage ? node.stage === stage && node.inLane !== false && !node.clusterId : node.clusterId === clusterId) ids.add(node.id);
+      }
+    });
+    root.querySelectorAll<HTMLElement>('[data-node][data-node-id]:not([data-folded-card])').forEach((el) => {
+      if (touches(el.getBoundingClientRect())) ids.add(el.dataset.nodeId!);
+    });
+    return [...ids];
+  }, []);
+
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (isPanning) {
-      setViewport({ ...viewport, x: viewport.x + e.movementX, y: viewport.y + e.movementY });
+      // Read the store, not the render closure: wheel/pinch frames may have
+      // written the viewport since this render.
+      setViewport(panByScroll(usePipelineStore.getState().viewport, -e.movementX, -e.movementY));
     }
     const drag = marqueeRef.current;
     if (drag) {
@@ -357,15 +421,19 @@ export const WorkshopFlow: React.FC = () => {
       drag.y1 = scene.y;
       drag.clientX = e.clientX;
       drag.clientY = e.clientY;
-      setMarquee({
+      const rect = {
         x: Math.min(drag.x0, drag.x1),
         y: Math.min(drag.y0, drag.y1),
         w: Math.abs(drag.x1 - drag.x0),
         h: Math.abs(drag.y1 - drag.y0),
-      });
+      };
+      setMarquee(rect);
+      // Live preview: light up exactly what the release will select.
+      const hits = nodesInSceneRect(rect);
+      setPicked(drag.additive ? Array.from(new Set([...drag.base, ...hits])) : hits);
     }
     if (pendingEdge) setMouse(toScene(e.clientX, e.clientY));
-  }, [isPanning, viewport, setViewport, pendingEdge, toScene]);
+  }, [isPanning, setViewport, pendingEdge, toScene, nodesInSceneRect]);
 
   const handlePointerUp = useCallback(() => {
     setIsPanning(false);
@@ -380,39 +448,14 @@ export const WorkshopFlow: React.FC = () => {
       w: Math.abs(drag.x1 - drag.x0),
       h: Math.abs(drag.y1 - drag.y0),
     };
-    if (rect.w < 6 && rect.h < 6) {
-      if (!drag.additive) setPicked([]);
-      setWheel(null);
+    if (rect.w * usePipelineStore.getState().viewport.zoom < 4 && rect.h * usePipelineStore.getState().viewport.zoom < 4) {
+      // A click on empty canvas: clear the selection (unless adding).
+      setPicked(drag.additive ? drag.base : []);
       return;
     }
-    const store = usePipelineStore.getState();
-    const folded = new Set(store.collapsedStages);
-    const hit = store.nodes.filter((node) => {
-      if (node.inLane !== false && folded.has(node.stage)) {
-        const members = store.nodes
-          .filter((item) => item.stage === node.stage && item.inLane !== false && item.id !== store.draggingId)
-          .sort((a, b) => a.slot - b.slot);
-        const index = members.findIndex((item) => item.id === node.id);
-        if (index < 0) return false;
-        const stack = collapsedStack(members.length);
-        const card = stack[index];
-        const previousLip = index === 0 ? 0 : stack[index - 1].lip;
-        return rectsOverlap(rect, {
-          x: laneX(node.stage) + LANE_PAD_X + card.shiftX,
-          y: COLLAPSED_HEADER + previousLip,
-          w: NODE_W,
-          h: card.lip - previousLip,
-        });
-      }
-      const at = nodePosition(node);
-      return rectsOverlap(rect, { x: at.x, y: at.y, w: NODE_W, h: NODE_H });
-    }).map((node) => node.id);
-    const ids = drag.additive ? Array.from(new Set([...pickedRef.current, ...hit])) : hit;
-    setPicked(ids);
-    const wheelOn = useSettingsStore.getState().settings.appearance.groupWheel !== false;
-    if (ids.length > 0 && wheelOn) setWheel({ clientX: drag.clientX, clientY: drag.clientY, ids });
-    else setWheel(null);
-  }, []);
+    const hits = nodesInSceneRect(rect);
+    setPicked(drag.additive ? Array.from(new Set([...drag.base, ...hits])) : hits);
+  }, [nodesInSceneRect]);
 
   // Explorer / OS drag-and-drop → a free picture. It joins a lane only when
   // released on one, or onto another picture (that opens the moodboard).
@@ -495,8 +538,8 @@ export const WorkshopFlow: React.FC = () => {
     const height = Math.max(1, maxY - minY);
     const pad = 48;
     const zoom = Math.min(
-      1.4,
-      Math.max(0.15, Math.min((rect.width - pad * 2) / width, (rect.height - pad * 2) / height))
+      FIT_ZOOM_MAX,
+      Math.max(CANVAS_ZOOM_MIN, Math.min((rect.width - pad * 2) / width, (rect.height - pad * 2) / height))
     );
     setViewport({
       zoom,
@@ -544,6 +587,212 @@ export const WorkshopFlow: React.FC = () => {
       };
     });
   }, [nodes]);
+
+  // ── Selection: what is selected, where its bar sits, and what it can do ──
+  const pickedOrSelected = useMemo(
+    () => (picked.length > 0 ? picked : selectedId ? [selectedId] : []),
+    [picked, selectedId],
+  );
+  const selectionMode: 'nodes' | 'group' | 'lane' | null = selectedClusterId
+    ? 'group'
+    : selectedLane
+      ? 'lane'
+      : picked.length > 0
+        ? 'nodes'
+        : null;
+  const [barAnchor, setBarAnchor] = useState<{ x: number; y: number } | null>(null);
+
+  /** The drawn elements of whatever is selected (cards, a plate, a lane). */
+  const selectionElements = useCallback((): HTMLElement[] => {
+    const root = canvasRef.current;
+    if (!root) return [];
+    const esc = (value: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(value) : value);
+    if (selectedClusterId) return [...root.querySelectorAll<HTMLElement>(`[data-cluster-id="${esc(selectedClusterId)}"]`)];
+    if (selectedLane) return [...root.querySelectorAll<HTMLElement>(`[data-lane-stage="${esc(selectedLane)}"]`)];
+    return pickedOrSelected.flatMap((id) => [...root.querySelectorAll<HTMLElement>(`[data-node][data-node-id="${esc(id)}"]`)]);
+  }, [selectedClusterId, selectedLane, pickedOrSelected]);
+
+  /** Scene-space bounds of drawn elements. */
+  const sceneBoundsOf = useCallback((elements: HTMLElement[]): SceneRect | null => {
+    const root = canvasRef.current;
+    if (!root || elements.length === 0) return null;
+    const bounds = root.getBoundingClientRect();
+    const vp = usePipelineStore.getState().viewport;
+    return unionRects(elements.map((el) => {
+      const box = el.getBoundingClientRect();
+      return {
+        x: (box.left - bounds.left - vp.x) / vp.zoom,
+        y: (box.top - bounds.top - vp.y) / vp.zoom,
+        w: box.width / vp.zoom,
+        h: box.height / vp.zoom,
+      };
+    }));
+  }, []);
+
+  // Keep the bar just above the selection (or below it near the top edge).
+  useLayoutEffect(() => {
+    if (!selectionMode || selecting) { setBarAnchor(null); return; }
+    const root = canvasRef.current;
+    const elements = selectionElements();
+    if (!root || elements.length === 0) { setBarAnchor(null); return; }
+    const bounds = root.getBoundingClientRect();
+    const boxes = elements.map((el) => el.getBoundingClientRect());
+    const left = Math.min(...boxes.map((b) => b.left)) - bounds.left;
+    const right = Math.max(...boxes.map((b) => b.right)) - bounds.left;
+    const top = Math.min(...boxes.map((b) => b.top)) - bounds.top;
+    const bottom = Math.max(...boxes.map((b) => b.bottom)) - bounds.top;
+    const x = Math.min(bounds.width - 140, Math.max(140, (left + right) / 2));
+    const above = top - 10;
+    const y = above > 56 ? above : Math.min(bounds.height - 12, bottom + 56);
+    setBarAnchor((prev) => (prev && Math.abs(prev.x - x) < 0.5 && Math.abs(prev.y - y) < 0.5 ? prev : { x, y }));
+  }, [selectionMode, selecting, selectionElements, viewport, nodes]);
+
+  // Glide to a view; any pan/zoom by the user during the glide wins.
+  const glideRef = useRef(0);
+  const glideTo = useCallback((target: PipelineViewport) => {
+    cancelAnimationFrame(glideRef.current);
+    const reduce = settings.appearance?.reduceMotion
+      || (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+    if (reduce) { setViewport(target); return; }
+    const from = usePipelineStore.getState().viewport;
+    const started = performance.now();
+    const duration = 260;
+    let written = from;
+    const step = (now: number) => {
+      if (usePipelineStore.getState().viewport !== written) return;
+      const t = Math.min(1, (now - started) / duration);
+      const eased = 1 - (1 - t) ** 3;
+      setViewport(interpolateViewport(from, target, eased));
+      written = usePipelineStore.getState().viewport;
+      if (t < 1) glideRef.current = requestAnimationFrame(step);
+    };
+    glideRef.current = requestAnimationFrame(step);
+  }, [setViewport, settings.appearance?.reduceMotion]);
+  useEffect(() => () => cancelAnimationFrame(glideRef.current), []);
+
+  /** 'center' keeps the zoom (toolbar button); 'fit' zooms onto it (double-click). */
+  const focusElements = useCallback((elements: HTMLElement[], mode: 'center' | 'fit') => {
+    const rect = sceneBoundsOf(elements);
+    const root = canvasRef.current;
+    if (!rect || !root) return;
+    const view = { w: root.clientWidth, h: root.clientHeight };
+    const current = usePipelineStore.getState().viewport;
+    glideTo(mode === 'fit' ? fitRect(rect, view) : centerOnRect(current, rect, view));
+    setViewFitted(false);
+  }, [sceneBoundsOf, glideTo]);
+
+  const centerSelection = useCallback(() => focusElements(selectionElements(), 'center'), [focusElements, selectionElements]);
+
+  const deleteSelection = useCallback(() => {
+    if (!deleteTarget) return;
+    if (deleteTarget.ids.length > 1) {
+      const confirmed = window.confirm(`Delete ${deleteTarget.label}? Undo can bring it back.`);
+      if (!confirmed) return;
+    }
+    usePipelineStore.getState().removeNodes(deleteTarget.ids);
+    if (selectedLane) closeStage(selectedLane);
+    setSelectedClusterId(null);
+    setSelectedLane(null);
+    setPicked([]);
+  }, [deleteTarget, selectedLane, closeStage]);
+
+  const clearSelection = useCallback(() => {
+    setPicked([]);
+    setSelectedClusterId(null);
+    setSelectedLane(null);
+    select(null);
+  }, [select]);
+
+  const groupSelection = useCallback(() => {
+    if (pickedOrSelected.length === 0) return;
+    const clusterId = usePipelineStore.getState().groupNodes(pickedOrSelected);
+    if (!clusterId) return;
+    setPicked([]);
+    setSelectedLane(null);
+    setSelectedClusterId(clusterId);
+    // The plate may land in free space off-screen: bring it into view.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const root = canvasRef.current;
+      const plate = root?.querySelector<HTMLElement>(`[data-cluster-id="${clusterId}"]`);
+      if (!root || !plate) return;
+      const view = root.getBoundingClientRect();
+      const box = plate.getBoundingClientRect();
+      const visible = box.left >= view.left && box.right <= view.right && box.top >= view.top && box.bottom <= view.bottom;
+      if (!visible) focusElements([plate], box.width > view.width || box.height > view.height ? 'fit' : 'center');
+    }));
+  }, [pickedOrSelected, focusElements]);
+
+  const ungroupSelection = useCallback(() => {
+    const clusterId = selectedClusterId ?? sharedPlate(usePipelineStore.getState().nodes, pickedOrSelected);
+    if (!clusterId) return;
+    const members = usePipelineStore.getState().nodes.filter((node) => node.clusterId === clusterId).map((node) => node.id);
+    usePipelineStore.getState().ungroupCluster(clusterId);
+    setSelectedClusterId(null);
+    setPicked(members);
+  }, [selectedClusterId, pickedOrSelected]);
+
+  // ⌘G groups the selection, ⇧⌘G dissolves the selected group.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== 'g') return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      // The layers list has its own ⌘G / ⇧⌘G for layers.
+      if (target?.closest?.('[data-layer-tree]')) return;
+      if (event.shiftKey) {
+        if (!selectedClusterId && !sharedPlate(usePipelineStore.getState().nodes, pickedOrSelected)) return;
+        event.preventDefault();
+        ungroupSelection();
+      } else {
+        if (pickedOrSelected.length === 0 || selectedClusterId) return;
+        event.preventDefault();
+        groupSelection();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [groupSelection, ungroupSelection, pickedOrSelected, selectedClusterId]);
+
+  // Double-click (speed from Settings) on a node or a group header zooms onto it.
+  const clickRef = useRef<{ down: { x: number; y: number } | null; last: ClickStamp | null }>({ down: null, last: null });
+  const doubleClickTarget = (target: EventTarget | null): { key: string; el: HTMLElement } | null => {
+    if (!(target instanceof Element)) return null;
+    if (target.closest('button, input, textarea, select, a, [role="button"], [data-port], [data-canvas-overlay], [data-wheel], [data-layer-tree]')) return null;
+    const card = target.closest<HTMLElement>('[data-node][data-node-id]');
+    if (card && !card.hasAttribute('data-folded-card')) return { key: `node:${card.dataset.nodeId}`, el: card };
+    const header = target.closest<HTMLElement>('[data-group-header]');
+    const group = header?.closest<HTMLElement>('[data-cluster-id], [data-lane-stage]');
+    if (group) return { key: group.dataset.clusterId ? `group:${group.dataset.clusterId}` : `lane:${group.dataset.laneStage}`, el: group };
+    return null;
+  };
+  const onCanvasPointerDownCapture = (event: React.PointerEvent) => {
+    clickRef.current.down = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+  };
+  const onCanvasPointerUpCapture = (event: React.PointerEvent) => {
+    const down = clickRef.current.down;
+    clickRef.current.down = null;
+    if (!down || event.button !== 0) return;
+    if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > DOUBLE_CLICK_SLOP_PX) { clickRef.current.last = null; return; }
+    const hit = doubleClickTarget(event.target);
+    if (!hit) { clickRef.current.last = null; return; }
+    const stamp: ClickStamp = { key: hit.key, at: performance.now(), x: event.clientX, y: event.clientY };
+    const windowMs = clampDoubleClickMs(settings.appearance?.doubleClickMs);
+    if (isDoubleClick(clickRef.current.last, stamp, windowMs)) {
+      clickRef.current.last = null;
+      // Let the click's own selection land first, then zoom on what is drawn.
+      requestAnimationFrame(() => {
+        const root = canvasRef.current;
+        const esc = (value: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(value) : value);
+        const [kind, ...rest] = hit.key.split(':');
+        const id = rest.join(':');
+        const selector = kind === 'node' ? `[data-node][data-node-id="${esc(id)}"]` : kind === 'group' ? `[data-cluster-id="${esc(id)}"]` : `[data-lane-stage="${esc(id)}"]`;
+        const fresh = root ? [...root.querySelectorAll<HTMLElement>(selector)].filter((el) => !el.hasAttribute('data-folded-card')) : [];
+        focusElements(fresh.length > 0 ? fresh : [hit.el], 'fit');
+      });
+    } else {
+      clickRef.current.last = stamp;
+    }
+  };
 
   useEffect(() => {
     if (clusterSpacingSettled.current) return;
@@ -806,16 +1055,17 @@ export const WorkshopFlow: React.FC = () => {
           <Undo2 size={14} />
         </button>
 
-        <button className={styles.tbtn} onClick={() => setViewport({ ...viewport, zoom: Math.min(2.5, viewport.zoom * 1.2) })}>
+        <button className={styles.tbtn} onClick={() => zoomFromCentre(BUTTON_ZOOM_STEP)} title="Zoom in (pinch out, or ⌘/Ctrl + scroll)" aria-label="Zoom in">
           <ZoomIn size={14} />
         </button>
         <span className={styles.zoomLabel}>{Math.round(viewport.zoom * 100)}%</span>
-        <button className={styles.tbtn} onClick={() => setViewport({ ...viewport, zoom: Math.max(0.2, viewport.zoom / 1.2) })}>
+        <button className={styles.tbtn} onClick={() => zoomFromCentre(1 / BUTTON_ZOOM_STEP)} title="Zoom out (pinch in, or ⌘/Ctrl + scroll)" aria-label="Zoom out">
           <ZoomOut size={14} />
         </button>
         <button
           className={styles.tbtn}
           title={viewFitted ? 'Precise view' : 'Fit whole pipeline in view'}
+          aria-label={viewFitted ? 'Precise view' : 'Fit whole pipeline in view'}
           onClick={() => {
             if (viewFitted) {
               setViewport({ x: 60, y: 40, zoom: 0.85 });
@@ -840,20 +1090,18 @@ export const WorkshopFlow: React.FC = () => {
           disabled={!deleteTarget}
           title={deleteTarget ? `Delete ${deleteTarget.label}` : 'Select a node or a group'}
           aria-label={deleteTarget ? `Delete ${deleteTarget.label}` : 'Delete selection'}
-          onClick={() => {
-            if (!deleteTarget) return;
-            if (deleteTarget.ids.length > 1) {
-              const confirmed = window.confirm(`Delete ${deleteTarget.label}? Undo can bring it back.`);
-              if (!confirmed) return;
-            }
-            usePipelineStore.getState().removeNodes(deleteTarget.ids);
-            if (selectedLane) closeStage(selectedLane);
-            setSelectedClusterId(null);
-            setSelectedLane(null);
-            setPicked([]);
-          }}
+          onClick={deleteSelection}
         >
           <Trash2 size={14} />
+        </button>
+        <button
+          className={styles.tbtn}
+          disabled={!selectionMode && !selectedId}
+          onClick={centerSelection}
+          title="Center the view on the selection (keeps the zoom). Double-click a node or group header to zoom onto it."
+          aria-label="Center on selection"
+        >
+          <LocateFixed size={14} />
         </button>
       </div>
 
@@ -861,10 +1109,46 @@ export const WorkshopFlow: React.FC = () => {
       <div
         ref={canvasRef}
         className={`${styles.canvas} ${isPanning ? styles.panning : ''} ${selecting ? styles.selecting : ''} ${pendingEdge ? styles.connecting : ''}`}
-        onWheel={handleWheel}
+        tabIndex={0}
+        role="region"
+        aria-roledescription="canvas"
+        aria-label="Workshop canvas. Arrow keys pan, plus and minus zoom, 0 fits the pipeline."
+        onPointerEnter={() => { overCanvasRef.current = true; }}
+        onPointerLeave={() => { overCanvasRef.current = false; }}
+        onKeyDown={(event) => {
+          // Keyboard parity for pan/zoom (WCAG 2.1.1). Only when the canvas
+          // itself has focus, and never with ⌘/Ctrl/Alt — browser zoom stays free.
+          if (event.target !== event.currentTarget || event.metaKey || event.ctrlKey || event.altKey) return;
+          const step = KEY_PAN_STEP * (event.shiftKey ? 4 : 1);
+          const panKeys: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+          const pan = panKeys[event.key];
+          if (pan) {
+            const current = usePipelineStore.getState().viewport;
+            setViewport({ ...current, x: current.x - pan[0], y: current.y - pan[1] });
+          } else if (event.key === '+' || event.key === '=') {
+            zoomFromCentre(BUTTON_ZOOM_STEP);
+          } else if (event.key === '-' || event.key === '_') {
+            zoomFromCentre(1 / BUTTON_ZOOM_STEP);
+          } else if (event.key === '0') {
+            fitView();
+            setViewFitted(true);
+          } else {
+            return;
+          }
+          event.preventDefault();
+        }}
+        onPointerDownCapture={onCanvasPointerDownCapture}
+        onPointerUpCapture={onCanvasPointerUpCapture}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          // Palm rejection / system gesture: drop the drag without selecting.
+          setIsPanning(false);
+          marqueeRef.current = null;
+          setSelecting(false);
+          setMarquee(null);
+        }}
         onContextMenu={(event) => {
           if (!pendingEdge && !linkWheel) return;
           event.preventDefault();
@@ -907,6 +1191,8 @@ export const WorkshopFlow: React.FC = () => {
                   height: laneHeights[group.stage],
                   ['--stage-color' as string]: stageColor,
                 }}
+                data-lane-stage={group.stage}
+                data-folded-group={group.collapsed ? '' : undefined}
                 onPointerDown={(event) => { if (group.collapsed) event.stopPropagation(); }}
                 onClick={() => {
                   if (!group.collapsed) return;
@@ -933,14 +1219,16 @@ export const WorkshopFlow: React.FC = () => {
                 })}
                 <div
                   className={styles.laneHeader}
+                  data-group-header
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(event) => {
+                    // A click selects the stage; the chevron folds it; a
+                    // double-click zooms onto it.
                     event.stopPropagation();
                     setSelectedLane(group.stage);
                     setSelectedClusterId(null);
                     setPicked([]);
                     select(null);
-                    toggleGroupCollapsed(group.stage);
                   }}
                 >
                   <span className={styles.laneIcon}>{nodeIcon(stage.icon, 16)}</span>
@@ -964,7 +1252,17 @@ export const WorkshopFlow: React.FC = () => {
                       ×
                     </button>
                   )}
-                  <ChevronRight size={14} className={styles.laneChevron} style={{ transform: group.collapsed ? undefined : 'rotate(90deg)' }} />
+                  <button
+                    type="button"
+                    className={styles.groupFoldBtn}
+                    aria-label={group.collapsed ? `Unfold ${stage.title}` : `Fold ${stage.title}`}
+                    aria-expanded={!group.collapsed}
+                    title={group.collapsed ? 'Unfold' : 'Fold'}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => { event.stopPropagation(); toggleGroupCollapsed(group.stage); }}
+                  >
+                    <ChevronRight size={14} className={styles.laneChevron} style={{ transform: group.collapsed ? undefined : 'rotate(90deg)' }} />
+                  </button>
                 </div>
               </div>
             );
@@ -989,6 +1287,8 @@ export const WorkshopFlow: React.FC = () => {
                   height: cluster.collapsed ? closed.h : cluster.h,
                   ['--stage-color' as string]: stageColor,
                 }}
+                data-cluster-id={cluster.id}
+                data-folded-group={cluster.collapsed ? '' : undefined}
                 onPointerDown={(event) => { if (cluster.collapsed) event.stopPropagation(); }}
                 onClick={(event) => {
                   if (!cluster.collapsed) return;
@@ -1016,18 +1316,31 @@ export const WorkshopFlow: React.FC = () => {
                 <div
                   className={styles.clusterHeader}
                   style={{ height: cluster.collapsed ? COLLAPSED_HEADER : CLUSTER_HEADER, zIndex: cluster.collapsed ? 30 : undefined }}
+                  data-group-header
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
+                    // A click selects the group; the chevron folds it; a
+                    // double-click zooms onto it.
+                    event.stopPropagation();
                     setSelectedClusterId(cluster.id);
                     setSelectedLane(null);
                     setPicked([]);
                     select(null);
-                    toggle(event);
                   }}
                 >
                   <span className={styles.clusterIcon}>{nodeIcon(cluster.icon, 13)}</span>
                   <div className={styles.clusterTitle}>{cluster.title}</div>
-                  <ChevronRight size={14} className={styles.clusterChevron} style={{ transform: cluster.collapsed ? undefined : 'rotate(90deg)' }} />
+                  <button
+                    type="button"
+                    className={styles.groupFoldBtn}
+                    aria-label={cluster.collapsed ? `Unfold ${cluster.title}` : `Fold ${cluster.title}`}
+                    aria-expanded={!cluster.collapsed}
+                    title={cluster.collapsed ? 'Unfold' : 'Fold'}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={toggle}
+                  >
+                    <ChevronRight size={14} className={styles.clusterChevron} style={{ transform: cluster.collapsed ? undefined : 'rotate(90deg)' }} />
+                  </button>
                 </div>
                 {!cluster.collapsed && (Object.keys(clusterHandleClass) as ClusterEdgeName[]).map((edge) => (
                   <div
@@ -1167,12 +1480,11 @@ export const WorkshopFlow: React.FC = () => {
             })}
         </div>
 
-        {(linkWheel || wheel) && (() => {
+        {linkWheel && (() => {
           const rect = canvasRef.current?.getBoundingClientRect();
-          const size = 280;
+          const size = settings.appearance?.groupWheelSize ?? 280;
           const room = 28;
-          const point = linkWheel ?? wheel;
-          if (!point) return null;
+          const point = linkWheel;
           const left = rect
             ? placeWheel(point.clientX, rect.left, rect.width, size / 2 + room, size / 2 + room)
             : point.clientX;
@@ -1192,77 +1504,60 @@ export const WorkshopFlow: React.FC = () => {
             settings.appearance?.stageLaneColors?.[stageId] || STAGES[stageId].color
           );
           const frame = { left, top, width: size, height: size };
-          if (linkWheel) {
-            return (
-              <ChoiceWheel
-                slices={linkWheelSlices(linkWheel.choices, colorOf)}
-                style={frame}
-                space={space}
-                onCancel={() => setLinkWheel(null)}
-                onPick={(stageId, type) => {
-                  const choice = linkWheel.choices.find((item) => item.type === type && item.stage === stageId);
-                  if (!choice) return;
-                  usePipelineStore.getState().spawnLinkedNode({
-                    type: choice.type,
-                    newPortId: choice.portId,
-                    sourceId: linkWheel.nodeId,
-                    sourcePortId: linkWheel.portId,
-                    sourceSide: linkWheel.side,
-                  });
-                  setLinkWheel(null);
-                }}
-              />
-            );
-          }
           return (
             <ChoiceWheel
-              slices={STAGE_ORDER.map((stageId) => {
-                const stage = STAGES[stageId];
-                const color = colorOf(stageId);
-                return {
-                  id: stageId,
-                  label: stage.title,
-                  icon: stage.icon,
-                  color,
-                  options: [
-                    { id: '__place', label: 'Place selection', hint: stage.tagline, icon: stage.icon, color },
-                    ...nodesForStage(stageId).map((def) => ({
-                      id: def.type,
-                      label: def.title,
-                      hint: def.subtitle,
-                      icon: def.icon,
-                      color,
-                    })),
-                  ],
-                };
-              })}
+              slices={linkWheelSlices(linkWheel.choices, colorOf)}
               style={frame}
               space={space}
-              onCancel={() => { setWheel(null); setPicked([]); }}
-              onPick={(stageId, optionId) => {
-                const stage = stageId as PipelineStageId;
-                if (optionId === '__place') {
-                  const store = usePipelineStore.getState();
-                  const ordered = [...wheel!.ids].sort((a, b) => {
-                    const leftNode = store.nodes.find((node) => node.id === a);
-                    const rightNode = store.nodes.find((node) => node.id === b);
-                    if (!leftNode || !rightNode) return 0;
-                    const pa = nodePosition(leftNode);
-                    const pb = nodePosition(rightNode);
-                    return pa.y - pb.y || pa.x - pb.x;
-                  });
-                  openStage(stage);
-                  ordered.forEach((id) => usePipelineStore.getState().joinLane(id, stage));
-                } else {
-                  openStage(stage);
-                  addNode(optionId);
-                }
-                setWheel(null);
-                setPicked([]);
+              onCancel={() => setLinkWheel(null)}
+              onPick={(stageId, type) => {
+                const choice = linkWheel.choices.find((item) => item.type === type && item.stage === stageId);
+                if (!choice) return;
+                usePipelineStore.getState().spawnLinkedNode({
+                  type: choice.type,
+                  newPortId: choice.portId,
+                  sourceId: linkWheel.nodeId,
+                  sourcePortId: linkWheel.portId,
+                  sourceSide: linkWheel.side,
+                });
+                setLinkWheel(null);
               }}
             />
           );
         })()}
+
+        {barAnchor && !selecting && selectionMode && (
+          <SelectionBar
+            anchor={barAnchor}
+            mode={selectionMode}
+            count={selectionMode === 'nodes' ? pickedOrSelected.length : 0}
+            groupTitle={selectionMode === 'group'
+              ? clusters.find((cluster) => cluster.id === selectedClusterId)?.title
+              : selectionMode === 'lane' && selectedLane ? STAGES[selectedLane].title : undefined}
+            inSharedGroup={selectionMode === 'nodes' && !!sharedPlate(nodes, pickedOrSelected)}
+            onGroup={selectionMode === 'nodes' ? groupSelection : undefined}
+            onUngroup={selectionMode === 'group' ? ungroupSelection : undefined}
+            onRemoveFromGroup={() => { usePipelineStore.getState().removeFromGroup(pickedOrSelected); }}
+            onRename={(title) => { if (selectedClusterId) usePipelineStore.getState().renameCluster(selectedClusterId, title); }}
+            onMoveToStage={(stage) => {
+              const store = usePipelineStore.getState();
+              const ordered = [...pickedOrSelected].sort((a, b) => {
+                const leftNode = store.nodes.find((node) => node.id === a);
+                const rightNode = store.nodes.find((node) => node.id === b);
+                if (!leftNode || !rightNode) return 0;
+                const pa = nodePosition(leftNode);
+                const pb = nodePosition(rightNode);
+                return pa.y - pb.y || pa.x - pb.x;
+              });
+              store.removeFromGroup(ordered);
+              openStage(stage);
+              ordered.forEach((id) => usePipelineStore.getState().joinLane(id, stage));
+              setPicked([]);
+            }}
+            onDelete={deleteTarget ? deleteSelection : undefined}
+            onClear={clearSelection}
+          />
+        )}
 
         {/* Empty state */}
         {nodes.length === 0 && (
